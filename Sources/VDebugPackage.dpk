@@ -24,6 +24,7 @@ package VDebugPackage;
 {$IMAGEBASE $400000}
 {$DESCRIPTION 'V Debug Package'}
 {$IMPLICITBUILD ON}
+{$DEFINE DELPHI2010}
 
 requires
   rtl,

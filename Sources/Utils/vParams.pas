@@ -372,7 +372,7 @@ begin
 
     dtBoolean:  Result := BooleanToStr(AsBoolean);
     dtInteger:  Result := IntToStr(AsInteger);
-    dtFloat:    Result := StringReplace(FloatToStr(AsFloat), DecimalSeparator, '.', []);
+    dtFloat:    Result := StringReplace(FloatToStr(AsFloat), {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, '.', []);
     dtDateTime: Result := DateTimeToStr(AsDateTime);
     dtString:   Result := String(FData);
     dtGUID:     Result := GUIDToString(AsGUID);

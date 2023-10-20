@@ -233,7 +233,7 @@ end;
 
 function ReduceStrToFloat(const S: String): String;
 begin
-  Result := StringReplace(StringReplace(S, '.', {FormatSettings.}DecimalSeparator, []), ',', {FormatSettings.}DecimalSeparator, []);
+  Result := StringReplace(StringReplace(S, '.', {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, []), ',', {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, []);
 end;
 
 function BooleanToStr(Value: Boolean): String;
