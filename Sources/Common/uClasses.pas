@@ -65,7 +65,7 @@ type
 
   protected
 
-    procedure EvaluteComplete(const _ExprStr, _ResultStr: String; _CanModify: Boolean; _ResultAddress, _ResultSize: LongWord; _ReturnCode: Integer); override;
+    procedure {$IFDEF DELPHI2010}EvaluteComplete{$ELSE}EvaluateComplete{$ENDIF}(const _ExprStr, _ResultStr: String; _CanModify: Boolean; _ResultAddress, _ResultSize: LongWord; _ReturnCode: Integer); override;
     procedure ModifyComplete(const _ExprStr: String; const _ResultStr: String; _ReturnCode: Integer); override;
 
   end;
@@ -181,7 +181,7 @@ begin
   FCompleted := False;
 end;
 
-procedure TThreadNotifier.EvaluteComplete(const _ExprStr, _ResultStr: String; _CanModify: Boolean; _ResultAddress, _ResultSize: LongWord; _ReturnCode: Integer);
+procedure TThreadNotifier.{$IFDEF DELPHI2010}EvaluteComplete{$ELSE}EvaluateComplete{$ENDIF}(const _ExprStr, _ResultStr: String; _CanModify: Boolean; _ResultAddress, _ResultSize: LongWord; _ReturnCode: Integer);
 begin
   FDeferredEvaluateResult := TEvaluateResult.Create(_ExprStr, _ResultStr, _CanModify, _ResultAddress, _ResultSize, _ReturnCode);
   FCompleted := True;
