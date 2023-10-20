@@ -1,0 +1,51 @@
+package VDebugPackage;
+
+{$R *.res}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS OFF}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO OFF}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DESCRIPTION 'V Debug Package'}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  designide;
+
+contains
+  vTypes in 'Utils\vTypes.pas',
+  vStrUtils in 'Utils\vStrUtils.pas',
+  vDataUtils in 'Utils\vDataUtils.pas',
+  vFileUtils in 'Utils\vFileUtils.pas',
+  vPathRunner in 'Utils\vPathRunner.pas',
+  vParams in 'Utils\vParams.pas',
+  vLog in 'Utils\vLog.pas',
+  uConsts in 'Common\uConsts.pas',
+  uCommon in 'Common\uCommon.pas',
+  uClasses in 'Common\uClasses.pas',
+  uRegister in 'Common\uRegister.pas',
+  uCustom in 'Custom\uCustom.pas',
+  uCustomViewerFrame in 'Custom\uCustomViewerFrame.pas' {CustomViewerFrame: TFrame},
+  uViewerFormHelper in 'Custom\uViewerFormHelper.pas',
+  uCustomVizualizers in 'Custom\uCustomVizualizers.pas',
+  uStringValueReplacer in 'Work\uStringValueReplacer.pas',
+  uGUIDValueReplacer in 'Work\uGUIDValueReplacer.pas';
+
+end.
