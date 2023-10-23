@@ -26,7 +26,7 @@ implementation
 
 uses
   { Utils }
-  vStrUtils,
+  vDataUtils,
   { VDebugPackage }
   uConsts, uCommon;
 

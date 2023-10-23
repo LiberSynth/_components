@@ -31,13 +31,13 @@ requires
   designide;
 
 contains
-  vTypes in 'Utils\vTypes.pas',
-  vStrUtils in 'Utils\vStrUtils.pas',
-  vDataUtils in 'Utils\vDataUtils.pas',
-  vFileUtils in 'Utils\vFileUtils.pas',
-  vPathRunner in 'Utils\vPathRunner.pas',
-  vParams in 'Utils\vParams.pas',
-  vLog in 'Utils\vLog.pas',
+  vTypes in '..\..\common\Utils\vTypes.pas',
+  vDataUtils in '..\..\common\Utils\vDataUtils.pas',
+  vStrUtils in '..\..\common\Utils\vStrUtils.pas',
+  vFileUtils in '..\..\common\Utils\vFileUtils.pas',
+  vParams in '..\..\common\Utils\vParams.pas',
+  vPathRunner in '..\..\common\Utils\vPathRunner.pas',
+  vLog in '..\..\common\Utils\vLog.pas',
   uConsts in 'Common\uConsts.pas',
   uCommon in 'Common\uCommon.pas',
   uClasses in 'Common\uClasses.pas',
