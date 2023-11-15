@@ -47,19 +47,16 @@ type
 
   end;
 
+{ TGUIDEvaluator }
+
 function TGUIDEvaluator.ExpressionToRemoteModify(_Address: Cardinal; const _TypeName: String): String;
 begin
   Result := inherited ExpressionToRemoteModify(_Address, _TypeName) + FGUIDPart;
 end;
 
-{ TGUIDEvaluator }
-
-function TGUIDEvaluator.MemoryEvaluateValue(_ValueAddress: Cardinal; const _EvalResult: String): String;
-var
-  G: TGUID;
+function TGUIDEvaluator.SuccessEmptyEvaluateResult: String;
 begin
-  CurrentProcess.ReadProcessMemory(_ValueAddress, SizeOf(TGUID), G);
-  Result := GUIDToStr(G);
+  Result := '0';
 end;
 
 procedure TGUIDEvaluator.ModifyRemoteMemory(_Address: Cardinal; const _ModifyExpression, _TypeName: String);
@@ -88,9 +85,12 @@ begin
 
 end;
 
-function TGUIDEvaluator.SuccessEmptyEvaluateResult: String;
+function TGUIDEvaluator.MemoryEvaluateValue(_ValueAddress: Cardinal; const _EvalResult: String): String;
+var
+  G: TGUID;
 begin
-  Result := '0';
+  CurrentProcess.ReadProcessMemory(_ValueAddress, SizeOf(TGUID), G);
+  Result := GUIDToStr(G);
 end;
 
 { TGUIDValueReplacer }

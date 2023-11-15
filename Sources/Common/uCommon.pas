@@ -145,7 +145,7 @@ end;
 
 function PureValueText(const Value: String): String;
 var
-  i, l: Integer;
+  i, L: Integer;
   InStr, DblQuote: Boolean;
   CRLF: Byte;
 begin
@@ -154,9 +154,9 @@ begin
   InStr := False;
   DblQuote := False;
   CRLF := 0;
-  l := Length(Value);
+  L := Length(Value);
 
-  for i := 1 to l do begin
+  for i := 1 to L do begin
 
     if Value[i] = '''' then
 
@@ -167,7 +167,7 @@ begin
 
       end else
 
-        if i < l then begin
+        if i < L then begin
 
           DblQuote := InStr and (Value[i + 1] = '''');
           if not DblQuote then begin
@@ -182,7 +182,7 @@ begin
     if InStr then Result := Result + Value[i]
     else
 
-      if (CRLF = 0) and (Value[i] = '#') and (i < l - 6) and SameText(Copy(Value, i, 6), '#$D#$A') then begin
+      if (CRLF = 0) and (Value[i] = '#') and (i < L - 6) and SameText(Copy(Value, i, 6), '#$D#$A') then begin
 
         Result := Result + #$D#$A;
         CRLF := 5;
@@ -193,10 +193,10 @@ begin
 
   end;
 
-  if (l > 3) and (Value[l] = '.') and (Value[l - 1] = '.') and (Value[l - 2] = '.') and (Value[l - 3] = '''') then begin
+  if (L > 3) and (Value[L] = '.') and (Value[L - 1] = '.') and (Value[L - 2] = '.') and (Value[L - 3] = '''') then begin
 
-    l := Length(Result);
-    if (l > 1) and ((Result[l - 1] <> #$D) or (Result[l] <> #$A)) then Result := Result + #$D#$A;
+    L := Length(Result);
+    if (L > 1) and ((Result[L - 1] <> #$D) or (Result[L] <> #$A)) then Result := Result + #$D#$A;
     Result := Result + '...';
 
   end;
