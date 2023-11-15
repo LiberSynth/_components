@@ -4,6 +4,7 @@ interface
 
 { TODO -oVasilyev : -> vUtils }
 procedure StrToClipboard(const Value: String);
+//procedure BitmapToClipboard..
 
 implementation
 
@@ -23,8 +24,8 @@ begin
       { Вставить обычный текст }
       Clipboard.AsText:= Str
     else begin
-      Size:= Length(Str) shl 1 + 2;
-      Data:= GlobalAlloc(GMEM_MOVEABLE + GMEM_DDESHARE, Size);
+      Size := Length(Str) shl 1 + 2;
+      Data := GlobalAlloc(GMEM_MOVEABLE + GMEM_DDESHARE, Size);
       try
         DataPtr := GlobalLock(Data);
         try

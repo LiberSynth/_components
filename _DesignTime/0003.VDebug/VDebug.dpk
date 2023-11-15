@@ -29,16 +29,10 @@ package VDebug;
 
 requires
   rtl,
-  designide;
+  designide,
+  VUtils;
 
 contains
-  vTypes in '..\..\Utils\vTypes.pas',
-  vDataUtils in '..\..\Utils\vDataUtils.pas',
-  vStrUtils in '..\..\Utils\vStrUtils.pas',
-  vFileUtils in '..\..\Utils\vFileUtils.pas',
-  vParams in '..\..\Utils\vParams.pas',
-  vPathRunner in '..\..\Utils\vPathRunner.pas',
-  vLog in '..\..\Utils\vLog.pas',
   uConsts in 'Sources\Common\uConsts.pas',
   uCommon in 'Sources\Common\uCommon.pas',
   uClasses in 'Sources\Common\uClasses.pas',
