@@ -1,5 +1,7 @@
 unit vDataUtils;
 
+{TODO -oVasilyev -cComponents : -> Core }
+
 interface
 
 uses

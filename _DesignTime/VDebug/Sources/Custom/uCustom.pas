@@ -18,7 +18,7 @@ type
     procedure Destroyed; virtual;
     procedure Modified; virtual;
     procedure ThreadNotify(_Reason: TOTANotifyReason); virtual;
-    procedure {$IFDEF DELPHI2010}EvaluteComplete{$ELSE}EvaluateComplete{$ENDIF}(const _ExprStr, _ResultStr: String; _CanModify: Boolean; _ResultAddress, _ResultSize: LongWord; _ReturnCode: Integer); virtual;
+    procedure {$IF DEFINED(DELPHI2010) OR DEFINED(DELPHIXE)}EvaluteComplete{$ELSE}EvaluateComplete{$IFEND}(const _ExprStr, _ResultStr: String; _CanModify: Boolean; _ResultAddress, _ResultSize: LongWord; _ReturnCode: Integer); virtual;
     procedure ModifyComplete(const _ExprStr, _ResultStr: String; _ReturnCode: Integer); virtual;
 
   end;
@@ -76,7 +76,7 @@ procedure TCustomThreadNotifier.Destroyed;
 begin
 end;
 
-procedure TCustomThreadNotifier.{$IFDEF DELPHI2010}EvaluteComplete{$ELSE}EvaluateComplete{$ENDIF}(const _ExprStr, _ResultStr: String; _CanModify: Boolean; _ResultAddress, _ResultSize: LongWord; _ReturnCode: Integer);
+procedure TCustomThreadNotifier.{$IF DEFINED(DELPHI2010) OR DEFINED(DELPHIXE)}EvaluteComplete{$ELSE}EvaluateComplete{$IFEND}(const _ExprStr, _ResultStr: String; _CanModify: Boolean; _ResultAddress, _ResultSize: LongWord; _ReturnCode: Integer);
 begin
 end;
 

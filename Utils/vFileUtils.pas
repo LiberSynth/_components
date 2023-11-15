@@ -2,6 +2,8 @@ unit vFileUtils;
 
 interface
 
+{TODO -oVasilyev -cComponents : -> Core }
+
 uses
   { VCL }
   Windows, Controls,

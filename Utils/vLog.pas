@@ -2,6 +2,8 @@ unit vLog;
 
 interface
 
+{TODO -oVasilyev -cComponents : -> ProjUtils }
+
 uses
   { VCL }
   SysUtils;

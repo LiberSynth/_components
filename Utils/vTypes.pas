@@ -1,5 +1,7 @@
 unit vTypes;
 
+{TODO -oVasilyev -cComponents : -> Core }
+
 interface
 
 uses
@@ -19,6 +21,9 @@ const
   BOM_UTF8 = #$EF#$BB#$BF;
   BOM_UTF16BE = #$FF#$FF;
   BOM_UTF16LE = #$FF#$FE;
+
+  {TODO -oVasilyev -cComponents : использовать только для часто используемых текстов }
+  {TODO -oVasilyev -cComponents : -> vConsts }
 
   SC_BooleanConvertError = '%s is not a valid Boolean value';
   SC_UnterminatedString = 'Unterminated String';

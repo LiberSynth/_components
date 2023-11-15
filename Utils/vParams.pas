@@ -7,6 +7,8 @@ unit vParams;
 (*                                                    *)
 (******************************************************)
 
+{TODO -oVasilyev -cComponents : Переписать на TDataHolder и переложить }
+
 interface
 
 uses
@@ -320,7 +322,7 @@ begin
   case FDataType of
     dtBoolean:  Result := BooleanToStr(AsBoolean);
     dtInteger:  Result := IntToStr(AsInteger);
-    dtFloat:    Result := StringReplace(FloatToStr(AsFloat), DecimalSeparator, '.', []);
+    dtFloat:    Result := StringReplace(FloatToStr(AsFloat), {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, '.', []);
     dtDateTime: Result := FormatDateTime(AsDateTime, True);
     dtString:   Result := String(FData);
     dtGUID:     Result := GUIDToString(AsGUID);
@@ -908,12 +910,12 @@ begin
   InitPos := Position;
   TP := ReadWord;
   try
-    InitDS := DecimalSeparator;
-    DecimalSeparator := '.';
+    InitDS := {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator;
+    {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator := '.';
     try
       T := StrToDateTime(TP);
     finally
-      DecimalSeparator := InitDS;
+      {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator := InitDS;
     end;
   except
     Restore(InitPos);

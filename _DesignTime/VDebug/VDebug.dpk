@@ -25,6 +25,7 @@ package VDebug;
 {$DESCRIPTION '#V Debug'}
 {$DESIGNONLY}
 {$IMPLICITBUILD ON}
+{$DEFINE DELPHIXE}
 
 requires
   rtl,

@@ -1,5 +1,7 @@
 unit vStrUtils;
 
+{TODO -oVasilyev -cComponents : -> Core }
+
 interface
 
 uses
