@@ -1,0 +1,47 @@
+package VUtils;
+
+{$R *.res}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$IMPLICITBUILD ON}
+{$DEFINE DELPHIXE}
+
+requires
+  rtl,
+  vcl;
+
+contains
+  vClipboard in '..\..\Utils\vClipboard.pas',
+  vConsts in '..\..\Utils\vConsts.pas',
+  vDataUtils in '..\..\Utils\vDataUtils.pas',
+  vFileUtils in '..\..\Utils\vFileUtils.pas',
+  vFormModel in '..\..\Utils\vFormModel.pas',
+  vLog in '..\..\Utils\vLog.pas',
+  vParams in '..\..\Utils\vParams.pas',
+  vPathRunner in '..\..\Utils\vPathRunner.pas',
+  vProjUtils in '..\..\Utils\vProjUtils.pas',
+  vRegistry in '..\..\Utils\vRegistry.pas',
+  vStrUtils in '..\..\Utils\vStrUtils.pas',
+  vTable in '..\..\Utils\vTable.pas',
+  vTypes in '..\..\Utils\vTypes.pas';
+
+end.

@@ -340,7 +340,7 @@ begin
     case FDataType of
       dtBoolean:  Result := BooleanToStr(AsBoolean[_RecNo]);
       dtInteger:  Result := IntToStr(AsInteger[_RecNo]);
-      dtFloat:    Result := StringReplace(FloatToStr(AsFloat[_RecNo]), DecimalSeparator, '.', []);
+      dtFloat:    Result := StringReplace(FloatToStr(AsFloat[_RecNo]), {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, '.', []);
       dtDateTime: Result := DateTimeToStr(AsDateTime[_RecNo]);
       dtGUID:     Result := GUIDToString(AsGUID[_RecNo]);
       dtString:   Result := String(FData[_RecNo]);
