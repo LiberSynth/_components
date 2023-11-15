@@ -1,0 +1,52 @@
+package VDebug;
+
+{$R *.res}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS OFF}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO OFF}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DESCRIPTION '#V Debug'}
+{$DESIGNONLY}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  designide;
+
+contains
+  vTypes in '..\..\Utils\vTypes.pas',
+  vDataUtils in '..\..\Utils\vDataUtils.pas',
+  vStrUtils in '..\..\Utils\vStrUtils.pas',
+  vFileUtils in '..\..\Utils\vFileUtils.pas',
+  vParams in '..\..\Utils\vParams.pas',
+  vPathRunner in '..\..\Utils\vPathRunner.pas',
+  vLog in '..\..\Utils\vLog.pas',
+  uConsts in 'Sources\Common\uConsts.pas',
+  uCommon in 'Sources\Common\uCommon.pas',
+  uClasses in 'Sources\Common\uClasses.pas',
+  uRegister in 'Sources\Common\uRegister.pas',
+  uCustom in 'Sources\Custom\uCustom.pas',
+  uCustomViewerFrame in 'Sources\Custom\uCustomViewerFrame.pas' {CustomViewerFrame: TFrame},
+  uViewerFormHelper in 'Sources\Custom\uViewerFormHelper.pas',
+  uCustomVizualizers in 'Sources\Custom\uCustomVizualizers.pas',
+  uStringValueReplacer in 'Sources\Work\uStringValueReplacer.pas',
+  uGUIDValueReplacer in 'Sources\Work\uGUIDValueReplacer.pas';
+
+end.
