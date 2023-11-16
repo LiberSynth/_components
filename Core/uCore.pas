@@ -4,11 +4,13 @@ interface
 
 uses
   { VCL }
-  SysUtils;
+  SysUtils,
+  { vSoft }
+  uGUID;
 
 type
 
-  TCoreDataType = (dtNone, dtBoolean, dtInteger, dtFloat, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB);
+  TCoreDataType = (dtUnknown, dtBoolean, dtInteger, dtFloat, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB);
 
   ECoreException = class(Exception);
 
@@ -18,9 +20,9 @@ type
 
     FData: Pointer;
     FDataType: TCoreDataType;
+    FPersistentDataType: Boolean;
 
     function GetIsNull: Boolean;
-    procedure SetIsNull(const _Value: Boolean);
     function GetAsBoolean: Boolean;
     procedure SetAsBoolean(const _Value: Boolean);
     function GetAsInteger: Int64;
@@ -38,22 +40,26 @@ type
     function GetAsBLOB: RawByteString;
     procedure SetAsBLOB(const _Value: RawByteString);
 
-    function DataSize: Cardinal;
     procedure AllocData;
     procedure FreeData;
+    function DataSize: Cardinal;
 
   protected
 
-    procedure CheckDataType(_DataType: TCoreDataType); virtual;
+    procedure CheckDataType(_DataType: TCoreDataType);
+
+    property Data: Pointer read FData write FData;
 
   public
 
-    constructor Create(_DataType: TCoreDataType);
+    constructor Create(_DataType: TCoreDataType); overload;
     destructor Destroy; override;
 
-    property DataType: TCoreDataType read FDataType;
+    procedure Assign(_Source: TDataHolder);
+    procedure Clear;
 
-    property IsNull: Boolean read GetIsNull write SetIsNull;
+    property DataType: TCoreDataType read FDataType;
+    property IsNull: Boolean read GetIsNull;
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
     property AsFloat: Double read GetAsFloat write SetAsFloat;
@@ -65,6 +71,21 @@ type
 
   end;
 
+  TNamedDataHolder = class(TDataHolder)
+
+  strict private
+
+    FName: String;
+
+  public
+
+    constructor Create(const _Name: String); overload;
+    constructor Create(_DataType: TCoreDataType; const _Name: String); overload;
+
+    property Name: String read FName write FName;
+
+  end;
+
 function CoreDataTypeToStr(DataType: TCoreDataType): String;
 
 function BooleanToStr(Value: Boolean): String;
@@ -73,8 +94,6 @@ function StrToBoolean(const S: String): Boolean;
 function RawByteStringToHex(const Value: RawByteString): String;
 function HexToRawByteString(const Value: String): RawByteString;
 
-function NullGUID: TGUID;
-
 implementation
 
 function CoreDataTypeToStr(DataType: TCoreDataType): String;
@@ -82,7 +101,7 @@ const
 
   AC_StringValues: array [TCoreDataType] of String = (
 
-      { dtNone       } '',
+      { dtUnknown    } 'Unknown',
       { dtBoolean    } 'Boolean',
       { dtInteger    } 'Integer',
       { dtFloat      } 'Float',
@@ -157,11 +176,6 @@ begin
 
 end;
 
-function NullGUID: TGUID;
-begin
-  FillChar(Result, SizeOf(TGUID), #0);
-end;
-
 { TDataHolder }
 
 procedure TDataHolder.AllocData;
@@ -169,16 +183,55 @@ begin
   FData := AllocMem(DataSize);
 end;
 
+procedure TDataHolder.Assign(_Source: TDataHolder);
+begin
+
+  case _Source.DataType of
+
+    dtBoolean:    AsBoolean    := _Source.AsBoolean;
+    dtInteger:    AsInteger    := _Source.AsInteger;
+    dtFloat:      AsFloat      := _Source.AsFloat;
+    dtDateTime:   AsDateTime   := _Source.AsDateTime;
+    dtGUID:       AsGUID       := _Source.AsGUID;
+    dtAnsiString: AsAnsiString := _Source.AsAnsiString;
+    dtString:     AsString     := _Source.AsString;
+    dtBLOB:       AsBLOB       := _Source.AsBLOB;
+
+  end;
+
+end;
+
 procedure TDataHolder.CheckDataType(_DataType: TCoreDataType);
 begin
+
   if FDataType <> _DataType then
-    raise ECoreException.CreateFmt('Holder data type is not %s', [CoreDataTypeToStr(_DataType)]);
+
+    if FPersistentDataType then
+
+      raise ECoreException.CreateFmt('Holder data type is not %s', [CoreDataTypeToStr(_DataType)])
+
+    else begin
+
+      FreeData;
+      FDataType := _DataType;
+
+    end;
+
 end;
 
 constructor TDataHolder.Create(_DataType: TCoreDataType);
 begin
+
   inherited Create;
-  FDataType := _DataType;
+
+  FDataType           := _DataType;
+  FPersistentDataType := True;
+
+end;
+
+procedure TDataHolder.Clear;
+begin
+  FreeData;
 end;
 
 function TDataHolder.DataSize: Cardinal;
@@ -369,9 +422,18 @@ begin
   String(FData) := _Value;
 end;
 
-procedure TDataHolder.SetIsNull(const _Value: Boolean);
+{ TNamedDataHolder }
+
+constructor TNamedDataHolder.Create(const _Name: String);
 begin
-  FreeData;
+  FName := _Name;
+  inherited Create;
+end;
+
+constructor TNamedDataHolder.Create(_DataType: TCoreDataType; const _Name: String);
+begin
+  FName := _Name;
+  inherited Create(_DataType);
 end;
 
 end.

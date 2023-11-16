@@ -30,6 +30,8 @@ requires
   rtl;
 
 contains
-  uCore in '..\..\Core\uCore.pas';
+  uCore in '..\..\Core\uCore.pas',
+  uGUID in '..\..\Core\uGUID.pas',
+  uParams in '..\..\Core\uParams.pas';
 
 end.
