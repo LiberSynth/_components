@@ -1,5 +1,11 @@
 unit uCore;
 
+(*********************************************************)
+(*                                                       *)
+(*                        Hello!)                        *)
+(*                                                       *)
+(*********************************************************)
+
 interface
 
 uses
@@ -10,7 +16,7 @@ uses
 
 type
 
-  TCoreDataType = (dtUnknown, dtBoolean, dtInteger, dtFloat, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB);
+  TDataType = (dtUnknown, dtBoolean, dtInteger, dtFloat, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, dtParams);
 
   ECoreException = class(Exception);
 
@@ -19,7 +25,7 @@ type
   strict private
 
     FData: Pointer;
-    FDataType: TCoreDataType;
+    FDataType: TDataType;
     FPersistentDataType: Boolean;
 
     function GetIsNull: Boolean;
@@ -46,19 +52,19 @@ type
 
   protected
 
-    procedure CheckDataType(_DataType: TCoreDataType);
-
-    property Data: Pointer read FData write FData;
+    procedure CheckDataType(_DataType: TDataType);
+    function GetAbstractObject: TObject;
+    procedure SetAbstractObject(_Value: TObject);
 
   public
 
-    constructor Create(_DataType: TCoreDataType); overload;
+    constructor Create(_DataType: TDataType); overload;
     destructor Destroy; override;
 
     procedure Assign(_Source: TDataHolder);
     procedure Clear;
 
-    property DataType: TCoreDataType read FDataType;
+    property DataType: TDataType read FDataType;
     property IsNull: Boolean read GetIsNull;
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger: Int64 read GetAsInteger write SetAsInteger;
@@ -80,13 +86,13 @@ type
   public
 
     constructor Create(const _Name: String); overload;
-    constructor Create(_DataType: TCoreDataType; const _Name: String); overload;
+    constructor Create(_DataType: TDataType; const _Name: String); overload;
 
     property Name: String read FName write FName;
 
   end;
 
-function CoreDataTypeToStr(DataType: TCoreDataType): String;
+function CoreDataTypeToStr(DataType: TDataType): String;
 
 function BooleanToStr(Value: Boolean): String;
 function StrToBoolean(const S: String): Boolean;
@@ -96,10 +102,10 @@ function HexToRawByteString(const Value: String): RawByteString;
 
 implementation
 
-function CoreDataTypeToStr(DataType: TCoreDataType): String;
+function CoreDataTypeToStr(DataType: TDataType): String;
 const
 
-  AC_StringValues: array [TCoreDataType] of String = (
+  AC_StringValues: array [TDataType] of String = (
 
       { dtUnknown    } 'Unknown',
       { dtBoolean    } 'Boolean',
@@ -109,7 +115,8 @@ const
       { dtGUID       } 'GUID',
       { dtAnsiString } 'AnsiString',
       { dtString     } 'String',
-      { dtBLOB       } 'BLOB'
+      { dtBLOB       } 'BLOB',
+      { dtParams     } 'Params'
 
   );
 
@@ -201,10 +208,10 @@ begin
 
 end;
 
-procedure TDataHolder.CheckDataType(_DataType: TCoreDataType);
+procedure TDataHolder.CheckDataType(_DataType: TDataType);
 begin
 
-  if FDataType <> _DataType then
+  if _DataType <> FDataType then
 
     if FPersistentDataType then
 
@@ -219,7 +226,7 @@ begin
 
 end;
 
-constructor TDataHolder.Create(_DataType: TCoreDataType);
+constructor TDataHolder.Create(_DataType: TDataType);
 begin
 
   inherited Create;
@@ -247,6 +254,7 @@ begin
     dtString:     Result := 0;
     dtGUID:       Result := SizeOf(TGUID);
     dtBLOB:       Result := 0;
+    dtParams:     Result := SizeOf(TObject);
 
   else
     Result := 0;
@@ -366,6 +374,16 @@ begin
   Result := FData = nil;
 end;
 
+function TDataHolder.GetAbstractObject: TObject;
+begin
+  Result := TObject(FData);
+end;
+
+procedure TDataHolder.SetAbstractObject(_Value: TObject);
+begin
+  TObject(FData) :=_Value;
+end;
+
 procedure TDataHolder.SetAsAnsiString(const _Value: AnsiString);
 begin
   CheckDataType(dtAnsiString);
@@ -430,7 +448,7 @@ begin
   inherited Create;
 end;
 
-constructor TNamedDataHolder.Create(_DataType: TCoreDataType; const _Name: String);
+constructor TNamedDataHolder.Create(_DataType: TDataType; const _Name: String);
 begin
   FName := _Name;
   inherited Create(_DataType);

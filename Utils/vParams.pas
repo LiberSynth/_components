@@ -82,6 +82,7 @@ type
     procedure Notify(const Item: TParam; Action: Generics.Collections.TCollectionNotification); override;
   public
     function Duplicate: TParams;
+    { TODO -oVasilyev : AddParam -> AppendParam }
     function AddParam(const _Name: String): TParam;
     function InsertParam(_Index: Integer; const _Name: String): TParam;
     { TODO -oVasilyev : Вместо этого нужна Boolean функция, которая будет возвращать результат поиска. }

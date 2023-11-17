@@ -3,48 +3,47 @@ unit uParams;
 interface
 
 uses
+  { VCL }
+  Generics.Collections,
   { vSoft }
   uCore;
 
 type
 
-  TParamsDataType = (dtUnknown, dtBoolean, dtInteger, dtFloat, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, dtParams);
-
   TParams = class;
 
   TParam = class(TNamedDataHolder)
 
-  strict private
-
-    FDataType: TParamsDataType;
-
   private
 
-    function GetAsParams: RawByteString;
-    procedure SetAsParams(const Value: RawByteString);
+    function GetAsParams: TParams;
+    procedure SetAsParams(const _Value: TParams);
 
   public
 
-    property DataType: TParamsDataType read FDataType write FDataType;
-    property AsParams: RawByteString read GetAsParams write SetAsParams;
+    property AsParams: TParams read GetAsParams write SetAsParams;
 
   end;
 
-  TParams = class
+  TParams = class(TObjectList<TParam>)
   end;
 
 implementation
 
 { TParam }
 
-function TParam.GetAsParams: RawByteString;
+function TParam.GetAsParams: TParams;
 begin
   CheckDataType(dtParams);
-  Result := TParams(Data);
+  Result := TParams(GetAbstractObject);
 end;
 
-procedure TParam.SetAsParams(const Value: RawByteString);
+procedure TParam.SetAsParams(const _Value: TParams);
 begin
+
+  CheckDataType(dtParams);
+  if Assigned(AsParams) then AsParams.Free;
+  SetAbstractObject(_Value);
 
 end;
 
