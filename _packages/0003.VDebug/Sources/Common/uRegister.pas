@@ -17,10 +17,10 @@ uses
 var
 
   { Не нужно пытаться обработать TDateTime. Среда не вызывает методы интерфейса для этого типа по неизвестным причинам. }
-  {TODO -oVasilyev : Похоже, проблема бв том, что для TDateTime уже объявлен визуализатор }
+  {TODO -oVasilyev : Похоже, проблема была в том, что для TDateTime уже объявлен визуализатор }
 
-  StringValueReplacer:       TStringValueReplacer;
-  GUIDValueReplacer:         TGUIDValueReplacer;
+  StringValueReplacer: TStringValueReplacer;
+  GUIDValueReplacer:   TGUIDValueReplacer;
 
 procedure Register;
 

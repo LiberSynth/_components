@@ -334,7 +334,7 @@ end;
 
 function DecodeUTF8(Value: RawByteString): String;
 begin
-  if Copy(Value, 1, Length(Signature_UTF8)) = Signature_UTF8 then Value := Copy(Value, Length(Signature_UTF8) + 1, MaxInt);
+  if Copy(Value, 1, Length(BOM_UTF8)) = BOM_UTF8 then Value := Copy(Value, Length(BOM_UTF8) + 1, MaxInt);
   Result := UTF8ToString(Value);
 end;
 

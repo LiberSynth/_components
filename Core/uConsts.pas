@@ -1,5 +1,11 @@
 unit uConsts;
 
+(*********************************************************)
+(*                                                       *)
+(*                        Hello!)                        *)
+(*                                                       *)
+(*********************************************************)
+
 interface
 
 const
@@ -11,12 +17,9 @@ const
 
   SC_HexCharSign = '#$';
 
-  { TODO -oVasilyevSM -cComponents : Это не то же самое, что и BOM_UTF8? }
-  Signature_UTF8: RawByteString = AnsiChar($EF) + AnsiChar($BB) + AnsiChar($BF);
-
-  BOM_UTF8 = #$EF#$BB#$BF;
   BOM_UTF16BE = #$FF#$FF;
   BOM_UTF16LE = #$FF#$FE;
+  BOM_UTF8    = #$EF#$BB#$BF;
 
   IC_MaxDoubleScale = 9;
 

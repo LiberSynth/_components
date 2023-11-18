@@ -7,8 +7,6 @@ unit vParams;
 (*                                                    *)
 (******************************************************)
 
-{TODO -oVasilyev -cComponents : ѕереписать на TDataHolder и переложить }
-
 interface
 
 uses
@@ -23,7 +21,6 @@ type
 
   TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtFloat, dtDateTime, dtString, dtGUID, dtBLOB, dtParams);
 
-  { TODO : Ќадо разложить по каталогам, не все в одном держать. }
   TParams = class;
 
   TParam = class
