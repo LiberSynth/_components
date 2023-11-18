@@ -68,7 +68,7 @@ type
     property AsVariant: Variant read GetAsVariant write SetAsVariant;
   end;
 
-  { TODO -oVasilyev : Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. Может быть, с опцией AutoSave, хотя это серьезно нагрузит код, конечно. }
+  { TODO -oVasilyevSM -cdeprecatred unit : Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. Может быть, с опцией AutoSave, хотя это серьезно нагрузит код, конечно. }
   TParams = class(TList<TParam>)
   private
     FReadParamCount: Integer;
@@ -77,10 +77,10 @@ type
     procedure Notify(const Item: TParam; Action: Generics.Collections.TCollectionNotification); override;
   public
     function Duplicate: TParams;
-    { TODO -oVasilyev : AddParam -> AppendParam }
+    { TODO -oVasilyevSM -cdeprecatred unit : AddParam -> Add }
     function AddParam(const _Name: String): TParam;
+    { TODO -oVasilyevSM -cdeprecatred unit : AddParam -> Insert }
     function InsertParam(_Index: Integer; const _Name: String): TParam;
-    { TODO -oVasilyev : Вместо этого нужна Boolean функция, которая будет возвращать результат поиска. }
     function FindParam(_Name: String; _Create: Boolean = False): TParam; overload;
     function FindParam(_Name: String; var _Value: TParam): Boolean; overload;
     function ParamByName(const _Name: String): TParam;
@@ -102,7 +102,7 @@ type
     procedure LoadFromFile(const _FileName: String);
     function SaveToString: String;
     procedure LoadFromString(const _S: String);
-    { TODO : SaveToStream and LoadFromStream }
+    { TODO -oVasilyevSM -cdeprecatred unit : SaveToStream and LoadFromStream }
   end;
 
 function ParamsToStr(Params: TParams): String;
@@ -162,8 +162,8 @@ function ParamsToStr(Params: TParams): String;
   end;
 
 begin
-  { TODO : Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
-  { TODO : И нужен еще режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении в CheckParam. }
+  { TODO -oVasilyevSM -cdeprecatred unit : Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
+  { TODO -oVasilyevSM -cdeprecatred unit : И нужен еще режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении в CheckParam. }
   Result := _ParamsToStr(Params, '');
 end;
 

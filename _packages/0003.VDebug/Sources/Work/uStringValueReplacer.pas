@@ -55,7 +55,7 @@ var
   i: Integer;
 begin
 
-  { TODO -oVasilyev : 4000 и RealMax читать из ини }
+  { TODO -oVasilyevSM -cVDebug : 4000 и RealMax читать из ини }
 
   Result := Evaluator.Evaluate(Format('Length(%s)', [_Expression]));
 

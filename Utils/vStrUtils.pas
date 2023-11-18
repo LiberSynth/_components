@@ -1,6 +1,6 @@
 unit vStrUtils;
 
-{TODO -oVasilyev -cComponents : deprecated -> Core }
+{TODO -oVasilyevSM -cdeprecatred unit : -> Core }
 
 interface
 
@@ -223,7 +223,7 @@ function TCustomParamsReader.Discard(_WithoutEnds: Boolean): Boolean;
 
       LE := _LongEnd;
       p := PosOf(LE, FData, FPosition);
-      { TODO -oVasilyev : все ошибки здесь должы быть формализованы по генерации. Ќужен диалог или лог с параметром, на котором это произошло, иначе т€жело разбиратьс€ }
+      { TODO -oVasilyevSM -cdeprecatred unit : все ошибки здесь должы быть формализованы по генерации. Ќужен диалог или лог с параметром, на котором это произошло, иначе т€жело разбиратьс€ }
       if p = 0 then raise EParamsReadException.Create(SC_ParamRead_UnterminatedLongComment, FPosition);
       Step(p - FPosition + Length(LE));
       Exit(True);

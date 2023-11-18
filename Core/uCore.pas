@@ -16,6 +16,14 @@ type
 
   ECoreException = class(Exception);
 
+  EUncomplitedMethod = class(ECoreException)
+
+  public
+
+    constructor Create;
+
+  end;
+
 function BooleanToStr(Value: Boolean): String;
 function StrToBoolean(const S: String): Boolean;
 
@@ -23,6 +31,13 @@ function RawByteStringToHex(const Value: RawByteString): String;
 function HexToRawByteString(const Value: String): RawByteString;
 
 implementation
+
+{ EUncomplitedMethod }
+
+constructor EUncomplitedMethod.Create;
+begin
+  inherited Create('Complete this method');
+end;
 
 function BooleanToStr(Value: Boolean): String;
 begin

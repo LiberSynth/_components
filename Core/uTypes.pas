@@ -15,6 +15,8 @@ type
   TIntegerArray = array of Integer;
   TStringArray = array of String;
 
+  BLOB = RawByteString;
+
 implementation
 
 end.

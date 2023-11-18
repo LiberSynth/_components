@@ -2,7 +2,7 @@ unit vClipboard;
 
 interface
 
-{ TODO -oVasilyev : -> vUtils }
+{ TODO -oVasilyevSM -cdeprecatred unit : -> vUtils }
 procedure StrToClipboard(const Value: String);
 //procedure BitmapToClipboard..
 

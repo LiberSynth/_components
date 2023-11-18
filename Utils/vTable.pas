@@ -7,8 +7,8 @@ uses
 
 type
 
-  { TODO : The idea was примитивный движок для совсем простого однопоточного хранения данных. }
-  { TODO : Данные должны храниться одним общим массивом и считываться полями по значению сдвига, вычисляемомоу при изменении. }
+  { TODO -oVasilyevSM -cdeprecatred unit: The idea was примитивный движок для совсем простого однопоточного хранения данных. }
+  { TODO -oVasilyevSM -cdeprecatred unit: Данные должны храниться одним общим массивом и считываться полями по значению сдвига, вычисляемомоу при изменении. }
   TDataType = (dtBoolean, dtInteger, dtFloat, dtDateTime, dtGUID, dtString, dtBLOB);
 
   TPointerList = class(TList<Pointer>)
@@ -88,7 +88,7 @@ type
   public
 
     constructor Create;
-    { TODO -oVasilyev : Create by description }
+    { TODO -oVasilyevSM -cdeprecatred unit : Create by description }
     destructor Destroy; override;
 
     function FindField(const _FieldName: String): TTableField;
@@ -119,7 +119,7 @@ end;
 
 function DataTypeToStr(DataType: TDataType): String;
 begin
-  { TODO -oVasilyev : можно как-то автоматом получить строку из сета }
+  { TODO -oVasilyevSM -cdeprecatred unit : можно как-то автоматом получить строку из сета через rtl }
   case DataType of
     dtBoolean : Result := 'Boolean';
     dtInteger : Result := 'Integer';
@@ -376,7 +376,7 @@ begin
   CheckRecNo(_RecNo);
   CheckDataType(dtBLOB);
   if (_Value <> AsBLOB[_RecNo]) or IsNull[_RecNo] then begin
-    { TODO -oVasilyev : SetAsBLOB }
+    { TODO -oVasilyevSM -cdeprecatred unit : SetAsBLOB }
 //    IsNull[_RecNo] := False;
 //    RawByteString(FData[_RecNo]) := _Value;
   end;

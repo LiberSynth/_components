@@ -18,6 +18,7 @@ function PosOf(Patterns: String; const S: String; Start: Integer = 1): Integer;
 function ReadStrTo(var S: String; const Pattern: String; WithPattern: Boolean = False): String;
 function LastPos(const Pattern, S: String): Integer;
 function StringReplicate(const Pattern: String; Count: Cardinal): String;
+function SpaceReplicate(Count: Cardinal): String;
 function CompleteStr(const Value: String; Completer: Char; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function CompleteStr(const Value: String; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function StrCount(const S: String; Pattern: String): Integer;
@@ -29,6 +30,10 @@ function SameText(const S: String; Patterns: array of String): Boolean; overload
 function StrMaskMatch(Value, Mask: String): Boolean;
 function FileMaskMatch(const FileName, Mask: String): Boolean;
 function FileMasksMatch(const FileName, Masks: String): Boolean;
+
+function ShiftText(const Value: String; Level: ShortInt; Interval: Byte = 2): String; overload;
+procedure ShiftText(Level: ShortInt; Interval: Byte; var Value: String); overload;
+procedure ShiftText(Level: ShortInt; var Value: String); overload;
 
 function StrToArray(S: String; const Delim: String = ';'; DelimBehind: Boolean = True): TStringArray;
 function ArrayToStr(const SA: TStringArray; const Delim: String = ';'; DelimBehind: Boolean = False): String; overload;
@@ -44,7 +49,6 @@ function FormatTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: 
 function FormatNow(Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
 function FormatNowSorted(Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
 function FormatNowToFileName(EmptyZero: Boolean = True): String;
-
 
 function IsHexChar(const Value: String): Boolean;
 function IsHexCharStr(const Value: String): Boolean;
@@ -135,6 +139,11 @@ begin
   Result := '';
   for i := 0 to Count - 1 do
     Result := Result + Pattern;
+end;
+
+function SpaceReplicate(Count: Cardinal): String;
+begin
+  Result := StringReplicate(' ', Count);
 end;
 
 function CompleteStr(const Value: String; Completer: Char; Count: Integer; Before, Cut: Boolean): String;
@@ -284,6 +293,44 @@ begin
   for i := Low(SA) to High(SA) do
     if FileMaskMatch(FileName, SA[i]) then Exit(True);
   Result := False;
+end;
+
+function ShiftText(const Value: String; Level: ShortInt; Interval: Byte): String;
+var
+  L: Integer;
+  Indent: String;
+  CRLFTerminated: Boolean;
+begin
+
+  if Level = 0 then Exit(Value);
+
+  L := Length(Value);
+  CRLFTerminated := Value[L - 1] + Value[L] = CRLF;
+  Indent := SpaceReplicate(Abs(Level) * Interval);
+
+  if Level > 0 then begin { Right }
+
+    Result := Indent + StringReplace(Value, CRLF, CRLF + Indent, [rfReplaceAll]);
+    if CRLFTerminated then
+      Result := Copy(Result, 1, Length(Result) - Length(Indent));
+
+  end else begin { Left }
+
+    Result := Copy(Value, Length(Indent) + 1, L);
+    Result := StringReplace(Result, CRLF + Indent, CRLF, [rfReplaceAll]);
+
+  end;
+
+end;
+
+procedure ShiftText(Level: ShortInt; Interval: Byte; var Value: String);
+begin
+  Value := ShiftText(Value, Level, Interval);
+end;
+
+procedure ShiftText(Level: ShortInt; var Value: String);
+begin
+  ShiftText(Level, 2, Value);
 end;
 
 function StrToArray(S: String; const Delim: String; DelimBehind: Boolean): TStringArray;

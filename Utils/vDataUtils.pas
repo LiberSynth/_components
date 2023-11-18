@@ -1,6 +1,6 @@
 unit vDataUtils;
 
-{TODO -oVasilyev -cComponents : deprecated -> Core }
+{TODO -oVasilyevSM -cdeprecatred unit : -> Core }
 
 interface
 

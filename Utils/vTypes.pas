@@ -1,6 +1,6 @@
 unit vTypes;
 
-{TODO -oVasilyev -cComponents : deprecated -> Core }
+{TODO -oVasilyevSM -cdeprecatred unit : -> Core }
 
 interface
 
@@ -10,7 +10,7 @@ uses
 
 const
 
-  { TODO : -> to new unit vConsts.pas }
+  { TODO -oVasilyevSM -cdeprecatred unit : -> to new unit vConsts.pas }
   GUID_NULL: TGUID = '{00000000-0000-0000-0000-000000000000}';
 
   CRLF = #13#10;
@@ -22,8 +22,8 @@ const
   BOM_UTF16BE = #$FF#$FF;
   BOM_UTF16LE = #$FF#$FE;
 
-  {TODO -oVasilyev -cComponents : использовать только для часто используемых текстов }
-  {TODO -oVasilyev -cComponents : -> vConsts }
+  {TODO -oVasilyevSM -cdeprecatred unit : использовать только для часто используемых текстов }
+  {TODO -oVasilyevSM -cdeprecatred unit : -> vConsts }
 
   SC_BooleanConvertError = '%s is not a valid Boolean value';
   SC_UnterminatedString = 'Unterminated String';

@@ -2,7 +2,7 @@ unit vFileUtils;
 
 interface
 
-{TODO -oVasilyev -cComponents : -> Core }
+{TODO -oVasilyevSM -cdeprecatred unit : -> Core }
 
 uses
   { VCL }
@@ -279,7 +279,7 @@ end;
 procedure FileVersionParts(FileVersionStr: String; var MajorVersion, MinorVersion, Release, Build: SmallInt);
 begin
 
-  { TODO : maybe faster by SysUtils.GetFileVersion }
+  { TODO -oVasilyevSM -cdeprecatred unit : maybe faster by SysUtils.GetFileVersion }
   MajorVersion := StrToInt(ReadStrTo(FileVersionStr, '.'));
   MinorVersion := StrToInt(ReadStrTo(FileVersionStr, '.'));
   Release := StrToInt(ReadStrTo(FileVersionStr, '.'));
