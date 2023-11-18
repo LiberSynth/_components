@@ -24,8 +24,6 @@ type
   TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtFloat, dtDateTime, dtString, dtGUID, dtBLOB, dtParams);
 
   { TODO : Надо разложить по каталогам, не все в одном держать. }
-  { TODO : Что я могу сказать. Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
-  { TODO : И нужен еще режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении в CheckParam. }
   TParams = class;
 
   TParam = class
@@ -167,6 +165,8 @@ function ParamsToStr(Params: TParams): String;
   end;
 
 begin
+  { TODO : Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
+  { TODO : И нужен еще режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении в CheckParam. }
   Result := _ParamsToStr(Params, '');
 end;
 
