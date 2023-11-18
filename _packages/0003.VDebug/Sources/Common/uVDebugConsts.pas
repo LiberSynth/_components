@@ -1,4 +1,4 @@
-unit uConsts;
+unit uVDebugConsts;
 
 interface
 

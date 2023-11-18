@@ -35,7 +35,7 @@ uses
   { Utils }
   vFileUtils, vLog,
   { VDebugPackage }
-  uConsts;
+  uVDebugConsts;
 
 { Сохраняемые параметры пакета }
 

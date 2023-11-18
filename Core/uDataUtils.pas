@@ -1,12 +1,14 @@
-unit vDataUtils;
+unit uDataUtils;
 
-{TODO -oVasilyev -cComponents : deprecated -> Core }
+{TODO -oVasilyev -cComponents : -> Core }
 
 interface
 
 uses
-  { Utils }
-  vTypes;
+  { VCL }
+  Classes, SysUtils, Math,
+  { vSoft }
+  uConsts, uTypes;
 
 type
 
@@ -43,9 +45,6 @@ function StrToBoolean(const S: String): Boolean;
 function StrIsBoolean(const S: String): Boolean;
 function RawByteStringToHex(const Value: RawByteString): String;
 function HexToRawByteString(const Value: String): RawByteString;
-function IsHexChar(const Value: String): Boolean;
-function IsHexCharStr(const Value: String): Boolean;
-function HexCharStrToStr(const Value: String): String;
 
 { Cравнение действительных чисел с отбросом "мусорной" части }
 function DoubleEqual(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
@@ -73,13 +72,7 @@ const
 
 implementation
 
-uses
-  { VCL }
-  Classes, SysUtils, Math,
-  { Utils }
-  vStrUtils;
-
-  { Data movement functions }
+{ Data movement functions }
 
 function GetNewLength(Length, Offset: Integer): Integer;
 begin
@@ -368,7 +361,7 @@ begin
   if SameText(S, 'FALSE') then Exit(False);
   if SameText(S, 'TRUE') then Exit(True);
 
-  raise EConvertError.CreateFmt(SC_BooleanConvertError, [S]);
+  raise EConvertError.CreateFmt('%s is not a Boolean value', [S]);
 
 end;
 
@@ -414,74 +407,6 @@ begin
 
   end;
 
-end;
-
-const
-
-  SC_HexCharSign = '#$';
-
-function IsHexChar(const Value: String): Boolean;
-var
-  S: String;
-  i: Integer;
-begin
-
-  Result := (Length(Value) > 2) and (Length(Value) <= 4);
-
-  if Result then begin
-
-    S := Copy(Value, 3, 2);
-    for i := 1 to Length(S) do
-      if not CharInSet(S[i], HexCharsSet) then Exit(False);
-
-  end;
-
-end;
-
-function IsHexCharStr(const Value: String): Boolean;
-var
-  i: Integer;
-  SA: TStringArray;
-begin
-
-  SA := StrToArray(Value, SC_HexCharSign, False);
-  Result := Length(SA) > 0;
-  for i := Low(SA) to High(SA) do
-    if not IsHexChar(SC_HexCharSign + SA[i]) then
-      Exit(False);
-
-end;
-
-function HexCharStrToStr(const Value: String): String;
-
-  procedure _Raise;
-  const
-    SC_NotHexCharStrFormat = '''%s'' is not a hex';
-  begin
-    raise Exception.CreateFmt(SC_NotHexCharStrFormat, [Value]);
-  end;
-
-  procedure _Check(const S: String);
-  var
-    i: Integer;
-  begin
-    for i := 1 to Length(S) do
-      if not CharInSet(S[i], HexCharsSet) then _Raise;
-  end;
-
-var
-  i: Integer;
-  SA: TStringArray;
-begin
-
-  SA := StrToArray(Value, SC_HexCharSign, False);
-  if Length(SA) = 0 then _Raise;
-  SetLength(Result, Length(SA));
-  for i := Low(SA) to High(SA) do begin
-
-    _Check(SA[i]);
-    Result[i + 1] := Char(StrToInt('$' + SA[i]));
-  end;
 end;
 
 function DoubleEqual(D1, D2: Double; Scale: Integer): Boolean;

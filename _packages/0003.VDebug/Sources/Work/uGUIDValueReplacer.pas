@@ -28,7 +28,7 @@ uses
   { Utils }
   vDataUtils,
   { VDebugPackage }
-  uConsts, uCommon;
+  uVDebugConsts, uCommon;
 
 type
 

@@ -1,64 +1,18 @@
-unit vStrUtils;
+unit uStrUtils;
 
-{TODO -oVasilyev -cComponents : deprecated -> Core }
+(*********************************************************)
+(*                                                       *)
+(*                        Hello!)                        *)
+(*                                                       *)
+(*********************************************************)
 
 interface
 
 uses
   { VCL }
-  SysUtils,
-  { Utils }
-  vTypes;
-
-const
-
-  LineEnds = [CR, LF];
-  Signature_UTF8: RawByteString = AnsiChar($EF) + AnsiChar($BB) + AnsiChar($BF);
-
-type
-
-  TCustomParamsReader = class
-
-  strict private
-
-    FData: String;
-    FPosition: Integer;
-
-  protected
-
-    procedure Step(_N: Integer = 1);
-    function Lick(_Count: Integer): String;
-    function Bite(_Count: Integer): String;
-    function EndOf: Boolean;
-    procedure Restore(_Position: Integer);
-
-    function Discard(_WithoutEnds: Boolean = False): Boolean;
-    function WordEnds: TSysCharSet; virtual;
-    function Untouchables: TSysCharSet; virtual;
-    function ReadWord: String;
-    function LickWord: String;
-    procedure StepToChar(_C: Char);
-
-    procedure ReadInternal; virtual; abstract;
-
-    property Data: String read FData;
-    property Position: Integer read FPosition;
-
-  public
-
-    constructor CreateReader(const _String: String);
-
-    procedure Read;
-
-  end;
-
-  TCustomStringsReader = class(TCustomParamsReader)
-
-  protected
-
-    function ReadString: String;
-
-  end;
+  SysUtils, Math,
+  { vSoft }
+  uConsts, uTypes, uDataUtils;
 
 function PosOf(Patterns: String; const S: String; Start: Integer = 1): Integer;
 function ReadStrTo(var S: String; const Pattern: String; WithPattern: Boolean = False): String;
@@ -91,253 +45,12 @@ function FormatNow(Milliseconds: Boolean = False; EmptyZero: Boolean = True): St
 function FormatNowSorted(Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
 function FormatNowToFileName(EmptyZero: Boolean = True): String;
 
+
+function IsHexChar(const Value: String): Boolean;
+function IsHexCharStr(const Value: String): Boolean;
+function HexCharStrToStr(const Value: String): String;
+
 implementation
-
-uses
-  { VCL }
-  Math,
-  { Utils }
-  vDataUtils;
-
-{ TCustomParamsReader }
-
-procedure TCustomParamsReader.Step(_N: Integer);
-begin
-  Inc(FPosition, _N);
-end;
-
-function TCustomParamsReader.Lick(_Count: Integer): String;
-begin
-  Result := Copy(FData, FPosition, _Count);
-end;
-
-function TCustomParamsReader.Bite(_Count: Integer): String;
-begin
-  Result := Lick(_Count);
-  Step(_Count);
-end;
-
-function TCustomParamsReader.EndOf: Boolean;
-begin
-  Result := FPosition > Length(FData);
-end;
-
-procedure TCustomParamsReader.Restore(_Position: Integer);
-begin
-  FPosition := _Position;
-end;
-
-constructor TCustomParamsReader.CreateReader(const _String: String);
-begin
-
-  inherited Create;
-
-  FData := _String;
-  FPosition := 1;
-
-end;
-
-function TCustomParamsReader.Discard(_WithoutEnds: Boolean): Boolean;
-
-  function _DiscardCharSet(_CharSet: TSysCharSet): Boolean;
-  var
-    C: Char;
-  begin
-
-    Result := False;
-    while not EndOf do begin
-
-      C := Lick(1)[1];
-      if CharInSet(C, _CharSet) then begin
-
-        Step;
-        Result := True;
-
-      end else Exit;
-
-    end;
-
-  end;
-
-  function _DiscardBlanks: Boolean;
-  const
-    Blanks = [#0, ' ', TAB];
-  begin
-    Result := _DiscardCharSet(Blanks);
-  end;
-
-  function _DiscardLineEnds: Boolean;
-  begin
-    Result := not _WithoutEnds and _DiscardCharSet(LineEnds);
-  end;
-
-  function _DiscardSemi: Boolean;
-  const
-    Semi = [';', ','];
-  begin
-    Result := not _WithoutEnds and _DiscardCharSet(Semi);
-  end;
-
-  function _DiscardShortComments: Boolean;
-  const
-    ShortStarts = '--;//';
-  begin
-
-    Result := PosOf(ShortStarts, Lick(2)) = 1;
-    if Result then
-      while not EndOf do
-        if CharInSet(Bite(1)[1], LineEnds) then Exit;
-
-  end;
-
-  function _DiscardLongComments: Boolean;
-  const
-    LongStarts  = '/*;(*';
-    LongEnds: array[0..1] of String = ('*/', '*)');
-  var
-    Token: String;
-
-    function _LongEnd: String;
-    var
-      i: Byte;
-      LS: TStringArray;
-    begin
-
-      LS := StrToArray(LongStarts);
-      for i := Low(LS) to High(LS) do
-        if Token = LS[i] then Exit(LongEnds[i]);
-
-      { We won't be here. It needs to synchronise LongStarts and LongEnds. }
-      raise EParamsReadException.Create('Can not define long comment end sign', FPosition);
-
-    end;
-
-  var
-    p: Integer;
-    LE: String;
-  begin
-
-    Token := Lick(2);
-    p := PosOf(LongStarts, Token);
-    if p = 1 then begin
-
-      LE := _LongEnd;
-      p := PosOf(LE, FData, FPosition);
-      { TODO -oVasilyev : все ошибки здесь должы быть формализованы по генерации. Ќужен диалог или лог с параметром, на котором это произошло, иначе т€жело разбиратьс€ }
-      if p = 0 then raise EParamsReadException.Create(SC_ParamRead_UnterminatedLongComment, FPosition);
-      Step(p - FPosition + Length(LE));
-      Exit(True);
-
-    end;
-
-    Result := False;
-
-  end;
-
-var
-  Detected: Boolean;
-begin
-
-  Result := False;
-
-  repeat
-
-    Detected := _DiscardBlanks;
-    Detected := _DiscardLineEnds or Detected;
-    Detected := _DiscardSemi or Detected;
-    Detected := _DiscardShortComments or Detected;
-    Detected := _DiscardLongComments or Detected;
-    Result := Result or Detected;
-
-  until not Detected;
-
-end;
-
-procedure TCustomParamsReader.Read;
-begin
-
-  try
-
-    while not EndOf do
-      ReadInternal;
-
-  finally
-    FPosition := 1;
-  end;
-
-end;
-
-function TCustomParamsReader.WordEnds: TSysCharSet;
-begin
-  Result := [CR, LF];
-end;
-
-function TCustomParamsReader.ReadWord: String;
-var
-  C: Char;
-begin
-
-  Result := '';
-  repeat
-
-    if EndOf then Exit;
-    C := Bite(1)[1];
-
-    if CharInSet(C, WordEnds) then begin
-
-      if CharInSet(C, Untouchables) then Dec(FPosition);
-      Exit;
-
-    end;
-
-    Result := Result + C;
-
-  until Discard(True);
-
-  if not EndOf then begin
-
-    C := Lick(1)[1];
-    if CharInSet(C, WordEnds) and (C <> ')') then Step;
-
-  end;
-
-end;
-
-function TCustomParamsReader.LickWord: String;
-var
-  InitPos: Integer;
-begin
-
-  InitPos := FPosition;
-  try
-
-    Result := ReadWord;
-
-  finally
-    Restore(InitPos);
-  end;
-
-end;
-
-procedure TCustomParamsReader.StepToChar(_C: Char);
-begin
-
-  while not (Lick(1) = _C) do begin
-
-    Discard;
-    while CharInSet(Lick(1)[1], LineEnds) do
-      Step(1);
-
-  end;
-
-  Step(1);
-
-end;
-
-function TCustomParamsReader.Untouchables: TSysCharSet;
-begin
-  Result := [')'];
-end;
 
 function PosOf(Patterns: String; const S: String; Start: Integer): Integer;
 var
@@ -573,43 +286,6 @@ begin
   Result := False;
 end;
 
-{ TCustomStringsReader }
-
-function TCustomStringsReader.ReadString: String;
-
-  function _ReadQuotedString: String;
-  begin
-
-    StepToChar('''');
-    Result := '';
-    while not EndOf do begin
-
-      if Lick(1) = '''' then
-        if Lick(2) = '''''' then Step(1)
-        else Exit;
-
-      Result := Result + Bite(1);
-
-    end;
-
-    if EndOf then raise EParamsReadException.Create(SC_UnterminatedString, Position);
-
-  end;
-
-var
-  Quoted: Boolean;
-  S: String;
-begin
-
-  S := LickWord;
-  Quoted := (Length(S) > 0) and (S[1] = '''');
-  if Quoted then S := _ReadQuotedString
-  else S := ReadWord;
-  Result := S;
-  if Quoted then Step(1);
-
-end;
-
 function StrToArray(S: String; const Delim: String; DelimBehind: Boolean): TStringArray;
 var
   i, L: Integer;
@@ -729,6 +405,70 @@ end;
 function FormatNowToFileName(EmptyZero: Boolean): String;
 begin
   Result := FormatDateTimeToFileName(Now, EmptyZero);
+end;
+
+function IsHexChar(const Value: String): Boolean;
+var
+  S: String;
+  i: Integer;
+begin
+
+  Result := (Length(Value) > 2) and (Length(Value) <= 4);
+
+  if Result then begin
+
+    S := Copy(Value, 3, 2);
+    for i := 1 to Length(S) do
+      if not CharInSet(S[i], HexCharsSet) then Exit(False);
+
+  end;
+
+end;
+
+function IsHexCharStr(const Value: String): Boolean;
+var
+  i: Integer;
+  SA: TStringArray;
+begin
+
+  SA := StrToArray(Value, SC_HexCharSign, False);
+  Result := Length(SA) > 0;
+  for i := Low(SA) to High(SA) do
+    if not IsHexChar(SC_HexCharSign + SA[i]) then
+      Exit(False);
+
+end;
+
+function HexCharStrToStr(const Value: String): String;
+
+  procedure _Raise;
+  const
+    SC_Format = '''%s'' is not a hex';
+  begin
+    raise Exception.CreateFmt(SC_Format, [Value]);
+  end;
+
+  procedure _Check(const S: String);
+  var
+    i: Integer;
+  begin
+    for i := 1 to Length(S) do
+      if not CharInSet(S[i], HexCharsSet) then _Raise;
+  end;
+
+var
+  i: Integer;
+  SA: TStringArray;
+begin
+
+  SA := StrToArray(Value, SC_HexCharSign, False);
+  if Length(SA) = 0 then _Raise;
+  SetLength(Result, Length(SA));
+  for i := Low(SA) to High(SA) do begin
+
+    _Check(SA[i]);
+    Result[i + 1] := Char(StrToInt('$' + SA[i]));
+  end;
 end;
 
 end.

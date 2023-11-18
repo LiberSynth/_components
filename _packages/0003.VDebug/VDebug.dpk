@@ -33,7 +33,7 @@ requires
   VUtils;
 
 contains
-  uConsts in 'Sources\Common\uConsts.pas',
+  uVDebugConsts in 'Sources\Common\uVDebugConsts.pas',
   uCommon in 'Sources\Common\uCommon.pas',
   uClasses in 'Sources\Common\uClasses.pas',
   uRegister in 'Sources\Common\uRegister.pas',

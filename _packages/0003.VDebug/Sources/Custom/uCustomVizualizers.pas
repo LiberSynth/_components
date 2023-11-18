@@ -72,7 +72,7 @@ uses
   { VCL }
   SysUtils, Forms,
   { VDebugPackage }
-  uConsts, uCommon, uCustom, uCustomViewerFrame;
+  uVDebugConsts, uCommon, uCustom, uCustomViewerFrame;
 
 { TCustomDebuggerVisualizer }
 

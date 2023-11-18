@@ -1,6 +1,6 @@
 unit vTypes;
 
-{TODO -oVasilyev -cComponents : -> Core }
+{TODO -oVasilyev -cComponents : deprecated -> Core }
 
 interface
 
