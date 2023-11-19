@@ -21,7 +21,8 @@ uses
 
 type
 
-  TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtFloat, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, dtParams);
+  { TODO -oVasilyevSM -cVCore : Ќасчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
+  TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, {dtExtended, }dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
 
   TParams = class;
 
@@ -40,7 +41,8 @@ type
 
     { v Using FData methods v }
     function GetAsBoolean: Boolean;
-    function GetAsInteger: Int64;
+    function GetAsInteger: Integer;
+    function GetAsBigInt: Int64;
     function GetAsFloat: Double;
     function GetAsDateTime: TDateTime;
     function GetAsGUID: TGUID;
@@ -50,7 +52,8 @@ type
     function GetAsParams: TParams;
 
     procedure SetAsBoolean(_Value: Boolean);
-    procedure SetAsInteger(_Value: Int64);
+    procedure SetAsInteger(_Value: Integer);
+    procedure SetAsBigInt(_Value: Int64);
     procedure SetAsFloat(_Value: Double);
     procedure SetAsDateTime(_Value: TDateTime);
     procedure SetAsGUID(const _Value: TGUID);
@@ -77,7 +80,7 @@ type
     destructor Destroy; override;
 
     procedure Clear;
-    { ƒл€ абстрактной по типу передачи }
+    { ƒл€ абстрактной типу передачи }
     procedure Assign(_Source: TParam);
 
     property DataType: TParamDataType read FDataType;
@@ -85,8 +88,8 @@ type
     property Name: String read FName;
 
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
-    property AsInteger: Int64 read GetAsInteger write SetAsInteger;
-    { TODO -oVasilyevSM -cVCore : AsInt64 (AsBigInt) }
+    property AsInteger: Integer read GetAsInteger write SetAsInteger;
+    property AsBigInt: Int64 read GetAsBigInt write SetAsBigInt;
     property AsFloat: Double read GetAsFloat write SetAsFloat;
     property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
     property AsGUID: TGUID read GetAsGUID write SetAsGUID;
@@ -120,6 +123,7 @@ type
 
     function GetAsBoolean(const _Path: String): Boolean;
     function GetAsInteger(const _Path: String): Integer;
+    function GetAsBigInt(const _Path: String): Int64;
     function GetAsFloat(_Path: String): Double;
     function GetAsDateTime(_Path: String): TDateTime;
     function GetAsGUID(_Path: String): TGUID;
@@ -130,6 +134,7 @@ type
 
     procedure SetAsBoolean(const _Path: String; _Value: Boolean);
     procedure SetAsInteger(const _Path: String; _Value: Integer);
+    procedure SetAsBigInt(const _Path: String; _Value: Int64);
     procedure SetAsFloat(_Path: String; _Value: Double);
     procedure SetAsDateTime(_Path: String; _Value: TDateTime);
     procedure SetAsGUID(_Path: String; const _Value: TGUID);
@@ -158,6 +163,7 @@ type
     { v ‘ункции и свойства дл€ основной работы v }
     function FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
     function FindInteger(const _Path: String; var _Value: Integer): Boolean;
+    function FindBigInt(const _Path: String; var _Value: Int64): Boolean;
     function FindFloat(const _Path: String; var _Value: Double): Boolean;
     function FindDateTime(const _Path: String; var _Value: TDateTime): Boolean;
     function FindGUID(const _Path: String; var _Value: TGUID): Boolean;
@@ -168,6 +174,7 @@ type
 
     function AsBooleanDef(const _Path: String; _Default: Boolean): Boolean;
     function AsIntegerDef(const _Path: String; _Default: Integer): Integer;
+    function AsBigIntDef(const _Path: String; _Default: Int64): Int64;
     function AsFloatDef(const _Path: String; _Default: Double): Double;
     function AsDateTimeDef(const _Path: String; _Default: TDateTime): TDateTime;
     function AsGUIDDef(const _Path: String; _Default: TGUID): TGUID;
@@ -177,6 +184,7 @@ type
 
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
+    property AsBigInt[const _Path: String]: Int64 read GetAsBigInt write SetAsBigInt;
     property AsFloat[_Path: String]: Double read GetAsFloat write SetAsFloat;
     property AsDateTime[_Path: String]: TDateTime read GetAsDateTime write SetAsDateTime;
     property AsGUID[_Path: String]: TGUID read GetAsGUID write SetAsGUID;
@@ -204,6 +212,7 @@ const
       { dtUnknown    } 'Unknown',
       { dtBoolean    } 'Boolean',
       { dtInteger    } 'Integer',
+      { dtBigInt     } 'BigInt',
       { dtFloat      } 'Float',
       { dtDateTime   } 'DateTime',
       { dtGUID       } 'GUID',
@@ -286,12 +295,22 @@ begin
 
 end;
 
-function TParam.GetAsInteger: Int64;
+function TParam.GetAsInteger: Integer;
 begin
 
   CheckDataType(dtInteger);
 
   { TODO -oVasilyevSM -cVCore : Boolean AsInteger это 0 и 1. 0 и 1 AsBoolean это False и True. Ёто может быть удобно, когда отправл€ешь куда-то значени€, где boolean это Integer. ƒругих типов тоже касаетс€. Ќужен режим строгой и "нестрого типизации". ѕо-умолчанию - нестрога€ и тогда все преобразуетс€ во все по возможности. }
+  if IsNull then Result := 0
+  else Move(FData^, Result, DataSize);
+
+end;
+
+function TParam.GetAsBigInt: Int64;
+begin
+
+  CheckDataType(dtBigInt);
+
   if IsNull then Result := 0
   else Move(FData^, Result, DataSize);
 
@@ -343,6 +362,7 @@ begin
 
       dtBoolean:    Result := BooleanToStr(AsBoolean);
       dtInteger:    Result := IntToStr(AsInteger);
+      dtBigInt:     Result := IntToStr(AsBigInt);
       dtFloat:      Result := DoubleToStr(AsFloat);
       dtDateTime:   Result := DateTimeToStr(AsDateTime);
       dtGUID:       Result := GUIDToStr(AsGUID);
@@ -375,9 +395,15 @@ begin
   Move(_Value, FData^, DataSize);
 end;
 
-procedure TParam.SetAsInteger(_Value: Int64);
+procedure TParam.SetAsInteger(_Value: Integer);
 begin
   PresetData(dtInteger);
+  Move(_Value, FData^, DataSize);
+end;
+
+procedure TParam.SetAsBigInt(_Value: Int64);
+begin
+  PresetData(dtBigInt);
   Move(_Value, FData^, DataSize);
 end;
 
@@ -471,7 +497,8 @@ begin
 
     dtUnknown:    Result := 0;
     dtBoolean:    Result := SizeOf(Boolean);
-    dtInteger:    Result := SizeOf(Int64);
+    dtInteger:    Result := SizeOf(Integer);
+    dtBigInt:     Result := SizeOf(Int64);
     dtFloat:      Result := SizeOf(Double);
     dtDateTime:   Result := SizeOf(TDateTime);
     dtAnsiString: Result := 0;
@@ -511,6 +538,7 @@ begin
 
     dtBoolean:    AsBoolean    := _Source.AsBoolean;
     dtInteger:    AsInteger    := _Source.AsInteger;
+    dtBigInt:     AsBigInt     := _Source.AsBigInt;
     dtFloat:      AsFloat      := _Source.AsFloat;
     dtDateTime:   AsDateTime   := _Source.AsDateTime;
     dtGUID:       AsGUID       := _Source.AsGUID;
@@ -544,6 +572,11 @@ end;
 function TParams.GetAsInteger(const _Path: String): Integer;
 begin
   Result := ParamByName(_Path).AsInteger;
+end;
+
+function TParams.GetAsBigInt(const _Path: String): Int64;
+begin
+  Result := ParamByName(_Path).AsBigInt;
 end;
 
 function TParams.GetAsFloat(_Path: String): Double;
@@ -589,6 +622,11 @@ end;
 procedure TParams.SetAsInteger(const _Path: String; _Value: Integer);
 begin
   GetParam(_Path).AsInteger := _Value;
+end;
+
+procedure TParams.SetAsBigInt(const _Path: String; _Value: Int64);
+begin
+  GetParam(_Path).AsBigInt := _Value;
 end;
 
 procedure TParams.SetAsFloat(_Path: String; _Value: Double);
@@ -760,6 +798,14 @@ begin
   if Result then _Value := P.AsInteger;
 end;
 
+function TParams.FindBigInt(const _Path: String; var _Value: Int64): Boolean;
+var
+  P: TParam;
+begin
+  Result := FindParam(_Path, dtBigInt, P);
+  if Result then _Value := P.AsBigInt;
+end;
+
 function TParams.FindFloat(const _Path: String; var _Value: Double): Boolean;
 var
   P: TParam;
@@ -825,6 +871,12 @@ end;
 function TParams.AsIntegerDef(const _Path: String; _Default: Integer): Integer;
 begin
   if not FindInteger(_Path, Result) then AsInteger[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsBigIntDef(const _Path: String; _Default: Int64): Int64;
+begin
+  if not FindBigInt(_Path, Result) then AsBigInt[_Path] := _Default;
   Result := _Default;
 end;
 
