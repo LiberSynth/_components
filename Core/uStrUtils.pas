@@ -6,6 +6,7 @@ unit uStrUtils;
 (*                                                       *)
 (*********************************************************)
 
+{ TODO -oVasilyevSM -cVCore : ”пор€дочить и подписать все группы функций }
 interface
 
 uses
@@ -53,6 +54,19 @@ function FormatNowToFileName(EmptyZero: Boolean = True): String;
 function IsHexChar(const Value: String): Boolean;
 function IsHexCharStr(const Value: String): Boolean;
 function HexCharStrToStr(const Value: String): String;
+
+{ v Simple types - string conversions v  - должны жить здесь, иначе будет циркул€рна€ ссылка }
+function BooleanToStr(Value: Boolean): String;
+function StrToBoolean(const S: String): Boolean;
+function DoubleToStr(Value: Double): String;
+function StrToDouble(const S: String): Double;
+function DateTimeToStr(Value: TDateTime): String;
+function GUIDToStr(const Value: TGUID) : String;
+function StrToGUID(const Value: String): TGUID;
+function StrToDateTime(const S: String): TDateTime;
+function BLOBToStr(const Value: BLOB): String;
+function StrToBLOB(const S: String): BLOB;
+{ ^ Simple types - string conversions ^ }
 
 implementation
 
@@ -478,10 +492,10 @@ var
   SA: TStringArray;
 begin
 
-  SA := StrToArray(Value, SC_HexCharSign, False);
+  SA := StrToArray(Value, SC_HEX_CHAR_SIGN, False);
   Result := Length(SA) > 0;
   for i := Low(SA) to High(SA) do
-    if not IsHexChar(SC_HexCharSign + SA[i]) then
+    if not IsHexChar(SC_HEX_CHAR_SIGN + SA[i]) then
       Exit(False);
 
 end;
@@ -508,7 +522,7 @@ var
   SA: TStringArray;
 begin
 
-  SA := StrToArray(Value, SC_HexCharSign, False);
+  SA := StrToArray(Value, SC_HEX_CHAR_SIGN, False);
   if Length(SA) = 0 then _Raise;
   SetLength(Result, Length(SA));
   for i := Low(SA) to High(SA) do begin
@@ -516,6 +530,81 @@ begin
     _Check(SA[i]);
     Result[i + 1] := Char(StrToInt('$' + SA[i]));
   end;
+end;
+
+function BooleanToStr(Value: Boolean): String;
+begin
+  if Value then Result := 'True'
+  else Result := 'False';
+end;
+
+function StrToBoolean(const S: String): Boolean;
+begin
+
+  if SameText(S, 'FALSE') then Exit(False);
+  if SameText(S, 'TRUE') then Exit(True);
+
+  raise EConvertError.CreateFmt('%s is not a Boolean value', [S]);
+
+end;
+
+function DoubleToStr(Value: Double): String;
+begin
+  Result := StringReplace(FloatToStr(Value), {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, '.', []);
+end;
+
+function StrToDouble(const S: String): Double;
+begin
+  Result := StrToFloat(S);
+end;
+
+function DateTimeToStr(Value: TDateTime): String;
+begin
+  FormatDateTime(Value, True);
+end;
+
+function GUIDToStr(const Value: TGUID): String;
+begin
+
+  with Value do
+
+    Result:= Format('%s-%s-%s-%s%s-%s%s%s%s%s%s', [
+
+        IntToHex(D1, 8),
+        IntToHex(D2, 4),
+        IntToHex(D3, 4),
+        IntToHex(D4[0], 2),
+        IntToHex(D4[1], 2),
+        IntToHex(D4[2], 2),
+        IntToHex(D4[3], 2),
+        IntToHex(D4[4], 2),
+        IntToHex(D4[5], 2),
+        IntToHex(D4[6], 2),
+        IntToHex(D4[7], 2)
+
+    ]);
+
+end;
+
+function StrToGUID(const Value: String): TGUID;
+begin
+  if not TryStrToGUID(Value, Result) then
+    raise EConvertError.CreateFmt('Error converting String ''%s'' to GUID', [Value]);
+end;
+
+function StrToDateTime(const S: String): TDateTime;
+begin
+  Result := SysUtils.StrToDateTime(S);
+end;
+
+function BLOBToStr(const Value: BLOB): String;
+begin
+  Result := RawByteStringToHex(Value);
+end;
+
+function StrToBLOB(const S: String): BLOB;
+begin
+  Result := HexToRawByteString(S);
 end;
 
 end.

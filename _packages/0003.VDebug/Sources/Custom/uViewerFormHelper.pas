@@ -54,7 +54,7 @@ uses
   { VCL }
   SysUtils, Math, Controls,
   { VDebugPackage }
-  uVDebugConsts, uCommon;
+  uProjectConsts, uCommon;
 
 { TCustomViewerForm }
 

@@ -6,6 +6,7 @@ unit uDataUtils;
 (*                                                       *)
 (*********************************************************)
 
+{ TODO -oVasilyevSM -cVCore : Упорядочить и подписать все группы функций }
 interface
 
 uses
@@ -19,11 +20,6 @@ type
   { Byte Order Mark }
   TBOM = (bomForward, bomBackward);
 
-const
-
-  WC_BOM_FWD = $FEFF;
-  WC_BOM_BWD = $FFFE;
-
 function DataToAnsiStr(const Data: TData; Offset: Integer = 0): AnsiString;
 function DataToStr(const Data: TData; Offset: Integer = 0): String;
 procedure CleanUpAnsiString(var Value: AnsiString);
@@ -34,11 +30,10 @@ function BOMToStr(Value: TBOM): String;
 function UTF16DataToStr(const Data: TData; BOM: TBOM): String;
 
 function DataToGUID(const Data: TData): TGUID;
+
 function TryStrToGUID(const S: String; var Value: TGUID): Boolean;
-function StrToGUID(const Value: String): TGUID;
-function GUIDToStr(const Value: TGUID) : String;
 function StrIsGUID(const Value: String): Boolean;
-function NormalizeGUID(var Value: String): Boolean;
+function CoverGUID(var Value: String): Boolean;
 
 function _ByteArrayToStr(const _Data: TData): String;
 function _ByteArrayToAnsiStr(const _Data: TData): String;
@@ -75,6 +70,22 @@ const
   IntegerCharsSet = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 implementation
+
+function BooleanToStr(Value: Boolean): String;
+begin
+  if Value then Result := 'True'
+  else Result := 'False';
+end;
+
+function StrToBoolean(const S: String): Boolean;
+begin
+
+  if SameText(S, 'FALSE') then Exit(False);
+  if SameText(S, 'TRUE' ) then Exit(True );
+
+  raise EConvertError.CreateFmt('%s is not a boolean value', [S]);
+
+end;
 
 { Data movement functions }
 
@@ -243,35 +254,6 @@ begin
 
 end;
 
-function StrToGUID(const Value: String): TGUID;
-begin
-  if not TryStrToGUID(Value, Result) then
-    raise EConvertError.CreateFmt('Error converting String ''%s'' to GUID', [Value]);
-end;
-
-function GUIDToStr(const Value: TGUID): String;
-begin
-
-  with Value do
-
-    Result:= Format('%s-%s-%s-%s%s-%s%s%s%s%s%s', [
-
-        IntToHex(D1, 8),
-        IntToHex(D2, 4),
-        IntToHex(D3, 4),
-        IntToHex(D4[0], 2),
-        IntToHex(D4[1], 2),
-        IntToHex(D4[2], 2),
-        IntToHex(D4[3], 2),
-        IntToHex(D4[4], 2),
-        IntToHex(D4[5], 2),
-        IntToHex(D4[6], 2),
-        IntToHex(D4[7], 2)
-
-    ]);
-
-end;
-
 function StrIsGUID(const Value: String): Boolean;
 
   function _CheckStr(const S: String): Boolean;
@@ -306,7 +288,7 @@ begin
 
 end;
 
-function NormalizeGUID(var Value: String): Boolean;
+function CoverGUID(var Value: String): Boolean;
 begin
   Result := StrIsGUID(Value);
   if Result and (Length(Value) = 36) then Value := '{' + Value + '}';
@@ -351,22 +333,6 @@ function ReduceStrToFloat(const S: String): String;
 begin
   Result := StringReplace(S,      '.', {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, []);
   Result := StringReplace(Result, ',', {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, []);
-end;
-
-function BooleanToStr(Value: Boolean): String;
-begin
-  if Value then Result := 'True'
-  else Result := 'False';
-end;
-
-function StrToBoolean(const S: String): Boolean;
-begin
-
-  if SameText(S, 'FALSE') then Exit(False);
-  if SameText(S, 'TRUE') then Exit(True);
-
-  raise EConvertError.CreateFmt('%s is not a Boolean value', [S]);
-
 end;
 
 function StrIsBoolean(const S: String): Boolean;

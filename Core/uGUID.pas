@@ -6,6 +6,7 @@ unit uGUID;
 (*                                                       *)
 (*********************************************************)
 
+{ TODO -oVasilyevSM -cVCore : Если функций будет не много, можно в uDataUtils перенести }
 interface
 
 function NullGUID: TGUID;

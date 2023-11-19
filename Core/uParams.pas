@@ -17,7 +17,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { vSoft }
-  uConsts, uTypes, uCore, uGUID, uStrUtils;
+  uConsts, uTypes, uCore, uStrUtils;
 
 type
 
@@ -26,6 +26,10 @@ type
   TParams = class;
 
   TParam = class
+
+  const
+
+    SC_SELF_ALLOCATED_TYPES = [dtAnsiString, dtString, dtBLOB, dtParams];
 
   strict private
 
@@ -151,7 +155,7 @@ type
     { Для абстрактной по типу передачи }
     procedure Assign(_Source: TParams);
 
-    { Для основной работы }
+    { v Функции и свойства для основной работы v }
     function FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
     function FindInteger(const _Path: String; var _Value: Integer): Boolean;
     function FindFloat(const _Path: String; var _Value: Double): Boolean;
@@ -162,6 +166,15 @@ type
     function FindBLOB(const _Path: String; var _Value: BLOB): Boolean;
     function FindParams(const _Path: String; var _Value: TParams): Boolean;
 
+    function AsBooleanDef(const _Path: String; _Default: Boolean): Boolean;
+    function AsIntegerDef(const _Path: String; _Default: Integer): Integer;
+    function AsFloatDef(const _Path: String; _Default: Double): Double;
+    function AsDateTimeDef(const _Path: String; _Default: TDateTime): TDateTime;
+    function AsGUIDDef(const _Path: String; _Default: TGUID): TGUID;
+    function AsAnsiStringDef(const _Path: String; _Default: AnsiString): AnsiString;
+    function AsStringDef(const _Path: String; _Default: String): String;
+    function AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
+
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
     property AsFloat[_Path: String]: Double read GetAsFloat write SetAsFloat;
@@ -171,6 +184,7 @@ type
     property AsString[_Path: String]: String read GetAsString write SetAsString;
     property AsBLOB[_Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
     property AsParams[_Path: String]: TParams read GetAsParams;
+    { v Функции и свойства для основной работы v }
 
   end;
 
@@ -178,7 +192,7 @@ type
 
 function ParamDataTypeToStr(DataType: TParamDataType): String;
 { TODO -oVasilyevSM -cVCore: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
-function ParamsToString(Params: TParams): String;
+function ParamsToStr(Params: TParams): String;
 
 implementation
 
@@ -204,7 +218,7 @@ begin
   Result := SA_StringValues[DataType];
 end;
 
-function ParamsToString(Params: TParams): String;
+function ParamsToStr(Params: TParams): String;
 const
 
   SC_SingleParamFormat = '%s = %s' + CRLF;
@@ -329,13 +343,13 @@ begin
 
       dtBoolean:    Result := BooleanToStr(AsBoolean);
       dtInteger:    Result := IntToStr(AsInteger);
-      dtFloat:      Result := StringReplace(FloatToStr(AsFloat), {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, '.', []);
-      dtDateTime:   Result := FormatDateTime(AsDateTime, True);
-      dtGUID:       Result := GUIDToString(AsGUID);
+      dtFloat:      Result := DoubleToStr(AsFloat);
+      dtDateTime:   Result := DateTimeToStr(AsDateTime);
+      dtGUID:       Result := GUIDToStr(AsGUID);
       dtAnsiString: Result := String(AnsiString(FData));
       dtString:     Result := String(FData);
-      dtBLOB:       Result := RawByteStringToHex(AsBLOB);
-      dtParams:     Result := ParamsToString(TParams(FData));
+      dtBLOB:       Result := BLOBToStr(AsBLOB);
+      dtParams:     Result := ParamsToStr(TParams(FData));
 
     else
       Result := '';
@@ -423,21 +437,27 @@ end;
 
 procedure TParam.AllocData;
 begin
-  FData := AllocMem(DataSize);
+  if not (DataType in ([dtUnknown] + SC_SELF_ALLOCATED_TYPES)) then
+    FData := AllocMem(DataSize);
 end;
 
 procedure TParam.FreeData;
 begin
 
+  { Объекту надо вызвать собственный деструктор }
+  if DataType = dtParams then
+    TParams(FData).Free;
+
+  if not (DataType in ([dtUnknown] + SC_SELF_ALLOCATED_TYPES)) then
+    FreeMemory(FData);
+
+  { Память строк освобождается так. }
   case FDataType of
 
     dtAnsiString: AnsiString(FData)    := '';
     dtString:     String(FData)        := '';
     dtBLOB:       RawByteString(FData) := '';
-    dtParams:     FData := nil;
 
-  else
-    FreeMemory(FData);
   end;
 
   FData := nil;
@@ -518,56 +538,47 @@ end;
 
 function TParams.GetAsBoolean(const _Path: String): Boolean;
 begin
-  if not FindBoolean(_Path, Result) then
-    Result := False;
+  Result := ParamByName(_Path).AsBoolean;
 end;
 
 function TParams.GetAsInteger(const _Path: String): Integer;
 begin
-  if not FindInteger(_Path, Result) then
-    Result := 0;
+  Result := ParamByName(_Path).AsInteger;
 end;
 
 function TParams.GetAsFloat(_Path: String): Double;
 begin
-  if not FindFloat(_Path, Result) then
-    Result := 0;
+  Result := ParamByName(_Path).AsFloat;
 end;
 
 function TParams.GetAsDateTime(_Path: String): TDateTime;
 begin
-  if not FindDateTime(_Path, Result) then
-    Result := 0;
+  Result := ParamByName(_Path).AsDateTime;
 end;
 
 function TParams.GetAsGUID(_Path: String): TGUID;
 begin
-  if not FindGUID(_Path, Result) then
-    Result := NULLGUID;
+  Result := ParamByName(_Path).AsGUID;
 end;
 
 function TParams.GetAsAnsiString(_Path: String): AnsiString;
 begin
-  if not FindAnsiString(_Path, Result) then
-    Result := '';
+  Result := ParamByName(_Path).AsAnsiString;
 end;
 
 function TParams.GetAsString(_Path: String): String;
 begin
-  if not FindString(_Path, Result) then
-    Result := '';
+  Result := ParamByName(_Path).AsString;
 end;
 
 function TParams.GetAsBLOB(_Path: String): BLOB;
 begin
-  if not FindBLOB(_Path, Result) then
-    Result := '';
+  Result := ParamByName(_Path).AsBLOB;
 end;
 
 function TParams.GetAsParams(_Path: String): TParams;
 begin
-  if not FindParams(_Path, Result) then
-    Result := nil;
+  Result := ParamByName(_Path).AsParams;
 end;
 
 procedure TParams.SetAsBoolean(const _Path: String; _Value: Boolean);
@@ -644,7 +655,7 @@ procedure TParams.Notify(const _Item: TParam; _Action: Generics.Collections.TCol
 begin
 
   if (_Action = cnRemoved) and (_Item.DataType = dtParams) then
-    _Item.AsParams.Free;
+    _Item.Clear;
 
   inherited Notify(_Item, _Action);
 
@@ -737,7 +748,7 @@ function TParams.FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtBoolean, P);
   if Result then _Value := P.AsBoolean;
 end;
 
@@ -745,7 +756,7 @@ function TParams.FindInteger(const _Path: String; var _Value: Integer): Boolean;
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtInteger, P);
   if Result then _Value := P.AsInteger;
 end;
 
@@ -753,7 +764,7 @@ function TParams.FindFloat(const _Path: String; var _Value: Double): Boolean;
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtFloat, P);
   if Result then _Value := P.AsFloat;
 end;
 
@@ -761,7 +772,7 @@ function TParams.FindDateTime(const _Path: String; var _Value: TDateTime): Boole
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtDateTime, P);
   if Result then _Value := P.AsDateTime;
 end;
 
@@ -769,7 +780,7 @@ function TParams.FindGUID(const _Path: String; var _Value: TGUID): Boolean;
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtGUID, P);
   if Result then _Value := P.AsGUID;
 end;
 
@@ -777,7 +788,7 @@ function TParams.FindAnsiString(const _Path: String; var _Value: AnsiString): Bo
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtAnsiString, P);
   if Result then _Value := P.AsAnsiString;
 end;
 
@@ -785,7 +796,7 @@ function TParams.FindString(const _Path: String; var _Value: String): Boolean;
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtString, P);
   if Result then _Value := P.AsString;
 end;
 
@@ -793,7 +804,7 @@ function TParams.FindBLOB(const _Path: String; var _Value: BLOB): Boolean;
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtBLOB, P);
   if Result then _Value := P.AsBLOB;
 end;
 
@@ -801,8 +812,56 @@ function TParams.FindParams(const _Path: String; var _Value: TParams): Boolean;
 var
   P: TParam;
 begin
-  Result := FindParam(_Path, P);
+  Result := FindParam(_Path, dtParams, P);
   if Result then _Value := P.AsParams;
+end;
+
+function TParams.AsBooleanDef(const _Path: String; _Default: Boolean): Boolean;
+begin
+  if not FindBoolean(_Path, Result) then AsBoolean[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsIntegerDef(const _Path: String; _Default: Integer): Integer;
+begin
+  if not FindInteger(_Path, Result) then AsInteger[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsFloatDef(const _Path: String; _Default: Double): Double;
+begin
+  if not FindFloat(_Path, Result) then AsFloat[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsDateTimeDef(const _Path: String; _Default: TDateTime): TDateTime;
+begin
+  if not FindDateTime(_Path, Result) then AsDateTime[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsGUIDDef(const _Path: String; _Default: TGUID): TGUID;
+begin
+  if not FindGUID(_Path, Result) then AsGUID[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsAnsiStringDef(const _Path: String; _Default: AnsiString): AnsiString;
+begin
+  if not FindAnsiString(_Path, Result) then AsAnsiString[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsStringDef(const _Path: String; _Default: String): String;
+begin
+  if not FindString(_Path, Result) then AsString[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
+begin
+  if not FindBLOB(_Path, Result) then AsBLOB[_Path] := _Default;
+  Result := _Default;
 end;
 
 end.

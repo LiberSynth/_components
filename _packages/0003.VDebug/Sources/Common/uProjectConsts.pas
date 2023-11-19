@@ -1,4 +1,4 @@
-unit uVDebugConsts;
+unit uProjectConsts;
 
 interface
 

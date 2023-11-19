@@ -29,7 +29,7 @@ uses
   { Utils }
   vTypes, vLog,
   { VDebugPackage }
-  uVDebugConsts, uCommon;
+  uProjectConsts, uCommon;
 
 { TStringValueReplacer }
 

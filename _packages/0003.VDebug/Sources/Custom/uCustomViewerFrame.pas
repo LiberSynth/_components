@@ -52,7 +52,7 @@ uses
   { VCL }
   SysUtils,
   { VDebugPackage }
-  uVDebugConsts;
+  uProjectConsts;
 
 {$R *.dfm}
 

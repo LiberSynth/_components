@@ -108,7 +108,7 @@ uses
   { Utils }
   vLog,
   { VDebugPackage }
-  uVDebugConsts, uCommon;
+  uProjectConsts, uCommon;
 
 var
   DbgrServices: IOTADebuggerServices;

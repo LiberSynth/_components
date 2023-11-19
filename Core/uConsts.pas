@@ -15,7 +15,10 @@ const
   LF = #10;
   TAB = #9;
 
-  SC_HexCharSign = '#$';
+  SC_HEX_CHAR_SIGN = '#$';
+
+  WC_BOM_FWD = $FEFF;
+  WC_BOM_BWD = $FFFE;
 
   BOM_UTF16BE = #$FF#$FF;
   BOM_UTF16LE = #$FF#$FE;

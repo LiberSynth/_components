@@ -30,12 +30,12 @@ requires
   rtl;
 
 contains
-  uConsts in '..\..\Core\uConsts.pas',
-  uTypes in '..\..\Core\uTypes.pas',
-  uCore in '..\..\Core\uCore.pas',
-  uDataUtils in '..\..\Core\uDataUtils.pas',
-  uStrUtils in '..\..\Core\uStrUtils.pas',
-  uGUID in '..\..\Core\uGUID.pas',
-  uParams in '..\..\Core\uParams.pas';
+  uConsts in '..\..\..\Core\uConsts.pas',
+  uTypes in '..\..\..\Core\uTypes.pas',
+  uDataUtils in '..\..\..\Core\uDataUtils.pas',
+  uStrUtils in '..\..\..\Core\uStrUtils.pas',
+  uCore in '..\..\..\Core\uCore.pas',
+  uGUID in '..\..\..\Core\uGUID.pas',
+  uParams in '..\..\..\Core\uParams.pas';
 
 end.
