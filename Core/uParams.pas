@@ -6,10 +6,11 @@ unit uParams;
 (*                                                       *)
 (*********************************************************)
 
-{ TODO -oVasilyevSM -cVCore: Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. }
-{ TODO -oVasilyevSM -cVCore: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
-{ TODO -oVasilyevSM -cVCore: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
-{ TODO -oVasilyevSM -cVCore: Нужен также компонент TRegParams }
+{ TODO -oVasilyevSM -cParams: Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. }
+{ TODO -oVasilyevSM -cParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
+{ TODO -oVasilyevSM -cParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
+{ TODO -oVasilyevSM -cParams: Нужен также компонент TRegParams }
+{ TODO -oVasilyevSM -cParams : Идея хорошая, преобразовывать все во все в методах TParam.GetAs..., но это нужен режим отдельный Hard/Soft и код засрется. Если понадобится, можно потом сделать. }
 
 interface
 
@@ -17,11 +18,11 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { vSoft }
-  uConsts, uTypes, uCore, uStrUtils;
+  uConsts, uTypes, uCore, uDataUtils, uStrUtils;
 
 type
 
-  { TODO -oVasilyevSM -cVCore : Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
+  { TODO -oVasilyevSM -cParams : Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
   TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, {dtExtended, }dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
 
   TParams = class;
@@ -198,13 +199,14 @@ type
 
   EParamsException = class(ECoreException);
 
-function ParamDataTypeToStr(DataType: TParamDataType): String;
-{ TODO -oVasilyevSM -cVCore: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
+function ParamDataTypeToStr(Value: TParamDataType): String;
+function StrToParamDataType(Value: String): TParamDataType;
+{ TODO -oVasilyevSM -cParams: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
 function ParamsToStr(Params: TParams): String;
 
 implementation
 
-function ParamDataTypeToStr(DataType: TParamDataType): String;
+function ParamDataTypeToStr(Value: TParamDataType): String;
 const
 
   SA_StringValues: array[TParamDataType] of String = (
@@ -224,7 +226,20 @@ const
   );
 
 begin
-  Result := SA_StringValues[DataType];
+  Result := SA_StringValues[Value];
+end;
+
+function StrToParamDataType(Value: String): TParamDataType;
+var
+  Item: TParamDataType;
+begin
+
+  for Item := Low(TParamDataType) to High(TParamDataType) do
+    if SameText(ParamDataTypeToStr(Item), Value) then
+      Exit(Item);
+
+  raise EConvertError.CreateFmt('%s is not a TParamDataType value', [Value]);
+
 end;
 
 function ParamsToStr(Params: TParams): String;
@@ -242,7 +257,7 @@ var
   Param: TParam;
 begin
 
-  { TODO -oVasilyevSM -cVCore : Пока так }
+  { TODO -oVasilyevSM -cParams : Пока так }
 
   Result := '';
   for Param in Params do
@@ -300,7 +315,6 @@ begin
 
   CheckDataType(dtInteger);
 
-  { TODO -oVasilyevSM -cVCore : Boolean AsInteger это 0 и 1. 0 и 1 AsBoolean это False и True. Это может быть удобно, когда отправляешь куда-то значения, где boolean это Integer. Других типов тоже касается. Нужен режим строгой и "нестрого типизации". По-умолчанию - нестрогая и тогда все преобразуется во все по возможности. }
   if IsNull then Result := 0
   else Move(FData^, Result, DataSize);
 
@@ -355,11 +369,20 @@ end;
 function TParam.GetAsString: String;
 begin
 
+  {
+
+    Этот метод особый. Он нужен как для прикладных визуальных задач, посколку возвращает отображаемый текст в самом
+    корневом виде, так и для отладочных. Можно в виде строки увидеть в отладчике что-то, имеющее непотребный вид.
+    Например, дату или GUID. Поэтому здесь проверку типа делать не надо. Пусть возвращает абсолютно все.
+
+  }
+
   if IsNull then Result := ''
   else
 
     case FDataType of
 
+      dtUnknown:    Result := '';
       dtBoolean:    Result := BooleanToStr(AsBoolean);
       dtInteger:    Result := IntToStr(AsInteger);
       dtBigInt:     Result := IntToStr(AsBigInt);
@@ -372,7 +395,7 @@ begin
       dtParams:     Result := ParamsToStr(TParams(FData));
 
     else
-      Result := '';
+      raise EUncomplitedMethod.Create;
     end;
 
 end;
@@ -527,8 +550,16 @@ end;
 
 procedure TParam.CheckDataType(_DataType: TParamDataType);
 begin
-  if _DataType <> FDataType then
-    raise EParamsException.CreateFmt('Param data type is not %s', [ParamDataTypeToStr(_DataType)])
+
+  if FDataType <> _DataType then
+
+    raise EParamsException.CreateFmt('This param can not read data type %s as %s', [
+
+        ParamDataTypeToStr(FDataType),
+        ParamDataTypeToStr(_DataType)
+
+    ]);
+
 end;
 
 procedure TParam.Assign(_Source: TParam);
@@ -779,7 +810,7 @@ end;
 function TParams.ParamByName(const _Path: String): TParam;
 begin
   if not FindParam(_Path, Result) then
-    raise EParamsException.CreateFmt('Param ''%s'' not found', [_Path]);
+    raise EParamsException.CreateFmt('Param %s not found', [_Path]);
 end;
 
 function TParams.FindBoolean(const _Path: String; var _Value: Boolean): Boolean;

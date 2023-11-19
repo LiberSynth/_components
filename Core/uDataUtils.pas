@@ -6,7 +6,8 @@ unit uDataUtils;
 (*                                                       *)
 (*********************************************************)
 
-{ TODO -oVasilyevSM -cVCore : Упорядочить и подписать все группы функций }
+{ TODO -oVasilyevSM -cuDataUtils : Упорядочить и подписать все группы функций }
+{ TODO -oVasilyevSM -cuDataUtils : RawByteString -> BLOB }
 interface
 
 uses
@@ -19,6 +20,9 @@ type
 
   { Byte Order Mark }
   TBOM = (bomForward, bomBackward);
+
+function BooleanToInt(Value: Boolean): Int64;
+function IntToBoolean(Value: Int64): Boolean;
 
 function DataToAnsiStr(const Data: TData; Offset: Integer = 0): AnsiString;
 function DataToStr(const Data: TData; Offset: Integer = 0): String;
@@ -46,14 +50,14 @@ function RawByteStringToHex(const Value: RawByteString): String;
 function HexToRawByteString(const Value: String): RawByteString;
 
 { Cравнение действительных чисел с отбросом "мусорной" части }
-function DoubleEqual(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
-function SameDouble(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
-function DoubleLess(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
-function DoubleMore(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
-function DoubleLessEqual(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
-function DoubleMoreEqual(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
-function DoubleMax(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Double;
-function DoubleMin(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Double;
+function DoubleEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function SameDouble(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleLess(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMore(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleLessEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMoreEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMax(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
+function DoubleMin(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
 
 function DivideSecurely(Dividend, Divider: Double): Double; overload;
 function DivideSecurely(Dividend, Divider: Integer): Double; overload;
@@ -70,6 +74,26 @@ const
   IntegerCharsSet = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 implementation
+
+function BooleanToInt(Value: Boolean): Int64;
+const
+  IA_MAP: array[Boolean] of Byte = (0, 1);
+begin
+  Result := IA_MAP[Value];
+end;
+
+function IntToBoolean(Value: Int64): Boolean;
+begin
+  case Value of
+
+    0: Result := False;
+    1: Result := True;
+
+  else
+    raise EConvertError.CreateFmt('%d is invalud Boolean value', [Value]);
+  end;
+
+end;
 
 function BooleanToStr(Value: Boolean): String;
 begin
@@ -384,38 +408,38 @@ begin
   Result := Abs(D1 - D2) < Power(10, - Scale);
 end;
 
-function SameDouble(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
+function SameDouble(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
   Result := DoubleEqual(D1, D2, Scale);
 end;
 
-function DoubleLess(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
+function DoubleLess(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
   Result := not DoubleEqual(D1, D2, Scale) and (D1 < D2);
 end;
 
-function DoubleMore(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
+function DoubleMore(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
   Result := not DoubleEqual(D1, D2, Scale) and (D1 > D2);
 end;
 
-function DoubleLessEqual(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
+function DoubleLessEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
   Result := DoubleLess(D1, D2, Scale) or DoubleEqual(D1, D2, Scale);
 end;
 
-function DoubleMoreEqual(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Boolean;
+function DoubleMoreEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
   Result := DoubleMore(D1, D2, Scale) or DoubleEqual(D1, D2, Scale);
 end;
 
-function DoubleMax(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Double;
+function DoubleMax(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
 begin
   if DoubleMore(D1, D2) then Result := D1
   else Result := D2;
 end;
 
-function DoubleMin(D1, D2: Double; Scale: Integer = IC_MaxDoubleScale): Double;
+function DoubleMin(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
 begin
   if DoubleLess(D1, D2) then Result := D1
   else Result := D2;

@@ -6,7 +6,7 @@ unit uStrUtils;
 (*                                                       *)
 (*********************************************************)
 
-{ TODO -oVasilyevSM -cVCore : Упорядочить и подписать все группы функций }
+{ TODO -oVasilyevSM -cuStrUtils : Упорядочить и подписать все группы функций }
 interface
 
 uses
