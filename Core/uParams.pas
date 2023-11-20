@@ -10,7 +10,9 @@ unit uParams;
 { TODO -oVasilyevSM -cParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
 { TODO -oVasilyevSM -cParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
 { TODO -oVasilyevSM -cParams: Нужен также компонент TRegParams }
-{ TODO -oVasilyevSM -cParams : Идея хорошая, преобразовывать все во все в методах TParam.GetAs..., но это нужен режим отдельный Hard/Soft и код засрется. Если понадобится, можно потом сделать. }
+{ TODO -oVasilyevSM -cParams: Идея хорошая, преобразовывать все во все в методах TParam.GetAs..., но это нужен режим отдельный Hard/Soft и код засрется. Самое логичное - в хэлперах исполнить для обоих классов. }
+{ TODO -oVasilyevSM -cParams: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
+{ TODO -oVasilyevSM -cParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
 
 interface
 
@@ -38,11 +40,12 @@ type
     FName: String;
     FDataType: TParamDataType;
     FIsNull: Boolean;
+    FStrictDataType: Boolean;
     FData: Pointer;
 
     { v Using FData methods v }
-    function GetAsBoolean: Boolean;
-    function GetAsInteger: Integer;
+    private function GetAsBoolean: Boolean;
+    strict private function GetAsInteger: Integer;
     function GetAsBigInt: Int64;
     function GetAsFloat: Double;
     function GetAsDateTime: TDateTime;
@@ -52,8 +55,8 @@ type
     function GetAsBLOB: RawByteString;
     function GetAsParams: TParams;
 
-    procedure SetAsBoolean(_Value: Boolean);
-    procedure SetAsInteger(_Value: Integer);
+    private procedure SetAsBoolean(_Value: Boolean);
+    strict private procedure SetAsInteger(_Value: Integer);
     procedure SetAsBigInt(_Value: Int64);
     procedure SetAsFloat(_Value: Double);
     procedure SetAsDateTime(_Value: TDateTime);
@@ -86,6 +89,7 @@ type
 
     property DataType: TParamDataType read FDataType;
     property IsNull: Boolean read FIsNull write SetIsNull;
+    property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
     property Name: String read FName;
 
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
@@ -105,6 +109,21 @@ type
 
     }
     property AsParams: TParams read GetAsParams;
+
+  end;
+
+  TParamHelper = class helper for TParam
+
+  strict private
+
+    function _GetAsBoolean: Boolean;
+    procedure _SetAsBoolean(const _Value: Boolean);
+
+  public
+
+    function Empty: Boolean;
+
+    property AsBoolean: Boolean read _GetAsBoolean write _SetAsBoolean;
 
   end;
 
@@ -553,7 +572,7 @@ begin
 
   if FDataType <> _DataType then
 
-    raise EParamsException.CreateFmt('This param can not read data type %s as %s', [
+    raise EParamsException.CreateFmt('Unable to read data type %s as %s', [
 
         ParamDataTypeToStr(FDataType),
         ParamDataTypeToStr(_DataType)
@@ -591,6 +610,38 @@ begin
   FIsNull := True;
   FDataType := dtUnknown;
 
+end;
+
+{ TParamHelper }
+
+function TParamHelper._GetAsBoolean: Boolean;
+begin
+
+  if StrictDataType then Result := GetAsBoolean
+  else
+
+    case DataType of
+
+      dtInteger:    Result := IntToBoolean(AsInteger);
+      dtBigInt:     Result := IntToBoolean(AsBigInt);
+      dtAnsiString: Result := StrToBoolean(AsAnsiString);
+      dtString:     Result := StrToBoolean(AsString);
+      dtBLOB:       raise EUncomplitedMethod.Create;
+
+    else
+      Result := GetAsBoolean;
+    end;
+
+end;
+
+procedure TParamHelper._SetAsBoolean(const _Value: Boolean);
+begin
+  SetAsBoolean(_Value);
+end;
+
+function TParamHelper.Empty: Boolean;
+begin
+  Result := (DataType = dtUnknown) and (IsNull);
 end;
 
 { TParams }
