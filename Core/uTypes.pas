@@ -15,7 +15,9 @@ type
   TIntegerArray = array of Integer;
   TStringArray = array of String;
 
-  BLOB = RawByteString;
+  BLOB = RawByteString; // too long)
+
+  TBOM = (bomForward, bomBackward);
 
 implementation
 

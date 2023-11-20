@@ -52,7 +52,7 @@ implementation
 
 uses
   { VCL }
-  SysUtils, Math, Controls,
+  SysUtils, {}Math, {}Controls,
   { VDebugPackage }
   uProjectConsts, uCommon;
 

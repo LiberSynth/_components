@@ -28,6 +28,10 @@ const
 
   NULLGUID: TGUID = '{00000000-0000-0000-0000-000000000000}';
 
+  AC_HEX_CHARS: array[0..15] of Char = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F');
+  AC_HEX_CHARS_SET     = ['0'..'9', 'A'..'F'];
+  AC_INTEGER_CHARS_SET = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
 implementation
 
 end.

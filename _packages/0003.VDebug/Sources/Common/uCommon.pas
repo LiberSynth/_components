@@ -31,7 +31,7 @@ implementation
 
 uses
   { VCL }
-  Math,
+  {}Math,{}
   { Utils }
   vFileUtils, vLog,
   { VDebugPackage }

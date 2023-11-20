@@ -6,13 +6,13 @@ unit uParams;
 (*                                                       *)
 (*********************************************************)
 
-{ TODO -oVasilyevSM -cParams: Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. }
-{ TODO -oVasilyevSM -cParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
-{ TODO -oVasilyevSM -cParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
-{ TODO -oVasilyevSM -cParams: Нужен также компонент TRegParams }
-{ TODO -oVasilyevSM -cParams: Идея хорошая, преобразовывать все во все в методах TParam.GetAs..., но это нужен режим отдельный Hard/Soft и код засрется. Самое логичное - в хэлперах исполнить для обоих классов. }
-{ TODO -oVasilyevSM -cParams: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
-{ TODO -oVasilyevSM -cParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
+{ TODO -oVasilyevSM -cuParams: Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. }
+{ TODO -oVasilyevSM -cuParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
+{ TODO -oVasilyevSM -cuParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
+{ TODO -oVasilyevSM -cuParams: Нужен также компонент TRegParams }
+{ TODO -oVasilyevSM -cuParams: Можно дописывать TParamHelper }
+{ TODO -oVasilyevSM -cuParams: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
+{ TODO -oVasilyevSM -cuParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
 
 interface
 
@@ -24,7 +24,7 @@ uses
 
 type
 
-  { TODO -oVasilyevSM -cParams : Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
+  { TODO -oVasilyevSM -cuParams: Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
   TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, {dtExtended, }dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
 
   TParams = class;
@@ -33,7 +33,7 @@ type
 
   const
 
-    SC_SELF_ALLOCATED_TYPES = [dtAnsiString, dtString, dtBLOB, dtParams];
+    SC_SELF_ALLOCATED_TYPES = [dtAnsiString, dtString, dtBLOB, {dtData,}dtParams];
 
   strict private
 
@@ -43,9 +43,18 @@ type
     FStrictDataType: Boolean;
     FData: Pointer;
 
+    procedure SetIsNull(const _Value: Boolean);
+
+    procedure AllocData;
+    procedure FreeData;
+    function DataSize: Cardinal;
+    procedure PresetData(_DataType: TParamDataType);
+
+  private
+
     { v Using FData methods v }
-    private function GetAsBoolean: Boolean;
-    strict private function GetAsInteger: Integer;
+    function GetAsBoolean: Boolean;
+    function GetAsInteger: Integer;
     function GetAsBigInt: Int64;
     function GetAsFloat: Double;
     function GetAsDateTime: TDateTime;
@@ -55,8 +64,8 @@ type
     function GetAsBLOB: RawByteString;
     function GetAsParams: TParams;
 
-    private procedure SetAsBoolean(_Value: Boolean);
-    strict private procedure SetAsInteger(_Value: Integer);
+    procedure SetAsBoolean(_Value: Boolean);
+    procedure SetAsInteger(_Value: Integer);
     procedure SetAsBigInt(_Value: Int64);
     procedure SetAsFloat(_Value: Double);
     procedure SetAsDateTime(_Value: TDateTime);
@@ -64,15 +73,8 @@ type
     procedure SetAsAnsiString(const _Value: AnsiString);
     procedure SetAsString(const _Value: String);
     procedure SetAsBLOB(const _Value: RawByteString);
-    private procedure SetAsParams(_Value: TParams);
+    procedure SetAsParams(_Value: TParams);
     { ^ Using FData methods ^ }
-
-    strict private procedure SetIsNull(const _Value: Boolean);
-
-    procedure AllocData;
-    procedure FreeData;
-    function DataSize: Cardinal;
-    procedure PresetData(_DataType: TParamDataType);
 
   protected
 
@@ -84,7 +86,7 @@ type
     destructor Destroy; override;
 
     procedure Clear;
-    { Для абстрактной типу передачи }
+    { Для передачи без разбора типов }
     procedure Assign(_Source: TParam);
 
     property DataType: TParamDataType read FDataType;
@@ -117,13 +119,24 @@ type
   strict private
 
     function _GetAsBoolean: Boolean;
+    function _GetAsInteger: Integer;
+    function _GetAsBigInt: Int64;
+
     procedure _SetAsBoolean(const _Value: Boolean);
+    procedure _SetAsInteger(const _Value: Integer);
+    procedure _SetAsBigInt(const _Value: Int64);
 
   public
 
-    function Empty: Boolean;
-
     property AsBoolean: Boolean read _GetAsBoolean write _SetAsBoolean;
+    property AsInteger: Integer read _GetAsInteger write _SetAsInteger;
+    property AsBigInt: Int64 read _GetAsBigInt write _SetAsBigInt;
+//    property AsFloat: Double read GetAsFloat write SetAsFloat;
+//    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
+//    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
+//    property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
+//    property AsString: String read GetAsString write SetAsString;
+//    property AsBLOB: RawByteString read GetAsBLOB write SetAsBLOB;
 
   end;
 
@@ -177,7 +190,7 @@ type
     function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
     function ParamByName(const _Path: String): TParam;
 
-    { Для абстрактной по типу передачи }
+    { Для передачи без разбора типов }
     procedure Assign(_Source: TParams);
 
     { v Функции и свойства для основной работы v }
@@ -220,7 +233,7 @@ type
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
-{ TODO -oVasilyevSM -cParams: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
+{ TODO -oVasilyevSM -cuParams: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
 function ParamsToStr(Params: TParams): String;
 
 implementation
@@ -276,7 +289,7 @@ var
   Param: TParam;
 begin
 
-  { TODO -oVasilyevSM -cParams : Пока так }
+  { TODO -oVasilyevSM -cuParams: Пока так }
 
   Result := '';
   for Param in Params do
@@ -410,7 +423,7 @@ begin
       dtGUID:       Result := GUIDToStr(AsGUID);
       dtAnsiString: Result := String(AnsiString(FData));
       dtString:     Result := String(FData);
-      dtBLOB:       Result := BLOBToStr(AsBLOB);
+      dtBLOB:       Result := BLOBToHexStr(AsBLOB);
       dtParams:     Result := ParamsToStr(TParams(FData));
 
     else
@@ -624,12 +637,52 @@ begin
 
       dtInteger:    Result := IntToBoolean(AsInteger);
       dtBigInt:     Result := IntToBoolean(AsBigInt);
-      dtAnsiString: Result := StrToBoolean(AsAnsiString);
+      dtAnsiString: Result := StrToBoolean(String(AsAnsiString));
       dtString:     Result := StrToBoolean(AsString);
-      dtBLOB:       raise EUncomplitedMethod.Create;
+      dtBLOB:       Result := BLOBToBoolean(AsBLOB);
 
     else
       Result := GetAsBoolean;
+    end;
+
+end;
+
+function TParamHelper._GetAsInteger: Integer;
+begin
+
+  if StrictDataType then Result := GetAsInteger
+  else
+
+    case DataType of
+
+      dtBoolean:    Result := BooleanToInt(AsBoolean);
+      dtBigInt:     Result := AsBigInt;
+      dtAnsiString: Result := StrToInt(String(AsAnsiString));
+      dtString:     Result := StrToInt(AsString);
+      dtBLOB:       raise EUncomplitedMethod.Create;
+
+    else
+      Result := GetAsInteger;
+    end;
+
+end;
+
+function TParamHelper._GetAsBigInt: Int64;
+begin
+
+  if StrictDataType then Result := GetAsBigInt
+  else
+
+    case DataType of
+
+      dtBoolean:    Result := BooleanToInt(AsBoolean);
+      dtInteger:     Result := AsInteger;
+      dtAnsiString: Result := StrToInt(String(AsAnsiString));
+      dtString:     Result := StrToInt(AsString);
+      dtBLOB:       raise EUncomplitedMethod.Create;
+
+    else
+      Result := GetAsBigInt;
     end;
 
 end;
@@ -639,9 +692,14 @@ begin
   SetAsBoolean(_Value);
 end;
 
-function TParamHelper.Empty: Boolean;
+procedure TParamHelper._SetAsInteger(const _Value: Integer);
 begin
-  Result := (DataType = dtUnknown) and (IsNull);
+  SetAsInteger(_Value);
+end;
+
+procedure TParamHelper._SetAsBigInt(const _Value: Int64);
+begin
+  SetAsBigInt(_Value);
 end;
 
 { TParams }

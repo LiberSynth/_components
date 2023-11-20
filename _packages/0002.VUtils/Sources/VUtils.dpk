@@ -29,9 +29,11 @@ package VUtils;
 
 requires
   rtl,
-  vcl;
+  vcl,
+  VCore;
 
 contains
+  uUtils in '..\..\..\Utils\uUtils.pas',
   vClipboard in '..\..\..\Utils\vClipboard.pas',
   vConsts in '..\..\..\Utils\vConsts.pas',
   vDataUtils in '..\..\..\Utils\vDataUtils.pas',
