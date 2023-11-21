@@ -59,7 +59,7 @@ procedure ShiftText(Level: ShortInt; var Value: String); overload;
 
 { v Стандартное форматирование дат v }
 { v !!! Эти форматы строго зашиты в алгоритм функции StrToDateTime !!! v }
-function FormatDateTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True): String; overload;
+function FormatDateTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True; ShowZeroDate: Boolean = False): String; overload;
 function FormatDateTimeSorted(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
 function FormatDateTimeToFileName(Value: TDateTime; EmptyZero: Boolean = True): String;
 function FormatTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
@@ -587,7 +587,7 @@ var
 begin
 
   L := Length(Value);
-  if Cut and (L >= Count) then
+  if Cut and (L > Count) then
 
     if Before then Result := Copy(Value, Count - 1, Count)
     else Result := Copy(Value, 1, Count)
@@ -774,64 +774,60 @@ const
 
   { v !!! Эти форматы строго зашиты в алгоритм функции StrToDateTime !!! v }
   { Поэтому, они должны лежать именно здесь, а не в uConsts. Это одно целое. }
-  SC_STRICT_DATE_FORMAT_SEC  = 'dd.mm.yyyy hh:nn:ss';
-  SC_STRICT_DATE_FORMAT_MS   = 'dd.mm.yyyy hh:nn:ss.zzz';
-  SC_SORTING_DATE_FORMAT_SEC = 'yyyy-mm-dd hh:nn:ss';
-  SC_SORTING_DATE_FORMAT_MS  = 'yyyy-mm-dd hh:nn:ss.zzz';
+  SC_STRICT_DATE_FORMAT     = 'dd.mm.yyyy hh:nn:ss';
+  SC_STRICT_DATE_FORMAT_MS  = 'dd.mm.yyyy hh:nn:ss.zzz';
+  SC_STRICT_TIME_FORMAT     = 'hh:nn:ss';
+  SC_STRICT_TIME_FORMAT_MS  = 'hh:nn:ss.zzz';
+  SC_SORTING_DATE_FORMAT    = 'yyyy-mm-dd hh:nn:ss';
+  SC_SORTING_DATE_FORMAT_MS = 'yyyy-mm-dd hh:nn:ss.zzz';
   { ^ !!! Эти форматы строго зашиты в алгоритм функции StrToDateTime !!! ^ }
-  SC_FILENAME_DATE_FORMAT    = 'yyyymmdd_hhnnss_zzz';
+  SC_FILENAME_DATE_FORMAT   = 'yyyymmdd_hhnnss_zzz';
 
-function FormatDateTime(Value: TDateTime; Milliseconds, EmptyZero: Boolean): String;
+function FormatDateTime(Value: TDateTime; Milliseconds, EmptyZero: Boolean; ShowZeroDate: Boolean): String;
 begin
-  if EmptyZero and DoubleEqual(Value, 0) then Result := ''
-  else if Milliseconds then Result := FormatDateTime(SC_STRICT_DATE_FORMAT_MS, Value)
-  else Result := FormatDateTime(SC_STRICT_DATE_FORMAT_SEC, Value);
+
+  if EmptyZero and DoubleEqual(Value, 0) then
+    Result := ''
+  else if not ShowZeroDate and (Trunc(Value) = 0) then
+    Result := FormatTime(Value, Milliseconds, EmptyZero)
+  else if Milliseconds then
+    Result := FormatDateTime(SC_STRICT_DATE_FORMAT_MS, Value)
+  else
+    Result := FormatDateTime(SC_STRICT_DATE_FORMAT, Value);
+
 end;
 
 function FormatDateTimeSorted(Value: TDateTime; Milliseconds, EmptyZero: Boolean): String;
 begin
-  if EmptyZero and DoubleEqual(Value, 0) then Result := ''
-  else if Milliseconds then Result := FormatDateTime(SC_SORTING_DATE_FORMAT_MS, Value)
-  else Result := FormatDateTime(SC_SORTING_DATE_FORMAT_SEC, Value);
+
+  if EmptyZero and DoubleEqual(Value, 0) then
+    Result := ''
+  else if Milliseconds then
+    Result := FormatDateTime(SC_SORTING_DATE_FORMAT_MS, Value)
+  else
+    Result := FormatDateTime(SC_SORTING_DATE_FORMAT, Value);
+
 end;
 
 function FormatDateTimeToFileName(Value: TDateTime; EmptyZero: Boolean): String;
 begin
-  if EmptyZero and DoubleEqual(Value, 0) then Result := ''
-  else Result := FormatDateTime(SC_FILENAME_DATE_FORMAT, Value);
+
+  if EmptyZero and DoubleEqual(Value, 0) then
+    Result := ''
+  else
+    Result := FormatDateTime(SC_FILENAME_DATE_FORMAT, Value);
+
 end;
 
 function FormatTime(Value: TDateTime; Milliseconds, EmptyZero: Boolean): String;
-var
-  D: Integer;
-  H, N, S, Z: Word;
 begin
 
-  if EmptyZero and DoubleEqual(Value, 0) then Result := ''
-  else begin
-
-    D := Trunc(Value);
-    DecodeTime(Value, H, N, S, Z);
-    H := H + D * 24;
-
-    Result := Format('%s:%s:%s', [
-
-        CompleteStr(IntToStr(H), '0', 2, True),
-        CompleteStr(IntToStr(N), '0', 2, True),
-        CompleteStr(IntToStr(S), '0', 2, True)
-
-    ]);
-
-    if Milliseconds then
-
-      Result := Format('%s.%s', [
-
-          Result,
-          CompleteStr(IntToStr(Z), '0', 3, True)
-
-      ]);
-
-  end;
+  if EmptyZero and DoubleEqual(Value, 0) then
+    Result := ''
+  else if Milliseconds then
+    Result := FormatDateTime(SC_STRICT_TIME_FORMAT_MS, Value)
+  else
+    Result := FormatDateTime(SC_STRICT_TIME_FORMAT, Value)
 
 end;
 
