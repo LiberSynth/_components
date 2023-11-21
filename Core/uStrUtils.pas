@@ -628,15 +628,23 @@ begin
 end;
 
 function UnquoteStr(const Value: String): String;
+var
+  L: Integer;
 begin
 
-  Result := Value;
-  if Length(Result) > 1 then begin
+  L := Length(Value);
+  if
 
-    if Result[1] = '''' then Result := Copy(Result, 2, Length(Result) - 1);
-    if Result[Length(Result)] = '''' then Result := Copy(Result, 1, Length(Result) - 1);
+      (L > 1) and
+      (Result[1] = '''') and
+      (Result[Length(Result)] = '''')
 
-  end;
+  then
+
+    Result := StringReplace(Copy(Value, 2, Length(Result) - 2), '''''', '''', [rfReplaceAll])
+
+  else Result := Value;
+
 end;
 
 function CutStr(var Value: String; Count: Integer): Boolean;
@@ -667,12 +675,16 @@ var
 begin
 
   if Mask = '*' then Exit(True);
+
   if Pos('*', Mask) = 0 then Exit(SameText(Value, Mask));
+
   if Pos('*', Mask) > 1 then begin
 
     S := ReadStrTo(Mask, '*');
     if SameText(S, Copy(Value, 1, Length(S))) then
+
       Value := Copy(Value, Length(S) + 1, Length(Value))
+
     else Exit(False);
 
   end;
@@ -683,6 +695,7 @@ begin
 
       S := ReadStrTo(Mask, '');
       p := PosOf(S, Value);
+
       Exit((p > 0) and (p = Length(Value) - Length(S) + 1))
 
     end else begin
@@ -716,8 +729,19 @@ begin
     NameMask := Copy(Mask, 1, MP - 1);
     ExtMask := Copy(Mask, MP + 1);
     FP := Pos('.', FileName);
-    if (FP = 0) and (Length(ExtMask) = 0) then Result := StrMaskMatch(FileName, NameMask)
-    else Result := StrMaskMatch(Copy(FileName, 1, FP - 1), NameMask) and StrMaskMatch(Copy(FileName, FP + 1), ExtMask);
+
+    if
+
+        (FP = 0) and
+        (Length(ExtMask) = 0)
+
+    then
+
+      Result := StrMaskMatch(FileName, NameMask)
+
+    else
+
+      Result := StrMaskMatch(Copy(FileName, 1, FP - 1), NameMask) and StrMaskMatch(Copy(FileName, FP + 1), ExtMask);
 
   end;
 
@@ -726,12 +750,17 @@ end;
 function FileMasksMatch(const FileName, Masks: String): Boolean;
 var
   SA: TStringArray;
-  i: Integer;
+  S: String;
 begin
+
   SA := StrToArray(Masks, '|');
-  for i := Low(SA) to High(SA) do
-    if FileMaskMatch(FileName, SA[i]) then Exit(True);
+
+  for S in SA do
+    if FileMaskMatch(FileName, S) then
+      Exit(True);
+
   Result := False;
+
 end;
 
 function ShiftText(const Value: String; Level: ShortInt; Interval: Byte): String;
@@ -861,7 +890,9 @@ begin
 
     Result[i] := ReadStrTo(S, Delim);
     Inc(i);
+
   end;
+
 end;
 
 function ArrayToStr(const SA: TStringArray; const Delim: String; DelimBehind: Boolean): String;
@@ -992,6 +1023,7 @@ var
 begin
 
   SA := StrToArray(Value, SC_HEX_CHAR_SIGN, False);
+
   Result := Length(SA) > 0;
   for i := Low(SA) to High(SA) do
     if not IsHexChar(SC_HEX_CHAR_SIGN + SA[i]) then
