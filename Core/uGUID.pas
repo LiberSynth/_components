@@ -10,12 +10,6 @@ unit uGUID;
 
 interface
 
-uses
-  { VCL }
-  SysUtils,
-  { vSoft }
-  uConsts;
-
 function NullGUID: TGUID;
 
 implementation

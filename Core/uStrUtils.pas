@@ -10,9 +10,9 @@ interface
 
 uses
   { VCL }
-  SysUtils, Math,
+  SysUtils,
   { vSoft }
-  uConsts, uTypes, uDataUtils, uGUID;
+  uConsts, uTypes, uDataUtils;
 
 { v Преобразование основных типов данных v }
 function StrIsBoolean(const S: String): Boolean;

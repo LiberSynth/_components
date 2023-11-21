@@ -10,7 +10,7 @@ interface
 
 uses
   { VCL }
-  Classes, SysUtils,
+  SysUtils,
   { vSoft }
   uConsts, uTypes;
 
@@ -42,7 +42,7 @@ function DivideSecurely(Dividend, Divider: Integer): Double; overload;
 function DivSecurely(Dividend, Divider: Integer): Integer;
 { ^ Безопасное деление. При попытке деления на 0 возвращает 0. ^ }
 
-{ v Жизнь без Math)) v }
+{ v Жизнь без Math в каждом юните)) v }
 function Min(Value1, Value2: Int64): Int64; overload;
 function Max(Value1, Value2: Int64): Int64; overload;
 function Min(Value1, Value2: Double): Double; overload;
@@ -50,7 +50,7 @@ function Max(Value1, Value2: Double): Double; overload;
 function Power(const Base, Exponent: Extended): Extended; overload;
 function Power(const Base, Exponent: Double): Double; overload;
 function Power(const Base, Exponent: Single): Single; overload;
-{ ^ Жизнь без Math)) ^ }
+{ ^ Жизнь без Math в каждом юните)) ^ }
 
 implementation
 

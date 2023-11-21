@@ -1,10 +1,16 @@
 unit uUtils;
 
+(*********************************************************)
+(*                                                       *)
+(*                        Hello!)                        *)
+(*                                                       *)
+(*********************************************************)
+
 interface
 
 uses
   { vSoft }
-  uTypes, uDataUtils;
+  uTypes;
 
 function IntArrayMin(const _Array: TIntegerArray): Integer;
 
