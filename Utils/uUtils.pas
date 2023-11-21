@@ -10,7 +10,7 @@ interface
 
 uses
   { vSoft }
-  uTypes;
+  uTypes, uDataUtils;
 
 function IntArrayMin(const _Array: TIntegerArray): Integer;
 

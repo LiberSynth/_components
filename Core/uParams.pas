@@ -6,8 +6,11 @@ unit uParams;
 (*                                                       *)
 (*********************************************************)
 
-{ TODO -oVasilyevSM -cuParams: Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. }
-{ TODO -oVasilyevSM -cuParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
+{ TODO -oVasilyevSM -cuParams: Нужен компонент TIniParams, которая будет сохраняться в файл. }
+{ TODO -oVasilyevSM -cuParams: Нужен компонент TRegistryParams, который будет сохраняться в реестр. }
+{ TODO -oVasilyevSM -cuParams: У этих оболочек есть общий предок, в котором будет управляться свойство, сохранять ли значения по умолчанию. Значение параметра может определяться в прикладном коде (SetAs...Def), но надо ли сохранять хранить его - большой вопрос. Это очень неудобно, когда все значения по умолчанию не сохраняются. Конечно, при следующем запуске приложение присвоит их без источника, но когда мы хотим поменять такой параметр в ини, нужно вспомнить его название. Но вот, если в следующей версии приложения по умолчанию будет другое значение, нужно отдельно предусматривать апгрейд параметров в этом случае. Чтобы не получилось эффекта Янушкевича. Типа, да мы тогда задавали такие значения, а теперь новая версия отрабатывает старое поведение. }
+{ TODO -oVasilyevSM -cuParams: Обе эти оболочкм должны уметь логировать все, что сохранили, это должен быть объект-помощник (TRecorder), использующий компонент TLogger. Потом надо использовать эти данные для универсальног деисталятора. }
+{ TODO -oVasilyevSM -cuParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream. Сохранение объекта класса в блоб - отдельная задача, требующая изучения общепринятого подхода. }
 { TODO -oVasilyevSM -cuParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
 { TODO -oVasilyevSM -cuParams: Нужен также компонент TRegParams }
 { TODO -oVasilyevSM -cuParams: Можно дописывать TParamHelper }
@@ -234,7 +237,7 @@ type
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
 { TODO -oVasilyevSM -cuParams: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
-function ParamsToStr(Params: TParams): String;
+function ParamsToStr(Params: TParams; Shift: Integer = 0): String;
 
 implementation
 
@@ -274,43 +277,44 @@ begin
 
 end;
 
-function ParamsToStr(Params: TParams): String;
+function ParamsToStr(Params: TParams; Shift: Integer): String;
 const
 
-  SC_SingleParamFormat = '%s = %s' + CRLF;
-
-  SC_NestedParamsFormat =
-
-      '%s = (' + CRLF +
-      '%s' +
-      ')' + CRLF;
+  SC_Single = '%s: %s = %s' + CRLF;
+  SC_Nested = '%s: %s = (' + CRLF + '%s)' + CRLF;
 
 var
-  Param: TParam;
+  P: TParam;
+  ValueFormat, Value: String;
 begin
 
-  { TODO -oVasilyevSM -cuParams: Пока так }
-
   Result := '';
-  for Param in Params do
 
-    if Param.DataType = dtParams then
+  for P in Params do
 
-      Result := Result + Format(SC_NestedParamsFormat, [
+    with P do begin
 
-          Param.Name,
-          ShiftText(Param.AsString, 1)
+      if DataType = dtParams then ValueFormat := SC_Nested
+      else ValueFormat := SC_Single;
 
-      ])
+      case DataType of
 
-    else
+        dtParams: Value := ShiftText(ParamsToStr(AsParams, Shift), Shift + 1);
+        dtString: Value := QuoteStr (AsString);
 
-      Result := Result + Format(SC_SingleParamFormat, [
+      else
+        Value := AsString;
+      end;
 
-          Param.Name,
-          Param.AsString
+      Result := Result + Format(ValueFormat, [
+
+          Name,
+          ParamDataTypeToStr(DataType),
+          Value
 
       ]);
+
+    end;
 
 end;
 

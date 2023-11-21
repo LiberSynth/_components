@@ -43,8 +43,8 @@ function SpaceReplicate(Count: Cardinal): String;
 function CompleteStr(const Value: String; Completer: Char; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function CompleteStr(const Value: String; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function StrCount(const Value: String; Pattern: String): Integer;
-function QuoteStr(const Value: String): String;
-function UnquoteStr(const Value: String): String;
+function QuoteStr(const Value: String; PercentEscaping: Boolean = False): String;
+function UnquoteStr(const Value: String; PercentEscaping: Boolean = False): String;
 function CutStr(var Value: String; Count: Integer): Boolean;
 function SameText(const Value: String; Patterns: TStringArray): Boolean; overload;
 
@@ -166,12 +166,13 @@ end;
 
 function DoubleToStr(Value: Double): String;
 begin
+  { TODO -oVasilyevSM -cuStrUtils: Ошибка Макеровой. "Вводим большое число и фигня какая-то. }
   Result := StringReplace(FloatToStr(Value), {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, '.', []);
 end;
 
 function StrToDouble(const Value: String): Double;
 begin
-  Result := StrToFloat(Value);
+  Result := StrToFloat(GetFloatStr(Value));
 end;
 
 function DateTimeToStr(Value: TDateTime): String;
@@ -622,12 +623,14 @@ begin
 
 end;
 
-function QuoteStr(const Value: String): String;
+function QuoteStr(const Value: String; PercentEscaping: Boolean): String;
 begin
   Result := '''' + StringReplace(Value, '''', '''''', [rfReplaceAll]) + '''';
+  if PercentEscaping then
+    Result := StringReplace(Result, '%', '%%', [rfReplaceAll])
 end;
 
-function UnquoteStr(const Value: String): String;
+function UnquoteStr(const Value: String; PercentEscaping: Boolean): String;
 var
   L: Integer;
 begin
@@ -636,14 +639,18 @@ begin
   if
 
       (L > 1) and
-      (Result[1] = '''') and
-      (Result[Length(Result)] = '''')
+      (Value[1] = '''') and
+      (Value[L] = '''')
 
-  then
+  then begin
 
-    Result := StringReplace(Copy(Value, 2, Length(Result) - 2), '''''', '''', [rfReplaceAll])
+    Result := Copy(Value, 2, L - 2);
 
-  else Result := Value;
+    Result := StringReplace(Result, '''''', '''', [rfReplaceAll]);
+    if PercentEscaping then
+      Result := StringReplace(Result, '%%', '%', [rfReplaceAll]);
+
+  end else Result := Value;
 
 end;
 
