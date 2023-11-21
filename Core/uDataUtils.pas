@@ -20,20 +20,20 @@ function BooleanToInt(Value: Boolean): Int64;
 function BooleanToBLOB(Value: Boolean): BLOB;
 function IntToBoolean(Value: Int64): Boolean;
 function BLOBToBoolean(const Value: BLOB): Boolean;
-function DataToAnsiStr(const Data: TData; Offset: Integer = 0): AnsiString;
-function DataToStr(const Data: TData; Offset: Integer = 0): String;
-function DataToGUID(const Data: TData): TGUID;
+function DataToAnsiStr(const Value: TData; Offset: Integer = 0): AnsiString;
+function DataToStr(const Value: TData; Offset: Integer = 0): String;
+function DataToGUID(const Value: TData): TGUID;
 { ^ Преобразование основных типов данных ^ }
 
 { v Cравнение действительных чисел с отбросом "мусорной" части v }
-function SameDouble(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
-function DoubleEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
-function DoubleLess(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
-function DoubleMore(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
-function DoubleLessEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
-function DoubleMoreEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
-function DoubleMax(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
-function DoubleMin(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
+function SameDouble(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleLess(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMore(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleLessEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMoreEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMax(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
+function DoubleMin(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
 { ^ Cравнение действительных чисел с отбросом "мусорной" части ^ }
 
 { v Безопасное деление. При попытке деления на 0 возвращает 0. v }
@@ -43,9 +43,9 @@ function DivSecurely(Dividend, Divider: Integer): Integer;
 { ^ Безопасное деление. При попытке деления на 0 возвращает 0. ^ }
 
 { v Жизнь без Math в каждом юните)) v }
-function Min(Value1, Value2: Int64): Int64; overload;
-function Max(Value1, Value2: Int64): Int64; overload;
-function Min(Value1, Value2: Double): Double; overload;
+function Min(ValueA, ValueB: Int64): Int64; overload;
+function Max(ValueA, ValueB: Int64): Int64; overload;
+function Min(ValueA, ValueB: Double): Double; overload;
 function Max(Value1, Value2: Double): Double; overload;
 function Power(const Base, Exponent: Extended): Extended; overload;
 function Power(const Base, Exponent: Double): Double; overload;
@@ -97,69 +97,69 @@ begin
   else Result := 0;
 end;
 
-function DataToAnsiStr(const Data: TData; Offset: Integer = 0): AnsiString;
+function DataToAnsiStr(const Value: TData; Offset: Integer = 0): AnsiString;
 var
   L: Integer;
 begin
-  L := _GetNewLength(Length(Data), Offset);
+  L := _GetNewLength(Length(Value), Offset);
   SetLength(Result, L);
-  Move(Data[Offset], Result[1], L);
+  Move(Value[Offset], Result[1], L);
 end;
 
-function DataToStr(const Data: TData; Offset: Integer = 0): String;
+function DataToStr(const Value: TData; Offset: Integer = 0): String;
 var
   L: Integer;
 begin
-  L := _GetNewLength(Length(Data), Offset);
+  L := _GetNewLength(Length(Value), Offset);
   SetLength(Result, L div 2);
-  Move(Data[Offset], Result[1], L);
+  Move(Value[Offset], Result[1], L);
 end;
 
-function DataToGUID(const Data: TData): TGUID;
+function DataToGUID(const Value: TData): TGUID;
 begin
-  Move(Data[0], Result, 16);
+  Move(Value[0], Result, 16);
 end;
 
-function SameDouble(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function SameDouble(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
-  Result := DoubleEqual(D1, D2, Scale);
+  Result := DoubleEqual(ValueA, ValueB, Scale);
 end;
 
-function DoubleEqual(D1, D2: Double; Scale: Integer): Boolean;
+function DoubleEqual(ValueA, ValueB: Double; Scale: Integer): Boolean;
 begin
-  Result := Abs(D1 - D2) < Power(10, - Scale);
+  Result := Abs(ValueA - ValueB) < Power(10, - Scale);
 end;
 
-function DoubleLess(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleLess(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
-  Result := not DoubleEqual(D1, D2, Scale) and (D1 < D2);
+  Result := not DoubleEqual(ValueA, ValueB, Scale) and (ValueA < ValueB);
 end;
 
-function DoubleMore(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMore(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
-  Result := not DoubleEqual(D1, D2, Scale) and (D1 > D2);
+  Result := not DoubleEqual(ValueA, ValueB, Scale) and (ValueA > ValueB);
 end;
 
-function DoubleLessEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleLessEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
-  Result := DoubleLess(D1, D2, Scale) or DoubleEqual(D1, D2, Scale);
+  Result := DoubleLess(ValueA, ValueB, Scale) or DoubleEqual(ValueA, ValueB, Scale);
 end;
 
-function DoubleMoreEqual(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMoreEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 begin
-  Result := DoubleMore(D1, D2, Scale) or DoubleEqual(D1, D2, Scale);
+  Result := DoubleMore(ValueA, ValueB, Scale) or DoubleEqual(ValueA, ValueB, Scale);
 end;
 
-function DoubleMax(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
+function DoubleMax(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
 begin
-  if DoubleMore(D1, D2) then Result := D1
-  else Result := D2;
+  if DoubleMore(ValueA, ValueB) then Result := ValueA
+  else Result := ValueB;
 end;
 
-function DoubleMin(D1, D2: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
+function DoubleMin(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
 begin
-  if DoubleLess(D1, D2) then Result := D1
-  else Result := D2;
+  if DoubleLess(ValueA, ValueB) then Result := ValueA
+  else Result := ValueB;
 end;
 
 function DivideSecurely(Dividend, Divider: Double): Double;
@@ -180,19 +180,19 @@ begin
   else Result := Dividend div Divider;
 end;
 
-function Min(Value1, Value2: Int64): Int64;
+function Min(ValueA, ValueB: Int64): Int64;
 begin
-  if Value1 <= Value2 then Result := Value1 else Result := Value2;
+  if ValueA <= ValueB then Result := ValueA else Result := ValueB;
 end;
 
-function Max(Value1, Value2: Int64): Int64;
+function Max(ValueA, ValueB: Int64): Int64;
 begin
-  if Value1 >= Value2 then Result := Value1 else Result := Value2;
+  if ValueA >= ValueB then Result := ValueA else Result := ValueB;
 end;
 
-function Min(Value1, Value2: Double): Double;
+function Min(ValueA, ValueB: Double): Double;
 begin
-  Result := DoubleMax(Value1, Value2);
+  Result := DoubleMax(ValueA, ValueB);
 end;
 
 function Max(Value1, Value2: Double): Double;

@@ -18,7 +18,7 @@ uses
 function StrIsBoolean(const S: String): Boolean;
 function StrIsGUID(const Value: String): Boolean;
 
-{ Можно ополнить: Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
+{ Можно дополнить: Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
 function BooleanToStr(Value: Boolean): String;
 function StrToBoolean(const S: String): Boolean;
 function IntToStr(Value: Int64): String;
@@ -35,18 +35,18 @@ function HexStrToBLOB(const Value: String): BLOB;
 { ^ Преобразование основных типов данных ^ }
 
 { v Для парсинга и автоскриптов v }
-function PosOf(Patterns: String; const S: String; Start: Integer = 1): Integer;
+function PosOf(Patterns: String; const Value: String; Start: Integer = 1): Integer;
 function ReadStrTo(var S: String; const Pattern: String; WithPattern: Boolean = False): String;
-function LastPos(const Pattern, S: String): Integer;
+function LastPos(const Pattern, Value: String): Integer;
 function StringReplicate(const Pattern: String; Count: Cardinal): String;
 function SpaceReplicate(Count: Cardinal): String;
 function CompleteStr(const Value: String; Completer: Char; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function CompleteStr(const Value: String; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
-function StrCount(const S: String; Pattern: String): Integer;
-function QuoteStr(const S: String): String;
-function UnquoteStr(const S: String): String;
-function CutStr(var Value: String; CutCount: Integer): Boolean;
-function SameText(const S: String; Patterns: TStringArray): Boolean; overload;
+function StrCount(const Value: String; Pattern: String): Integer;
+function QuoteStr(const Value: String): String;
+function UnquoteStr(const Value: String): String;
+function CutStr(var Value: String; Count: Integer): Boolean;
+function SameText(const Value: String; Patterns: TStringArray): Boolean; overload;
 
 function StrMaskMatch(Value, Mask: String): Boolean;
 function FileMaskMatch(const FileName, Mask: String): Boolean;
@@ -491,7 +491,7 @@ begin
 
 end;
 
-function PosOf(Patterns: String; const S: String; Start: Integer): Integer;
+function PosOf(Patterns: String; const Value: String; Start: Integer): Integer;
 var
   Pt: String;
 
@@ -502,11 +502,11 @@ var
   begin
 
     LP := Length(Pt);
-    L := Length(S) - LP + 1;
+    L := Length(Value) - LP + 1;
 
     for i := Start to L do begin
 
-      Token := Copy(S, i, LP);
+      Token := Copy(Value, i, LP);
       if SameText(Token, Pt) then Exit(i);
 
     end;
@@ -554,14 +554,14 @@ begin
 
 end;
 
-function LastPos(const Pattern, S: String): Integer;
+function LastPos(const Pattern, Value: String): Integer;
 var
   i, pl: Integer;
 begin
 
   pl := Length(Pattern);
-  for i := Length(S) - pl + 1 downto 1 do
-    if Copy(S, i, pl) = Pattern then Exit(i);
+  for i := Length(Value) - pl + 1 downto 1 do
+    if Copy(Value, i, pl) = Pattern then Exit(i);
 
   Result := 0;
 
@@ -604,7 +604,7 @@ begin
   Result := CompleteStr(Value, ' ', Count, Before, Cut);
 end;
 
-function StrCount(const S: String; Pattern: String): Integer;
+function StrCount(const Value: String; Pattern: String): Integer;
 var
   i, p: Integer;
 begin
@@ -613,24 +613,24 @@ begin
   i := 1;
   repeat
 
-    p := Pos(Pattern, Copy(S, i, Length(S)));
+    p := Pos(Pattern, Copy(Value, i, Length(Value)));
     if p = 0 then Exit;
     Inc(Result);
     Inc(i, p);
 
-  until i > Length(S) - Length(Pattern) + 1;
+  until i > Length(Value) - Length(Pattern) + 1;
 
 end;
 
-function QuoteStr(const S: String): String;
+function QuoteStr(const Value: String): String;
 begin
-  Result := '''' + S + '''';
+  Result := '''' + StringReplace(Value, '''', '''''', [rfReplaceAll]) + '''';
 end;
 
-function UnquoteStr(const S: String): String;
+function UnquoteStr(const Value: String): String;
 begin
 
-  Result := S;
+  Result := Value;
   if Length(Result) > 1 then begin
 
     if Result[1] = '''' then Result := Copy(Result, 2, Length(Result) - 1);
@@ -639,22 +639,22 @@ begin
   end;
 end;
 
-function CutStr(var Value: String; CutCount: Integer): Boolean;
+function CutStr(var Value: String; Count: Integer): Boolean;
 var
   L: Integer;
 begin
   L := Length(Value);
-  Result := L >= CutCount;
-  if Result then Value := Copy(Value, 1, L - CutCount);
+  Result := L >= Count;
+  if Result then Value := Copy(Value, 1, L - Count);
 end;
 
-function SameText(const S: String; Patterns: TStringArray): Boolean;
+function SameText(const Value: String; Patterns: TStringArray): Boolean;
 var
   i: Integer;
 begin
 
   for i := Low(Patterns) to High(Patterns) do
-    if SameText(S, Patterns[i]) then Exit(True);
+    if SameText(Value, Patterns[i]) then Exit(True);
 
   Result := False;
 
