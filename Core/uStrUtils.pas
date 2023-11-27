@@ -21,8 +21,10 @@ function StrIsGUID(const Value: String): Boolean;
 { Можно дополнить: Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
 function BooleanToStr(Value: Boolean): String;
 function StrToBoolean(const S: String): Boolean;
-function IntToStr(Value: Int64): String;
-function StrToInt(const Value: String): Int64;
+function IntToStr(Value: Integer): String;
+function StrToInt(const Value: String): Integer;
+function BigIntToStr(Value: Int64): String;
+function StrToBigInt(const Value: String): Int64;
 function DoubleToStr(Value: Double): String;
 function StrToDouble(const Value: String): Double;
 function DateTimeToStr(Value: TDateTime): String;
@@ -154,12 +156,22 @@ begin
 
 end;
 
-function IntToStr(Value: Int64): String;
+function IntToStr(Value: Integer): String;
 begin
   Result := SysUtils.IntToStr(Value);
 end;
 
-function StrToInt(const Value: String): Int64;
+function StrToInt(const Value: String): Integer;
+begin
+  Result := SysUtils.StrToInt(Value);
+end;
+
+function BigIntToStr(Value: Int64): String;
+begin
+  Result := SysUtils.IntToStr(Value);
+end;
+
+function StrToBigInt(const Value: String): Int64;
 begin
   Result := SysUtils.StrToInt64(Value);
 end;

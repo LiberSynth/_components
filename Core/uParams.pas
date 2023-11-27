@@ -24,7 +24,7 @@ uses
 
 type
 
-  { TODO -oVasilyevSM -cuParams: Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
+  { TODO -oVasilyevSM -cTParam: Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
   TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, {dtExtended, }dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
 
   TParams = class;
@@ -297,7 +297,7 @@ type
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
-{ TODO -oVasilyevSM -cuParams: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
+{ TODO -oVasilyevSM -cParamsToStr: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
 function ParamsToStr(Params: TParams): String;
 procedure StrToParams(const Value: String; Params: TParams);
 
@@ -342,19 +342,17 @@ end;
 function ParamsToStr(Params: TParams): String;
 const
 
-  SC_SingleParamFormat = '%s = %s' + CRLF;
+  SC_SingleParamFormat = '%s: %s = %s' + CRLF;
 
   SC_NestedParamsFormat =
 
-      '%s = (' + CRLF +
+      '%s: %s = (' + CRLF +
       '%s' +
       ')' + CRLF;
 
 var
   Param: TParam;
 begin
-
-  { TODO -oVasilyevSM -cuParams: Пока так }
 
   Result := '';
   for Param in Params do
@@ -364,6 +362,7 @@ begin
       Result := Result + Format(SC_NestedParamsFormat, [
 
           Param.Name,
+          ParamDataTypeToStr(Param.DataType),
           ShiftText(Param.AsString, 1)
 
       ])
@@ -373,6 +372,7 @@ begin
       Result := Result + Format(SC_SingleParamFormat, [
 
           Param.Name,
+          ParamDataTypeToStr(Param.DataType),
           Param.AsString
 
       ]);
@@ -757,8 +757,8 @@ begin
 
       dtBoolean:    Result := BooleanToInt(AsBoolean);
       dtInteger:     Result := AsInteger;
-      dtAnsiString: Result := StrToInt(String(AsAnsiString));
-      dtString:     Result := StrToInt(AsString);
+      dtAnsiString: Result := StrToBigInt(String(AsAnsiString));
+      dtString:     Result := StrToBigInt(AsString);
       dtBLOB:       raise EUncomplitedMethod.Create;
 
     else
@@ -1204,7 +1204,7 @@ begin
 
     dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean (ReadItem);
     dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt     (TrimDigital(ReadItem));
-    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToInt     (TrimDigital(ReadItem));
+    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt  (TrimDigital(ReadItem));
     dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble  (TrimDigital(ReadItem));
     dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(ReadItem);
     dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID    (ReadItem);
