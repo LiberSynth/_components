@@ -2,7 +2,7 @@ unit vLog;
 
 interface
 
-{TODO -oVasilyevSM -cdeprecatred unit : -> ProjUtils }
+{ TODO -oVasilyevSM -cdeprecatred unit : -> ProjUtils }
 
 uses
   { VCL }

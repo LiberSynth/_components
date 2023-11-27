@@ -789,21 +789,25 @@ var
 begin
 
   L := Length(Value);
-  CRLFTerminated := Value[L - 1] + Value[L] = CRLF;
-  Indent := SpaceReplicate(Abs(Level) * Interval);
+  if L > 0 then begin
 
-  if Level > 0 then begin { Right }
+    CRLFTerminated := Value[L - 1] + Value[L] = CRLF;
+    Indent := SpaceReplicate(Abs(Level) * Interval);
 
-    Result := Indent + StringReplace(Value, CRLF, CRLF + Indent, [rfReplaceAll]);
-    if CRLFTerminated then
-      Result := Copy(Result, 1, Length(Result) - Length(Indent));
+    if Level > 0 then begin { Right }
 
-  end else if Level < 0 then begin { Left }
+      Result := Indent + StringReplace(Value, CRLF, CRLF + Indent, [rfReplaceAll]);
+      if CRLFTerminated then
+        Result := Copy(Result, 1, Length(Result) - Length(Indent));
 
-    Result := Copy(Value, Length(Indent) + 1, L);
-    Result := StringReplace(Result, CRLF + Indent, CRLF, [rfReplaceAll]);
+    end else if Level < 0 then begin { Left }
 
-  end else Result := Value; { Nowhere }
+      Result := Copy(Value, Length(Indent) + 1, L);
+      Result := StringReplace(Result, CRLF + Indent, CRLF, [rfReplaceAll]);
+
+    end else Result := Value; { Nowhere }
+
+  end else Result := '';
 
 end;
 

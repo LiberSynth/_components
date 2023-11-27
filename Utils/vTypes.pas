@@ -1,6 +1,6 @@
 unit vTypes;
 
-{TODO -oVasilyevSM -cdeprecatred unit : -> Core }
+{ TODO -oVasilyevSM -cdeprecatred unit : -> Core }
 
 interface
 
@@ -22,8 +22,8 @@ const
   BOM_UTF16BE = #$FF#$FF;
   BOM_UTF16LE = #$FF#$FE;
 
-  {TODO -oVasilyevSM -cdeprecatred unit : использовать только для часто используемых текстов }
-  {TODO -oVasilyevSM -cdeprecatred unit : -> vConsts }
+  { TODO -oVasilyevSM -cdeprecatred unit : использовать только для часто используемых текстов }
+  { TODO -oVasilyevSM -cdeprecatred unit : -> vConsts }
 
   SC_BooleanConvertError = '%s is not a valid Boolean value';
   SC_UnterminatedString = 'Unterminated String';

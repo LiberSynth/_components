@@ -131,6 +131,7 @@ type
     property AsBoolean: Boolean read _GetAsBoolean write _SetAsBoolean;
     property AsInteger: Integer read _GetAsInteger write _SetAsInteger;
     property AsBigInt: Int64 read _GetAsBigInt write _SetAsBigInt;
+    { TODO -oVasilyevSM -cTParamHelper: Продолжение следует }
 //    property AsFloat: Double read GetAsFloat write SetAsFloat;
 //    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
 //    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
@@ -144,11 +145,12 @@ type
 
     {
 
-      _Name - всегда чистое имя параметра без пути. Путь через "." это _Path, причем, вместе с именем на последнем
+      _Name - всегда чистое имя параметра без пути. Путь через "." это _Path, причем, вместе с именем на последнем.
       месте.
       Методы SetAs... создают путь и конечный параметр, используя GetParam, если их нет.
       Метод FindParam ничего не создает, только ищет существующий.
       Метод ParamByName вовсе генерирует исключение, если чего-то не хватает.
+      Краткая запись при сохранении с предопределенными типами здесь не поддерживается. Нужно исполнять ее в потомках.
 
     }
 
@@ -246,8 +248,9 @@ type
   TReadInfo = record
 
     State: TState;
-    KeyTypes: TKeyWordTypes;
+    EntryKeyTypes: TKeyWordTypes;
     Proc: TProcedure;
+    ValidKeyTypes: TKeyWordTypes;
 
   end;
 
@@ -256,8 +259,9 @@ type
   strict private
 
     FParams: TParams;
-    FState: TState;
+    FNested: Boolean;
 
+    FState: TState;
     FCurrentName: String;
     FCurrentType: TParamDataType;
 
@@ -269,15 +273,26 @@ type
 
     function TrimDigital(const _Value: String): String;
     procedure CheckParams(_KeyWord: TKeyWord);
+    function CheckExpectedKey: Boolean;
+    function KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
+    function KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
     function ReadParams(_KeyWord: TKeyWord): Int64;
 
     function GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
-    procedure AddReadSetting(_State: TState; _KeyTypes: TKeyWordTypes; _Proc: TProcedure);
+    procedure AddReadSetting(
+
+        _State: TState;
+        _EntryKeyTypes: TKeyWordTypes;
+        _Proc: TProcedure;
+        _ValidKeyTypes: TKeyWordTypes
+
+    );
     procedure InitReadSetting;
 
   protected
 
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
+    function SpecialSpace: Boolean; override;
 
   public
 
@@ -293,12 +308,16 @@ type
 
   end;
 
-  EParamsReadException = class(ECoreException);
+  EParamsReadException = class(EStringParserException);
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
-{ TODO -oVasilyevSM -cParamsToStr: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
-function ParamsToStr(Params: TParams): String;
+{ TODO -oVasilyevSM -cParamsToStr: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле
+  или без него. И тогда при считывании тип должен предварительно определяться в приложении через вызов функций
+  RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams также можно просто на вход
+  подавать пустой контейнер с готовой структурой. Тогда она просто заполняется данными, типы известны и не требуют
+  хранения в строке. }
+function ParamsToStr(Params: TParams; SingleString: Boolean = False): String;
 procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
@@ -339,16 +358,39 @@ begin
 
 end;
 
-function ParamsToStr(Params: TParams): String;
+function ParamsToStr(Params: TParams; SingleString: Boolean): String;
 const
 
-  SC_SingleParamFormat = '%s: %s = %s' + CRLF;
+  SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
+  SC_SingleParamSingleStringFormat = '%s: %s = %s;';
 
-  SC_NestedParamsFormat =
+  SC_NestedParamsMultiStringFormat =
 
       '%s: %s = (' + CRLF +
       '%s' +
       ')' + CRLF;
+
+  SC_NestedParamsSingleStringFormat =
+
+      '%s: %s = (%s);';
+
+  function _NestedParamsFormat: String;
+  begin
+    if SingleString then Result := SC_NestedParamsSingleStringFormat
+    else Result := SC_NestedParamsMultiStringFormat;
+  end;
+
+  function _SingleParamFormat: String;
+  begin
+    if SingleString then Result := SC_SingleParamSingleStringFormat
+    else Result := SC_SingleParamMultiStringFormat;
+  end;
+
+  function _GetNested(_Param: TParam): String;
+  begin
+    Result := ParamsToStr(_Param.AsParams, SingleString);
+    if not SingleString then ShiftText(1, Result);
+  end;
 
 var
   Param: TParam;
@@ -359,23 +401,25 @@ begin
 
     if Param.DataType = dtParams then
 
-      Result := Result + Format(SC_NestedParamsFormat, [
+      Result := Result + Format(_NestedParamsFormat, [
 
           Param.Name,
           ParamDataTypeToStr(Param.DataType),
-          ShiftText(Param.AsString, 1)
+          _GetNested(Param)
 
       ])
 
     else
 
-      Result := Result + Format(SC_SingleParamFormat, [
+      Result := Result + Format(_SingleParamFormat, [
 
           Param.Name,
           ParamDataTypeToStr(Param.DataType),
           Param.AsString
 
       ]);
+
+  if SingleString then CutStr(Result, 1);
 
 end;
 
@@ -904,8 +948,13 @@ begin
 
   end;
 
-  if Params.FindParam(_Path, Param) then Result := Param
-  else Result := Params.Add(_Path);
+  {
+
+    Для возможности многострочных структур просто параметры не поддерживают чтение без типов. Сохранение с
+    зарегистрированными типами должно исполнятся в потомках. Поэтому, просто Add.
+
+  }
+  Result := Params.Add(_Path);
 
 end;
 
@@ -1144,6 +1193,7 @@ begin
   inherited Create(_Source, _Cursor, _Line, _LinePos);
 
   FParams := _Params;
+  FNested := _Cursor > 1;
 
   FState := stName;
 
@@ -1182,8 +1232,8 @@ begin
   FCurrentName := ReadItem;
 
   { Определенный заранее тип данных }
-  {TODO -oVasilyevSM -cTParamsReader : Тут еще надо подумать, может, будет у ини-параметра свойство,
-    зарегистрированный тип. Тогда сперва из него читать, и проверять, что считанный тип такой же. }
+  { TODO -oVasilyevSM -cTParamsReader : Тут еще надо подумать, может, будет у ини-параметра свойство, зарегистрированный
+    тип. Тогда сперва из него читать, и проверять, что считанный тип такой же. }
   if FParams.FindParam(FCurrentName, P) and (P.DataType <> dtUnknown) then
     FCurrentType := P.DataType;
 
@@ -1198,7 +1248,7 @@ procedure TParamsReader.SetValue;
 begin
 
   if FCurrentType = dtUnknown then
-    raise EParamsReadException.Create('Unknown data type');
+    raise EParamsReadException.Create('Unknown data type', Line, Cursor - LinePos);
 
   case FCurrentType of
 
@@ -1219,9 +1269,57 @@ begin
 
 end;
 
+function TParamsReader.SpecialSpace: Boolean;
+begin
+
+  case FCurrentType of
+
+    dtDateTime: Result := not CheckExpectedKey;
+    dtString:   Result := not CheckExpectedKey;
+
+  else
+    Result := inherited;
+  end;
+
+end;
+
 function TParamsReader.TrimDigital(const _Value: String): String;
 begin
   Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
+end;
+
+function TParamsReader.CheckExpectedKey: Boolean;
+var
+  KW: TKeyWord;
+  RI: TReadInfo;
+  Expected: TKeyWordTypes;
+begin
+
+  Expected := [];
+  for RI in FReadSettings do
+    if RI.State = FState then begin
+
+      Expected := RI.EntryKeyTypes;
+      Break;
+
+    end;
+
+  for KW in KeyWords do
+    if CheckKey(KW) and KeyWordTypeInSet(KW, Expected) then
+      Exit(True);
+
+  Result := False;
+
+end;
+
+function TParamsReader.KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
+begin
+  Result := TKeyWordType(_KeyWord.KeyType) in _Set;
+end;
+
+function TParamsReader.KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
+begin
+  Result := TKeyWordType(_KeyType) in _Set;
 end;
 
 procedure TParamsReader.CheckParams(_KeyWord: TKeyWord);
@@ -1229,8 +1327,8 @@ begin
 
   if (FCurrentType = dtParams) and (FState = stValue) then begin
 
-    if not (TKeyWordType(_KeyWord.KeyType) in [ktSpace, ktLineEnd, ktOpeningBracket]) then
-      raise EParamsReadException.CreateFmt('''('' expected but ''%s'' found', [_KeyWord.StrValue]);
+    if not KeyWordTypeInSet(_KeyWord, [ktSpace, ktLineEnd, ktOpeningBracket]) then
+      raise EParamsReadException.CreateFmt('''('' expected but ''%s'' found', [_KeyWord.StrValue], Line, Cursor - LinePos);
 
     if TKeyWordType(_KeyWord.KeyType) = ktOpeningBracket then
       Move(ReadParams(_KeyWord) - Cursor);
@@ -1239,6 +1337,9 @@ begin
 
   if TKeyWordType(_KeyWord.KeyType) = ktClosingBracket then
     Terminate;
+
+  if FNested and not Terminated and (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd) then
+    raise EParamsReadException.Create('Unterminated nested params', Line, Cursor - LinePos);
 
 end;
 
@@ -1272,14 +1373,15 @@ begin
       end;
 
   finally
-    FParams.GetParam(FCurrentName).SetAsParams(P);
-  end;
 
-  ItemBody := False;
-  ItemBegin := 0;
-  FCurrentName := '';
-  FCurrentType := dtUnknown;
-  FState := stName;
+    FParams.GetParam(FCurrentName).SetAsParams(P);
+    ItemBody := False;
+    ItemBegin := 0;
+    FCurrentName := '';
+    FCurrentType := dtUnknown;
+    FState := stName;
+
+  end;
 
 end;
 
@@ -1288,12 +1390,13 @@ var
   RI: TReadInfo;
 begin
 
+  { Поиск результата }
   for RI in FReadSettings do
 
     if
 
         (RI.State = _State) and
-        (TKeyWordType(_KeyType) in RI.KeyTypes)
+        KeyTypeInSet(_KeyType, RI.EntryKeyTypes)
 
     then begin
 
@@ -1302,11 +1405,21 @@ begin
 
     end;
 
-  Result := False;
+  { Проверка на допустимый тип ключевого слова }
+  for RI in FReadSettings do
+
+    if
+
+        (RI.State = _State) and
+        KeyTypeInSet(_KeyType, RI.ValidKeyTypes)
+
+    then Exit(False);
+
+  raise EParamsReadException.Create('Unexpected keyword', Line, Cursor - LinePos);
 
 end;
 
-procedure TParamsReader.AddReadSetting(_State: TState; _KeyTypes: TKeyWordTypes; _Proc: TProcedure);
+procedure TParamsReader.AddReadSetting(_State: TState; _EntryKeyTypes: TKeyWordTypes; _Proc: TProcedure; _ValidKeyTypes: TKeyWordTypes);
 var
   L: Integer;
 begin
@@ -1316,9 +1429,10 @@ begin
 
   with FReadSettings[L] do begin
 
-    State :=    _State;
-    KeyTypes := _KeyTypes;
-    Proc :=     _Proc;
+    State :=         _State;
+    EntryKeyTypes := _EntryKeyTypes;
+    Proc :=          _Proc;
+    ValidKeyTypes := _ValidKeyTypes;
 
   end;
 
@@ -1329,9 +1443,9 @@ begin
 
   SetLength(FReadSettings, 0);
 
-  AddReadSetting(stName,  [ktTypeIdent, ktAssigning],                             GetName );
-  AddReadSetting(stType,  [ktAssigning],                                          GetType );
-  AddReadSetting(stValue, [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket], SetValue);
+  AddReadSetting(stName,  [ktTypeIdent, ktAssigning],                             GetName,  [ktSpace]);
+  AddReadSetting(stType,  [ktAssigning],                                          GetType,  [ktSpace]);
+  AddReadSetting(stValue, [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket], SetValue, [ktSpace]);
 
 end;
 

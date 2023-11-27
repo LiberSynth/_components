@@ -42,21 +42,25 @@ type
     FLinePos: Int64;
 
     function CheckKeys: Boolean;
-    function CheckKey(const _KeyWord: TKeyWord): Boolean;
     procedure KeyFound(const _KeyWord: TKeyWord);
     procedure IncLine(const _KeyWord: TKeyWord);
 
   protected
 
     procedure AddKeyWord(_KeyType: Integer; const _StrValue: String);
+    function CheckKey(const _KeyWord: TKeyWord): Boolean;
     procedure Move(_Incrementer: Int64 = 1);
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
     procedure MoveEvent; virtual;
     procedure Terminate;
     function ReadItem: String;
+    { Функция, позволяющая НЕ считать ключевыми словами любые символы внутри какого-либо пространства (строки, комментарии итд) }
+    function SpecialSpace: Boolean; virtual;
 
+    property KeyWords: TKeyWordList read FKeyWords;
     property ItemBody: Boolean read FItemBody write FItemBody;
     property ItemBegin: Int64 read FItemBegin write FItemBegin;
+    property Terminated: Boolean read FTerminated;
 
   public
 
@@ -84,8 +88,12 @@ type
 
   public
 
+    { TODO -oVasilyevSM -cTCustomStringParser: В случае отрицательной позиции здесь нужно в принципе по-другому
+      отсчитывать строки, чтобы нормально спозиционироваться. И ItemBegin на момент генерации исключения может быть
+      сброшен, поэтому надо хранить последний актуальный ItemBegin и его возвращать здесь. }
     constructor Create(const _Message: String; _Line, _Position: Int64);
     constructor CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64);
+    constructor CreatePos(const _Message: String; _Line, _Position: Int64);
 
   end;
 
@@ -134,26 +142,18 @@ var
   KW: TKeyWord;
 begin
 
-  for KW in FKeyWords do
+  if not SpecialSpace then
 
-    if CheckKey(KW) then begin
+    for KW in FKeyWords do
 
-      KeyFound(KW);
-      Exit(True);
+      if CheckKey(KW) then begin
 
-    end;
+        KeyFound(KW);
+        Exit(True);
+
+      end;
 
   Result := False;
-
-end;
-
-function TCustomStringParser.CheckKey(const _KeyWord: TKeyWord): Boolean;
-begin
-
-  Result :=
-
-    ((Cursor + _KeyWord.KeyLength) < Length) and
-    SameText(_KeyWord.StrValue, Copy(Source, Cursor, _KeyWord.KeyLength));
 
 end;
 
@@ -172,6 +172,11 @@ end;
 procedure TCustomStringParser.AddKeyWord(_KeyType: Integer; const _StrValue: String);
 begin
   FKeyWords.Add(TKeyWord.Create(_KeyType, _StrValue));
+end;
+
+function TCustomStringParser.CheckKey(const _KeyWord: TKeyWord): Boolean;
+begin
+  Result := SameText(_KeyWord.StrValue, Copy(Source, Cursor, _KeyWord.KeyLength));
 end;
 
 procedure TCustomStringParser.Move(_Incrementer: Int64);
@@ -198,27 +203,18 @@ end;
 procedure TCustomStringParser.Read;
 begin
 
-  try
+  while (Cursor <= Length) and not FTerminated do
 
-    while (Cursor <= Length) and not FTerminated do
+    if not CheckKeys then begin
 
-      {TODO -oVasilyevSM -cTCustomStringParser : Попробовать сделать мягкий цикл,
-        не смог прочитать - пропустил. Хотя это и против идеи скрипта, типа есть
-        синтаксис, если он нарушен, отменяем его целиком. Надо почитать в
-        концепциях }
-      if not CheckKeys then begin
+      MoveEvent;
+      Move;
 
-        MoveEvent;
-        Move;
+    end;
 
-      end;
+  KeyEvent(TKeyWord.Create(Integer(ktSourceEnd), ''));
 
-    KeyEvent(TKeyWord.Create(Integer(ktSourceEnd), ''));
-
-  except
-    on E: Exception do
-      raise EStringParserException.CreateFmt('%s: %s', [E.ClassName, E.Message], Line, Cursor - LinePos + 1);
-  end;
+  { Оборачивать этот метод в try except чревато. В on E do получается уничтоженный объект E. }
 
 end;
 
@@ -237,6 +233,11 @@ begin
 
 end;
 
+function TCustomStringParser.SpecialSpace: Boolean;
+begin
+  Result := False;
+end;
+
 { EStringParserError }
 
 constructor EStringParserException.Create(const _Message: String; _Line, _Position: Int64);
@@ -247,6 +248,11 @@ end;
 constructor EStringParserException.CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64);
 begin
   Create(Format(_Message, _Args), _Line, _Position);
+end;
+
+constructor EStringParserException.CreatePos(const _Message: String; _Line, _Position: Int64);
+begin
+ inherited CreateFmt('%s [Line = %d, position = %d]', [_Message, _Line, _Position]);
 end;
 
 end.

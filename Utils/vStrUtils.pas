@@ -1,6 +1,6 @@
 unit vStrUtils;
 
-{TODO -oVasilyevSM -cdeprecatred unit : -> Core }
+{ TODO -oVasilyevSM -cdeprecatred unit : -> Core }
 
 interface
 

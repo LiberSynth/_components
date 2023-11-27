@@ -17,7 +17,7 @@ uses
 var
 
   { Не нужно пытаться обработать TDateTime. Среда не вызывает методы интерфейса для этого типа по неизвестным причинам. }
-  {TODO -oVasilyevSM -cVDebug : Похоже, проблема была в том, что для TDateTime уже объявлен визуализатор }
+  { TODO -oVasilyevSM -cVDebug : Похоже, проблема была в том, что для TDateTime уже объявлен визуализатор }
 
   StringValueReplacer: TStringValueReplacer;
   GUIDValueReplacer:   TGUIDValueReplacer;

@@ -2,7 +2,7 @@ unit vFileUtils;
 
 interface
 
-{TODO -oVasilyevSM -cdeprecatred unit : -> Core }
+{ TODO -oVasilyevSM -cdeprecatred unit : -> Core }
 
 uses
   { VCL }
