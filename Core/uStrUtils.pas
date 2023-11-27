@@ -43,8 +43,8 @@ function SpaceReplicate(Count: Cardinal): String;
 function CompleteStr(const Value: String; Completer: Char; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function CompleteStr(const Value: String; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function StrCount(const Value: String; Pattern: String): Integer;
-function QuoteStr(const Value: String; PercentEscaping: Boolean = False): String;
-function UnquoteStr(const Value: String; PercentEscaping: Boolean = False): String;
+function QuoteStr(const Value: String; PercentDoubling: Boolean = False): String;
+function UnquoteStr(const Value: String; PercentDoubling: Boolean = False): String;
 function CutStr(var Value: String; Count: Integer): Boolean;
 function SameText(const Value: String; Patterns: TStringArray): Boolean; overload;
 
@@ -623,14 +623,14 @@ begin
 
 end;
 
-function QuoteStr(const Value: String; PercentEscaping: Boolean): String;
+function QuoteStr(const Value: String; PercentDoubling: Boolean): String;
 begin
   Result := '''' + StringReplace(Value, '''', '''''', [rfReplaceAll]) + '''';
-  if PercentEscaping then
+  if PercentDoubling then
     Result := StringReplace(Result, '%', '%%', [rfReplaceAll])
 end;
 
-function UnquoteStr(const Value: String; PercentEscaping: Boolean): String;
+function UnquoteStr(const Value: String; PercentDoubling: Boolean): String;
 var
   L: Integer;
 begin
@@ -647,7 +647,7 @@ begin
     Result := Copy(Value, 2, L - 2);
 
     Result := StringReplace(Result, '''''', '''', [rfReplaceAll]);
-    if PercentEscaping then
+    if PercentDoubling then
       Result := StringReplace(Result, '%%', '%', [rfReplaceAll]);
 
   end else Result := Value;
