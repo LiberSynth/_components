@@ -4,9 +4,13 @@ interface
 
 uses
   { VCL }
-  SysUtils, Generics.Collections;
+  SysUtils, Generics.Collections,
+  { vSoft }
+  uConsts, uCore;
 
 type
+
+  TKeyWordType = (ktSourceEnd, ktLineEnd);
 
   TKeyWord = record
 
@@ -21,8 +25,6 @@ type
   TKeyWordList = class(TList<TKeyWord>)
   end;
 
-  TKeyWordType = (ktSourceEnd);
-
   TCustomStringParser = class
 
   strict private
@@ -31,10 +33,18 @@ type
     FLength: Int64;
     FCursor: Int64;
     FKeyWords: TKeyWordList;
+    FTerminated: Boolean;
+
+    FItemBody: Boolean;
+    FItemBegin: Int64;
+
+    FLine: Int64;
+    FLinePos: Int64;
 
     function CheckKeys: Boolean;
     function CheckKey(const _KeyWord: TKeyWord): Boolean;
     procedure KeyFound(const _KeyWord: TKeyWord);
+    procedure IncLine(const _KeyWord: TKeyWord);
 
   protected
 
@@ -42,10 +52,22 @@ type
     procedure Move(_Incrementer: Int64 = 1);
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
     procedure MoveEvent; virtual;
+    procedure Terminate;
+    function ReadItem: String;
+
+    property ItemBody: Boolean read FItemBody write FItemBody;
+    property ItemBegin: Int64 read FItemBegin write FItemBegin;
 
   public
 
-    constructor Create(const _Source: String);
+    constructor Create(
+
+        const _Source: String;
+        _Cursor: Int64 = 1;
+        _Line: Int64 = 1;
+        _LinePos: Int64 = 1
+
+    );
     destructor Destroy; override;
 
     procedure Read;
@@ -53,6 +75,17 @@ type
     property Source: String read FSource;
     property Length: Int64 read FLength;
     property Cursor: Int64 read FCursor;
+    property Line: Int64 read FLine write FLine;
+    property LinePos: Int64 read FLinePos write FLinePos;
+
+  end;
+
+  EStringParserException = class(ECoreException)
+
+  public
+
+    constructor Create(const _Message: String; _Line, _Position: Int64);
+    constructor CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64);
 
   end;
 
@@ -71,16 +104,22 @@ end;
 
 { TCustomStringParser }
 
-constructor TCustomStringParser.Create(const _Source: String);
+constructor TCustomStringParser.Create;
 begin
 
   inherited Create;
 
-  FSource := _Source;
-  FLength := System.Length(_Source);
+  FSource  := _Source;
+  FLength  := System.Length(_Source);
+  FCursor  := _Cursor;
+  FLine    := _Line;
+  FLinePos := _LinePos;
 
   FKeyWords := TKeyWordList.Create;
-  FCursor := 1;
+
+  AddKeyword(Integer(ktLineEnd), CRLF);
+  AddKeyword(Integer(ktLineEnd), CR  );
+  AddKeyword(Integer(ktLineEnd), LF  );
 
 end;
 
@@ -113,8 +152,8 @@ begin
 
   Result :=
 
-    ((FCursor + _KeyWord.KeyLength) < FLength) and
-    SameText(_KeyWord.StrValue, Copy(FSource, FCursor, _KeyWord.KeyLength));
+    ((Cursor + _KeyWord.KeyLength) < Length) and
+    SameText(_KeyWord.StrValue, Copy(Source, Cursor, _KeyWord.KeyLength));
 
 end;
 
@@ -122,6 +161,12 @@ procedure TCustomStringParser.KeyFound(const _KeyWord: TKeyWord);
 begin
   KeyEvent(_KeyWord);
   Move(_KeyWord.KeyLength);
+end;
+
+procedure TCustomStringParser.IncLine(const _KeyWord: TKeyWord);
+begin
+  Inc(FLine);
+  LinePos := Cursor + _KeyWord.KeyLength;
 end;
 
 procedure TCustomStringParser.AddKeyWord(_KeyType: Integer; const _StrValue: String);
@@ -136,26 +181,72 @@ end;
 
 procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);
 begin
+  if TKeyWordType(_KeyWord.KeyType) = ktLineEnd then
+    IncLine(_KeyWord);
 end;
 
 procedure TCustomStringParser.MoveEvent;
 begin
+
+  if not ItemBody then
+    ItemBegin := Cursor;
+
+  ItemBody := True;
+
 end;
 
 procedure TCustomStringParser.Read;
 begin
 
-  while FCursor <= FLength do
+  try
 
-    if not CheckKeys then begin
+    while (Cursor <= Length) and not FTerminated do
 
-      MoveEvent;
-      Move;
+      {TODO -oVasilyevSM -cTCustomStringParser : Попробовать сделать мягкий цикл,
+        не смог прочитать - пропустил. Хотя это и против идеи скрипта, типа есть
+        синтаксис, если он нарушен, отменяем его целиком. Надо почитать в
+        концепциях }
+      if not CheckKeys then begin
 
-    end;
+        MoveEvent;
+        Move;
 
-  KeyEvent(TKeyWord.Create(Integer(ktSourceEnd), ''));
+      end;
 
+    KeyEvent(TKeyWord.Create(Integer(ktSourceEnd), ''));
+
+  except
+    on E: Exception do
+      raise EStringParserException.CreateFmt('%s: %s', [E.ClassName, E.Message], Line, Cursor - LinePos + 1);
+  end;
+
+end;
+
+procedure TCustomStringParser.Terminate;
+begin
+  FTerminated := True;
+end;
+
+function TCustomStringParser.ReadItem: String;
+begin
+
+  Result := Trim(Copy(Source, ItemBegin, Cursor - ItemBegin));
+
+  ItemBody := False;
+  ItemBegin := 0;
+
+end;
+
+{ EStringParserError }
+
+constructor EStringParserException.Create(const _Message: String; _Line, _Position: Int64);
+begin
+ inherited CreateFmt('%s [Line = %d, before position = %d]', [_Message, _Line, _Position]);
+end;
+
+constructor EStringParserException.CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64);
+begin
+  Create(Format(_Message, _Args), _Line, _Position);
 end;
 
 end.

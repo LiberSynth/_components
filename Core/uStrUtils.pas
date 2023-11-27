@@ -161,18 +161,17 @@ end;
 
 function StrToInt(const Value: String): Int64;
 begin
-  Result := SysUtils.StrToInt(Value);
+  Result := SysUtils.StrToInt64(Value);
 end;
 
 function DoubleToStr(Value: Double): String;
 begin
-  { TODO -oVasilyevSM -cuStrUtils: Ошибка Макеровой. "Вводим большое число и фигня какая-то. }
-  Result := StringReplace(FloatToStr(Value), {$IFNDEF DELPHI2010}FormatSettings.{$ENDIF}DecimalSeparator, '.', []);
+  Result := SysUtils.FloatToStr(Value);
 end;
 
 function StrToDouble(const Value: String): Double;
 begin
-  Result := StrToFloat(GetFloatStr(Value));
+  Result := SysUtils.StrToFloat(GetFloatStr(Value));
 end;
 
 function DateTimeToStr(Value: TDateTime): String;

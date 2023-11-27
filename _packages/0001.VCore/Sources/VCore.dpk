@@ -37,6 +37,6 @@ contains
   uCore in '..\..\..\Core\uCore.pas',
   uGUID in '..\..\..\Core\uGUID.pas',
   uParams in '..\..\..\Core\uParams.pas',
-  uParamsReader in '..\..\..\Core\uParamsReader.pas';
+  uCustomStringParser in '..\..\..\Core\uCustomStringParser.pas';
 
 end.

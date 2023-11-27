@@ -6,11 +6,8 @@ unit uParams;
 (*                                                       *)
 (*********************************************************)
 
-{ TODO -oVasilyevSM -cuParams: Нужен компонент TIniParams, которая будет сохраняться в файл. }
-{ TODO -oVasilyevSM -cuParams: Нужен компонент TRegistryParams, который будет сохраняться в реестр. }
-{ TODO -oVasilyevSM -cuParams: У этих оболочек есть общий предок, в котором будет управляться свойство, сохранять ли значения по умолчанию. Значение параметра может определяться в прикладном коде (SetAs...Def), но надо ли сохранять хранить его - большой вопрос. Это очень неудобно, когда все значения по умолчанию не сохраняются. Конечно, при следующем запуске приложение присвоит их без источника, но когда мы хотим поменять такой параметр в ини, нужно вспомнить его название. Но вот, если в следующей версии приложения по умолчанию будет другое значение, нужно отдельно предусматривать апгрейд параметров в этом случае. Чтобы не получилось эффекта Янушкевича. Типа, да мы тогда задавали такие значения, а теперь новая версия отрабатывает старое поведение. }
-{ TODO -oVasilyevSM -cuParams: Обе эти оболочкм должны уметь логировать все, что сохранили, это должен быть объект-помощник (TRecorder), использующий компонент TLogger. Потом надо использовать эти данные для универсальног деисталятора. }
-{ TODO -oVasilyevSM -cuParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream. Сохранение объекта класса в блоб - отдельная задача, требующая изучения общепринятого подхода. }
+{ TODO -oVasilyevSM -cuParams: Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. }
+{ TODO -oVasilyevSM -cuParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
 { TODO -oVasilyevSM -cuParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
 { TODO -oVasilyevSM -cuParams: Нужен также компонент TRegParams }
 { TODO -oVasilyevSM -cuParams: Можно дописывать TParamHelper }
@@ -23,7 +20,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { vSoft }
-  uConsts, uTypes, uCore, uDataUtils, uStrUtils;
+  uConsts, uTypes, uCore, uDataUtils, uStrUtils, uCustomStringParser;
 
 type
 
@@ -178,6 +175,8 @@ type
     procedure SetAsString(_Path: String; const _Value: String);
     procedure SetAsBLOB(_Path: String; const _Value: BLOB);
 
+  private
+
     function GetParam(_Path: String): TParam;
 
   protected
@@ -234,10 +233,73 @@ type
 
   EParamsException = class(ECoreException);
 
+  TKeyWordType = (
+
+      ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktString,
+      ktOpeningBracket, ktClosingBracket, ktShortComment, ktLongCommentBegin, ktLongCommentEnd
+
+  );
+  TKeyWordTypes = set of TKeyWordType;
+
+  TState = (stName, stType, stValue, stString, stShortComment, stLongComment);
+
+  TReadInfo = record
+
+    State: TState;
+    KeyTypes: TKeyWordTypes;
+    Proc: TProcedure;
+
+  end;
+
+  TParamsReader = class(TCustomStringParser)
+
+  strict private
+
+    FParams: TParams;
+    FState: TState;
+
+    FCurrentName: String;
+    FCurrentType: TParamDataType;
+
+    FReadSettings: array of TReadInfo;
+
+    procedure GetName;
+    procedure GetType;
+    procedure SetValue;
+
+    function TrimDigital(const _Value: String): String;
+    procedure CheckParams(_KeyWord: TKeyWord);
+    function ReadParams(_KeyWord: TKeyWord): Int64;
+
+    function GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
+    procedure AddReadSetting(_State: TState; _KeyTypes: TKeyWordTypes; _Proc: TProcedure);
+    procedure InitReadSetting;
+
+  protected
+
+    procedure KeyEvent(const _KeyWord: TKeyWord); override;
+
+  public
+
+    constructor Create(
+
+        const _Source: String;
+        _Params: TParams;
+        _Cursor: Int64 = 1;
+        _Line: Int64 = 1;
+        _LinePos: Int64 = 1
+
+    );
+
+  end;
+
+  EParamsReadException = class(ECoreException);
+
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
 { TODO -oVasilyevSM -cuParams: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда тип должен определяться в приложении через предварительный вызов функций RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams - или на входе пустой контейнер, куда добавляются параметры, или готовая структура, тогда она просто заполняется и типы данных известны и не требуют хранения в строке. }
-function ParamsToStr(Params: TParams; Shift: Integer = 0): String;
+function ParamsToStr(Params: TParams): String;
+procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
 
@@ -277,43 +339,57 @@ begin
 
 end;
 
-function ParamsToStr(Params: TParams; Shift: Integer): String;
+function ParamsToStr(Params: TParams): String;
 const
 
-  SC_Single = '%s: %s = %s' + CRLF;
-  SC_Nested = '%s: %s = (' + CRLF + '%s)' + CRLF;
+  SC_SingleParamFormat = '%s = %s' + CRLF;
+
+  SC_NestedParamsFormat =
+
+      '%s = (' + CRLF +
+      '%s' +
+      ')' + CRLF;
 
 var
-  P: TParam;
-  ValueFormat, Value: String;
+  Param: TParam;
 begin
 
+  { TODO -oVasilyevSM -cuParams: Пока так }
+
   Result := '';
+  for Param in Params do
 
-  for P in Params do
+    if Param.DataType = dtParams then
 
-    with P do begin
+      Result := Result + Format(SC_NestedParamsFormat, [
 
-      if DataType = dtParams then ValueFormat := SC_Nested
-      else ValueFormat := SC_Single;
+          Param.Name,
+          ShiftText(Param.AsString, 1)
 
-      case DataType of
+      ])
 
-        dtParams: Value := ShiftText(ParamsToStr(AsParams, Shift), Shift + 1);
-        dtString: Value := QuoteStr (AsString);
+    else
 
-      else
-        Value := AsString;
-      end;
+      Result := Result + Format(SC_SingleParamFormat, [
 
-      Result := Result + Format(ValueFormat, [
-
-          Name,
-          ParamDataTypeToStr(DataType),
-          Value
+          Param.Name,
+          Param.AsString
 
       ]);
 
+end;
+
+procedure StrToParams(const Value: String; Params: TParams);
+begin
+
+  with TParamsReader.Create(Value, Params) do
+
+    try
+
+      Read;
+
+    finally
+      Free;
     end;
 
 end;
@@ -1058,6 +1134,236 @@ function TParams.AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
 begin
   if not FindBLOB(_Path, Result) then AsBLOB[_Path] := _Default;
   Result := _Default;
+end;
+
+{ TParamsReader }
+
+constructor TParamsReader.Create;
+begin
+
+  inherited Create(_Source, _Cursor, _Line, _LinePos);
+
+  FParams := _Params;
+
+  FState := stName;
+
+  AddKeyword(Integer(ktSpace), ' ');
+  AddKeyword(Integer(ktSpace), TAB);
+
+  AddKeyword(Integer(ktSplitter),  ';');
+
+  AddKeyword(Integer(ktTypeIdent), ':');
+  AddKeyword(Integer(ktAssigning), '=');
+
+  AddKeyword(Integer(ktString), '''');
+  AddKeyword(Integer(ktString), '"');
+
+  AddKeyword(Integer(ktOpeningBracket), '(');
+  AddKeyword(Integer(ktClosingBracket), ')');
+
+  AddKeyword(Integer(ktShortComment    ), '--');
+  AddKeyword(Integer(ktShortComment    ), '//');
+  AddKeyword(Integer(ktLongCommentBegin), '{');
+  AddKeyword(Integer(ktLongCommentBegin), '/*');
+  AddKeyword(Integer(ktLongCommentBegin), '(*');
+  AddKeyword(Integer(ktLongCommentEnd  ), '}');
+  AddKeyword(Integer(ktLongCommentEnd  ), '*/');
+  AddKeyword(Integer(ktLongCommentEnd  ), '*)');
+
+  InitReadSetting;
+
+end;
+
+procedure TParamsReader.GetName;
+var
+  P: TParam;
+begin
+
+  FCurrentName := ReadItem;
+
+  { Определенный заранее тип данных }
+  {TODO -oVasilyevSM -cTParamsReader : Тут еще надо подумать, может, будет у ини-параметра свойство,
+    зарегистрированный тип. Тогда сперва из него читать, и проверять, что считанный тип такой же. }
+  if FParams.FindParam(FCurrentName, P) and (P.DataType <> dtUnknown) then
+    FCurrentType := P.DataType;
+
+end;
+
+procedure TParamsReader.GetType;
+begin
+  FCurrentType := StrToParamDataType(ReadItem);
+end;
+
+procedure TParamsReader.SetValue;
+begin
+
+  if FCurrentType = dtUnknown then
+    raise EParamsReadException.Create('Unknown data type');
+
+  case FCurrentType of
+
+    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean (ReadItem);
+    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt     (TrimDigital(ReadItem));
+    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToInt     (TrimDigital(ReadItem));
+    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble  (TrimDigital(ReadItem));
+    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(ReadItem);
+    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID    (ReadItem);
+    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString   (ReadItem);
+    dtString:     FParams.AsString    [FCurrentName] :=               ReadItem ;
+    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB (ReadItem);
+
+  end;
+
+  FCurrentName := '';
+  FCurrentType := dtUnknown;
+
+end;
+
+function TParamsReader.TrimDigital(const _Value: String): String;
+begin
+  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
+end;
+
+procedure TParamsReader.CheckParams(_KeyWord: TKeyWord);
+begin
+
+  if (FCurrentType = dtParams) and (FState = stValue) then begin
+
+    if not (TKeyWordType(_KeyWord.KeyType) in [ktSpace, ktLineEnd, ktOpeningBracket]) then
+      raise EParamsReadException.CreateFmt('''('' expected but ''%s'' found', [_KeyWord.StrValue]);
+
+    if TKeyWordType(_KeyWord.KeyType) = ktOpeningBracket then
+      Move(ReadParams(_KeyWord) - Cursor);
+
+  end;
+
+  if TKeyWordType(_KeyWord.KeyType) = ktClosingBracket then
+    Terminate;
+
+end;
+
+function TParamsReader.ReadParams(_KeyWord: TKeyWord): Int64;
+var
+  P: TParams;
+begin
+
+  P := TParams.Create;
+  try
+
+    with TParamsReader.Create(
+
+        Source,
+        P,
+        Cursor + _KeyWord.KeyLength,
+        Line,
+        LinePos
+
+    ) do
+
+      try
+
+        Read;
+        Self.Line := Line;
+        Self.LinePos := LinePos;
+        Result := Cursor - _KeyWord.KeyLength;
+
+      finally
+        Free;
+      end;
+
+  finally
+    FParams.GetParam(FCurrentName).SetAsParams(P);
+  end;
+
+  ItemBody := False;
+  ItemBegin := 0;
+  FCurrentName := '';
+  FCurrentType := dtUnknown;
+  FState := stName;
+
+end;
+
+function TParamsReader.GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
+var
+  RI: TReadInfo;
+begin
+
+  for RI in FReadSettings do
+
+    if
+
+        (RI.State = _State) and
+        (TKeyWordType(_KeyType) in RI.KeyTypes)
+
+    then begin
+
+      _Proc := RI.Proc;
+      Exit(True);
+
+    end;
+
+  Result := False;
+
+end;
+
+procedure TParamsReader.AddReadSetting(_State: TState; _KeyTypes: TKeyWordTypes; _Proc: TProcedure);
+var
+  L: Integer;
+begin
+
+  L := System.Length(FReadSettings);
+  SetLength(FReadSettings, L + 1);
+
+  with FReadSettings[L] do begin
+
+    State :=    _State;
+    KeyTypes := _KeyTypes;
+    Proc :=     _Proc;
+
+  end;
+
+end;
+
+procedure TParamsReader.InitReadSetting;
+begin
+
+  SetLength(FReadSettings, 0);
+
+  AddReadSetting(stName,  [ktTypeIdent, ktAssigning],                             GetName );
+  AddReadSetting(stType,  [ktAssigning],                                          GetType );
+  AddReadSetting(stValue, [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket], SetValue);
+
+end;
+
+procedure TParamsReader.KeyEvent(const _KeyWord: TKeyWord);
+var
+  ReadProc: TProcedure;
+begin
+
+  inherited KeyEvent(_KeyWord);
+
+  CheckParams(_KeyWord);
+
+  if ItemBody then begin
+
+    { Считывние }
+    if GetReadProc(FState, _KeyWord.KeyType, ReadProc) then
+
+      ReadProc
+
+    else Exit;
+
+    { Переключение состояния }
+    case TKeyWordType(_KeyWord.KeyType) of
+
+      ktTypeIdent:           FState := stType;
+      ktAssigning:           FState := stValue;
+      ktLineEnd, ktSplitter: if FState = stValue then FState := stName;
+
+    end;
+
+  end;
+
 end;
 
 end.

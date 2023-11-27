@@ -19,6 +19,9 @@ type
 
   TBOM = (bomForward, bomBackward);
 
+  TProc = procedure;
+  TProcedure = procedure () of object;
+
 implementation
 
 end.
