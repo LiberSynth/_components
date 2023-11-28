@@ -254,6 +254,18 @@ type
 
   end;
 
+  TSpecialSpaceHandler = record
+
+    Active: Boolean;
+    OpeningKey: TKeyWord;
+    ClosingKey: TKeyWord;
+
+    procedure Open(_OpeningKey: TKeyWord; _ClosingKey: TKeyWord);
+    procedure Close;
+    function CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
+
+  end;
+
   TParamsReader = class(TCustomStringParser)
 
   strict private
@@ -266,18 +278,21 @@ type
     FCurrentType: TParamDataType;
 
     FReadSettings: array of TReadInfo;
+    FStringSpecialSpace: TSpecialSpaceHandler;
 
     procedure GetName;
     procedure GetType;
     procedure SetValue;
 
-    function TrimDigital(const _Value: String): String;
+    procedure CheckType;
     procedure CheckParams(_KeyWord: TKeyWord);
+    procedure CheckString(_KeyWord: TKeyWord);
+    function ReadParams(_KeyWord: TKeyWord): Int64;
     function KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
     function KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
-    function ReadParams(_KeyWord: TKeyWord): Int64;
+    function TrimDigital(const _Value: String): String;
+    function UndoubleString(const _Value: String): String;
 
-    procedure InitReadSetting;
     procedure AddReadSetting(
 
         _State: TState;
@@ -286,12 +301,14 @@ type
         _ValidKeyTypes: TKeyWordTypes
 
     );
+    procedure InitReadSetting;
     function GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
     function CheckExpectedKey: Boolean;
 
   protected
 
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
+    procedure MoveEvent; override;
     function SpecialSpace: Boolean; override;
 
   public
@@ -392,6 +409,20 @@ const
     if not SingleString then ShiftText(1, Result);
   end;
 
+  function _QuoteParam(_Param: TParam): String;
+  begin
+
+    Result := _Param.AsString;
+
+    if
+
+        (_Param.DataType = dtString) and
+        (PosOf(':;=;'';";(;);' + CR + ';' + LF, Result) > 0)
+
+    then Result := QuoteStr(Result);
+
+  end;
+
 var
   Param: TParam;
 begin
@@ -415,7 +446,7 @@ begin
 
           Param.Name,
           ParamDataTypeToStr(Param.DataType),
-          Param.AsString
+          _QuoteParam(Param)
 
       ]);
 
@@ -1185,6 +1216,57 @@ begin
   Result := _Default;
 end;
 
+{ TSpecialSpaceHandler }
+
+procedure TSpecialSpaceHandler.Open(_OpeningKey, _ClosingKey: TKeyWord);
+begin
+
+  OpeningKey := _OpeningKey;
+  ClosingKey := _ClosingKey;
+  Active     := True;
+
+end;
+
+procedure TSpecialSpaceHandler.Close;
+begin
+
+  OpeningKey := TKeyWord.Create(0, '');
+  ClosingKey := TKeyWord.Create(0, '');
+  Active     := False;
+
+end;
+
+function TSpecialSpaceHandler.CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
+begin
+
+  with ClosingKey do begin
+
+    { ѕроверка задублированного закрывающего ключа }
+    if
+
+        (StrValue = StrValue) and
+        (KeyLength = 1) and
+        (
+
+            (Copy(_Source, _Cursor, 2) = StrValue + StrValue) or
+            ((_Cursor > 1) and (Copy(_Source, _Cursor - 1, 2) = StrValue + StrValue))
+
+        ) and
+        not ((_Cursor > 2) and (Copy(_Source, _Cursor - 2, 3) = StrValue + StrValue + StrValue))
+
+    then Exit(False);
+
+    if Copy(_Source, _Cursor, KeyLength) = StrValue then begin
+
+      Active := False;
+      Result := True;
+
+    end else Result := False;
+
+  end;
+
+end;
+
 { TParamsReader }
 
 constructor TParamsReader.Create;
@@ -1225,18 +1307,8 @@ begin
 end;
 
 procedure TParamsReader.GetName;
-var
-  P: TParam;
 begin
-
   FCurrentName := ReadItem;
-
-  { ќпределенный заранее тип данных }
-  { TODO -oVasilyevSM -cTParamsReader : “ут еще надо подумать, может, будет у ини-параметра свойство, зарегистрированный
-    тип. “огда сперва из него читать, и провер€ть, что считанный тип такой же. }
-  if FParams.FindParam(FCurrentName, P) and (P.DataType <> dtUnknown) then
-    FCurrentType := P.DataType;
-
 end;
 
 procedure TParamsReader.GetType;
@@ -1247,55 +1319,45 @@ end;
 procedure TParamsReader.SetValue;
 begin
 
-  if FCurrentType = dtUnknown then
-    raise EParamsReadException.Create('Unknown data type', Line, Cursor - LinePos);
+  CheckType;
 
   case FCurrentType of
 
-    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean (ReadItem);
-    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt     (TrimDigital(ReadItem));
-    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt  (TrimDigital(ReadItem));
-    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble  (TrimDigital(ReadItem));
-    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(ReadItem);
-    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID    (ReadItem);
-    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString   (ReadItem);
-    dtString:     FParams.AsString    [FCurrentName] :=               ReadItem ;
-    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB (ReadItem);
+    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean  (ReadItem);
+    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt      (TrimDigital(ReadItem));
+    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt   (TrimDigital(ReadItem));
+    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble   (TrimDigital(ReadItem));
+    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime (ReadItem);
+    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID     (ReadItem);
+    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString    (ReadItem);
+    dtString:     FParams.AsString    [FCurrentName] := UndoubleString(ReadItem);
+    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB  (ReadItem);
 
   end;
 
   FCurrentName := '';
   FCurrentType := dtUnknown;
+  FStringSpecialSpace.Close;
 
 end;
 
-function TParamsReader.SpecialSpace: Boolean;
+procedure TParamsReader.CheckType;
+var
+  P: TParam;
 begin
 
-  case FCurrentType of
+  { ќпределенный заранее тип данных }
+  if
 
-    dtDateTime: Result := not CheckExpectedKey;
-    dtString:   Result := not CheckExpectedKey;
+      (FCurrentType = dtUnknown) and
+      FParams.FindParam(FCurrentName, P) and
+      (P.DataType <> dtUnknown)
 
-  else
-    Result := inherited;
-  end;
+  then FCurrentType := P.DataType;
 
-end;
+  if FCurrentType = dtUnknown then
+    raise EParamsReadException.Create('Unknown data type', Line, Cursor - LinePos);
 
-function TParamsReader.TrimDigital(const _Value: String): String;
-begin
-  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
-end;
-
-function TParamsReader.KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
-begin
-  Result := TKeyWordType(_KeyWord.KeyType) in _Set;
-end;
-
-function TParamsReader.KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
-begin
-  Result := TKeyWordType(_KeyType) in _Set;
 end;
 
 procedure TParamsReader.CheckParams(_KeyWord: TKeyWord);
@@ -1316,6 +1378,21 @@ begin
 
   if FNested and not Terminated and (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd) then
     raise EParamsReadException.Create('Unterminated nested params', Line, Cursor - LinePos);
+
+end;
+
+procedure TParamsReader.CheckString(_KeyWord: TKeyWord);
+begin
+
+  if (FCurrentType = dtString) and (FState = stValue) then begin
+
+    if (TKeyWordType(_KeyWord.KeyType) = ktString) and not ItemBody then
+      FStringSpecialSpace.Open(_KeyWord, _KeyWord);
+
+    if FStringSpecialSpace.Active and (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd) then
+      raise EParamsReadException.Create('Unterminated string', Line, Cursor - LinePos);
+
+  end;
 
 end;
 
@@ -1361,14 +1438,31 @@ begin
 
 end;
 
-procedure TParamsReader.InitReadSetting;
+function TParamsReader.KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
+begin
+  Result := TKeyWordType(_KeyWord.KeyType) in _Set;
+end;
+
+function TParamsReader.KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
+begin
+  Result := TKeyWordType(_KeyType) in _Set;
+end;
+
+function TParamsReader.TrimDigital(const _Value: String): String;
+begin
+  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
+end;
+
+function TParamsReader.UndoubleString(const _Value: String): String;
 begin
 
-  SetLength(FReadSettings, 0);
+  with FStringSpecialSpace.ClosingKey do
 
-  AddReadSetting(stName,  [ktTypeIdent, ktAssigning],                             GetName,  [ktSpace]);
-  AddReadSetting(stType,  [ktAssigning],                                          GetType,  [ktSpace]);
-  AddReadSetting(stValue, [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket], SetValue, [ktSpace]);
+    if TKeyWordType(KeyType) = ktString then
+
+      Result := StringReplace(_Value, StrValue + StrValue, StrValue, [rfReplaceAll])
+
+    else Result := _Value;
 
 end;
 
@@ -1388,6 +1482,18 @@ begin
     ValidKeyTypes := _ValidKeyTypes;
 
   end;
+
+end;
+
+procedure TParamsReader.InitReadSetting;
+begin
+
+  SetLength(FReadSettings, 0);
+
+  AddReadSetting(stName,   [ktTypeIdent, ktAssigning],                                       GetName,  [ktSpace]);
+  AddReadSetting(stType,   [ktAssigning],                                                    GetType,  [ktSpace]);
+  AddReadSetting(stValue,  [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket, ktString], SetValue, [ktSpace]);
+  AddReadSetting(stString, [ktString],                                                       SetValue, []       );
 
 end;
 
@@ -1425,6 +1531,20 @@ begin
 
 end;
 
+function TParamsReader.SpecialSpace: Boolean;
+begin
+
+  case FCurrentType of
+
+    dtDateTime: Result := not CheckExpectedKey;
+    dtString:   Result := FStringSpecialSpace.Active;
+
+  else
+    Result := inherited;
+  end;
+
+end;
+
 function TParamsReader.CheckExpectedKey: Boolean;
 var
   KW: TKeyWord;
@@ -1457,6 +1577,7 @@ begin
   inherited KeyEvent(_KeyWord);
 
   CheckParams(_KeyWord);
+  CheckString(_KeyWord);
 
   if ItemBody then begin
 
@@ -1473,10 +1594,23 @@ begin
       ktTypeIdent:           FState := stType;
       ktAssigning:           FState := stValue;
       ktLineEnd, ktSplitter: if FState = stValue then FState := stName;
+      ktString:              FState := stName;
 
     end;
 
   end;
+
+
+end;
+
+procedure TParamsReader.MoveEvent;
+begin
+
+  inherited MoveEvent;
+
+  with FStringSpecialSpace do
+    if Active and CheckClosing(Source, Cursor) then
+      KeyEvent(TKeyWord.Create(ClosingKey.KeyType, ClosingKey.StrValue));
 
 end;
 

@@ -16,7 +16,7 @@ implementation
 
 function NullGUID: TGUID;
 begin
-  FillChar(Result, SizeOf(TGUID), #0);
+  FillChar(Result, SizeOf(TGUID), 0);
 end;
 
 end.
