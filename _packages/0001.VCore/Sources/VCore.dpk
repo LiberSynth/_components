@@ -25,11 +25,13 @@ package VCore;
 {$DESCRIPTION '#V Core'}
 {$DESIGNONLY}
 {$IMPLICITBUILD ON}
+{$WARN DUPLICATE_CTOR_DTOR OFF}
 
 requires
   rtl;
 
 contains
+
   uConsts in '..\..\..\Core\uConsts.pas',
   uTypes in '..\..\..\Core\uTypes.pas',
   uDataUtils in '..\..\..\Core\uDataUtils.pas',

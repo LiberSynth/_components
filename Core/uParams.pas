@@ -247,7 +247,7 @@ type
 
   private
 
-    constructor Create(_KeyType: TKeyWordType; const _StrValue: String); overload;
+    constructor Create(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean); overload;
 
     function GetKeyType: TKeyWordType;
     procedure SetKeyType(const _Value: TKeyWordType);
@@ -260,24 +260,26 @@ type
 
   public
 
-    function AddKey(_KeyType: TKeyWordType; const _StrValue: String): TKeyWord;
+    function AddKey(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean = False): TKeyWord;
 
   end;
 
   TState = (stName, stType, stValue, stString, stShortComment, stLongComment);
 
+  TReadProc = procedure (const KeyWord: TKeyWord) of object;
+
   TReadInfo = record
 
     State: TState;
     EntryKeyTypes: TKeyWordTypes;
-    Proc: TProcedure;
+    ReadProc: TReadProc;
     ValidKeyTypes: TKeyWordTypes;
 
     constructor Create(
 
         _State: TState;
         _EntryKeyTypes: TKeyWordTypes;
-        _Proc: TProcedure;
+        _ReadProc: TReadProc;
         _ValidKeyTypes: TKeyWordTypes
 
     );
@@ -292,14 +294,15 @@ type
 
         _State: TState;
         _EntryKeyTypes: TKeyWordTypes;
-        _Proc: TProcedure;
+        _ReadProc: TReadProc;
         _ValidKeyTypes: TKeyWordTypes
 
     );
-    function GetReadProc(_State: TState; _KeyType: TKeyWordType; var _Proc: TProcedure; _Line, _Cursor, _LinePos: Int64): Boolean;
+    function GetReadProc(_State: TState; _KeyType: TKeyWordType; var _Proc: TReadProc; _Line, _Cursor, _LinePos: Int64): Boolean;
 
   end;
 
+  { TODO -oVasilyevSM -cTParamsReader: Надо его все равно в отдельный юнит положить как-то, не жертвуя закрытостью SetAsParams. }
   TParamsReader = class(TCustomStringParser)
 
   strict private
@@ -313,23 +316,29 @@ type
 
     FReadSettings: TReadSettings;
 
-    procedure GetName;
-    procedure GetType;
-    procedure SetValue;
+    procedure GetName(const _KeyWord: TKeyWord);
+    procedure GetType(const _KeyWord: TKeyWord);
+    procedure SetValue(const _KeyWord: TKeyWord);
 
     procedure CheckType;
     procedure CheckParams(_KeyWord: TKeyWord);
     procedure ReadParams(_KeyWord: TKeyWord);
-    function TrimDigital(const _Value: String): String;
-    function UndoubleString(const _Value: String): String;
 
-    procedure InitKeyWords;
+    function TrimDigital(const _Value: String): String;
+    function UndoubleSymbols(const _Value, _KeyWord: String): String;
+
     procedure InitReadSetting;
+
+  private
+
+    class function QuotingSymbols: String;
 
   protected
 
+    class procedure InitKeyWords(_KeyWords: TKeyWordList); override;
+    procedure InitSpecialSegments; override;
+
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
-    procedure MoveEvent; override;
 
   public
 
@@ -435,7 +444,10 @@ const
     if not SingleString then ShiftText(1, Result);
   end;
 
-  function _QuoteParam(_Param: TParam): String;
+  var
+    QuotingSymbols: String;
+
+  function _QuoteString(_Param: TParam): String;
   begin
 
     Result := _Param.AsString;
@@ -443,7 +455,7 @@ const
     if
 
         (_Param.DataType = dtString) and
-        (PosOf(':;=;'';";(;);' + CR + ';' + LF, Result) > 0)
+        (PosOf(QuotingSymbols, Result) > 0)
 
     then Result := QuoteStr(Result);
 
@@ -452,6 +464,8 @@ const
 var
   Param: TParam;
 begin
+
+  QuotingSymbols := TParamsReader.QuotingSymbols;
 
   Result := '';
   for Param in Params do
@@ -472,7 +486,7 @@ begin
 
           Param.Name,
           ParamDataTypeToStr(Param.DataType),
-          _QuoteParam(Param)
+          _QuoteString(Param)
 
       ]);
 
@@ -1244,9 +1258,9 @@ end;
 
 { TKeyWordHelper }
 
-constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String);
+constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean);
 begin
-  Create(Integer(_KeyType), _StrValue);
+  Create(Integer(_KeyType), _StrValue, _QuotingSymbol);
 end;
 
 function TKeyWordHelper.GetKeyType: TKeyWordType;
@@ -1262,9 +1276,9 @@ end;
 
 { TKeyWordListHelper }
 
-function TKeyWordListHelper.AddKey(_KeyType: TKeyWordType; const _StrValue: String): TKeyWord;
+function TKeyWordListHelper.AddKey(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean): TKeyWord;
 begin
-  Result := TKeyWord.Create(Integer(_KeyType), _StrValue);
+  Result := TKeyWord.Create(Integer(_KeyType), _StrValue, _QuotingSymbol);
   Add(Result);
 end;
 
@@ -1275,7 +1289,7 @@ begin
 
   State         := _State;
   EntryKeyTypes := _EntryKeyTypes;
-  Proc          := _Proc;
+  ReadProc      := _ReadProc;
   ValidKeyTypes := _ValidKeyTypes;
 
 end;
@@ -1284,10 +1298,10 @@ end;
 
 procedure TReadSettings.Add;
 begin
-  inherited Add(TReadInfo.Create(_State, _EntryKeyTypes, _Proc, _ValidKeyTypes));
+  inherited Add(TReadInfo.Create(_State, _EntryKeyTypes, _ReadProc, _ValidKeyTypes));
 end;
 
-function TReadSettings.GetReadProc(_State: TState; _KeyType: TKeyWordType; var _Proc: TProcedure; _Line, _Cursor, _LinePos: Int64): Boolean;
+function TReadSettings.GetReadProc(_State: TState; _KeyType: TKeyWordType; var _Proc: TReadProc; _Line, _Cursor, _LinePos: Int64): Boolean;
 var
   RI: TReadInfo;
 begin
@@ -1302,7 +1316,7 @@ begin
 
     then begin
 
-      _Proc := RI.Proc;
+      _Proc := RI.ReadProc;
       Exit(True);
 
     end;
@@ -1335,7 +1349,6 @@ begin
   FState := stName;
   FReadSettings := TReadSettings.Create;
 
-  InitKeyWords;
   InitReadSetting;
 
 end;
@@ -1365,12 +1378,13 @@ begin
 
     dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean  (ReadItem);
     dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt      (TrimDigital(ReadItem));
+    { TODO 1 -oVasilyevSM -cTParamsReader: 2 147 483 648 -> -2147483648 }
     dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt   (TrimDigital(ReadItem));
     dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble   (TrimDigital(ReadItem));
     dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime (ReadItem);
     dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID     (ReadItem);
     dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString    (ReadItem);
-    dtString:     FParams.AsString    [FCurrentName] := UndoubleString(ReadItem);
+    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(ReadItem, _KeyWord.StrValue);
     dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB  (ReadItem);
 
   end;
@@ -1475,42 +1489,59 @@ begin
   Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
 end;
 
-function TParamsReader.UndoubleString(const _Value: String): String;
+function TParamsReader.UndoubleSymbols(const _Value, _KeyWord: String): String;
+begin
+  Result := StringReplace(_Value, _KeyWord + _KeyWord, _KeyWord, [rfReplaceAll])
+end;
+
+class function TParamsReader.QuotingSymbols: String;
+var
+  TempKeyWords: TKeyWordList;
+  KeyWord: TKeyWord;
 begin
 
-  { TODO 1 -oVasilyevSM -cGeneral: ActionItem }
-  {with FStringSpecialSpace.ClosingKeys[0] do
+  TempKeyWords := TKeyWordList.Create;
+  try
 
-    if KeyType = ktString then
+    InitKeyWords(TempKeyWords);
 
-      Result := StringReplace(_Value, StrValue + StrValue, StrValue, [rfReplaceAll])
+    Result := '';
+    for KeyWord in TempKeyWords do
+      if KeyWord.QuotingSymbol then
+        Result := Format('%s%s;', [Result, KeyWord.StrValue]);
 
-    else }Result := _Value;
+    CutStr(Result, 1);
+
+  finally
+    TempKeyWords.Free;
+  end;
 
 end;
 
-procedure TParamsReader.InitKeyWords;
+class procedure TParamsReader.InitKeyWords(_KeyWords: TKeyWordList);
 begin
 
-  with KeyWords do begin
+  inherited InitKeyWords(_KeyWords);
 
-    AddKey(ktSpace           , ' ' );
-    AddKey(ktSpace           , TAB );
-    AddKey(ktSplitter        , ';' );
-    AddKey(ktTypeIdent       , ':' );
-    AddKey(ktAssigning       , '=' );
-    AddKey(ktString          , '''');
-    AddKey(ktString          , '"' );
-    AddKey(ktOpeningBracket  , '(' );
-    AddKey(ktClosingBracket  , ')' );
-    AddKey(ktShortComment    , '--');
-    AddKey(ktShortComment    , '//');
-    AddKey(ktLongCommentBegin, '{' );
-    AddKey(ktLongCommentEnd  , '}' );
-    AddKey(ktLongCommentBegin, '/*');
-    AddKey(ktLongCommentEnd  , '*/');
-    AddKey(ktLongCommentBegin, '(*');
-    AddKey(ktLongCommentEnd  , '*)');
+  with _KeyWords do begin
+
+    AddKey(ktSpace           , ' '       );
+    AddKey(ktSpace           , TAB       );
+    AddKey(ktSplitter        , ';',  True);
+    AddKey(ktTypeIdent       , ':',  True);
+    AddKey(ktAssigning       , '=',  True);
+    AddKey(ktString          , '''', True);
+    AddKey(ktString          , '"',  True);
+    AddKey(ktOpeningBracket  , '(',  True);
+    AddKey(ktClosingBracket  , ')',  True);
+    AddKey(ktShortComment    , '--'      );
+    AddKey(ktShortComment    , '//'      );
+    AddKey(ktLongCommentBegin, '{'       );
+    AddKey(ktLongCommentEnd  , '}'       );
+    AddKey(ktLongCommentBegin, '/*'      );
+    AddKey(ktLongCommentEnd  , '*/'      );
+    AddKey(ktLongCommentBegin, '(*'      );
+    AddKey(ktLongCommentEnd  , '*)'      );
 
   end;
 
@@ -1530,52 +1561,56 @@ begin
 
 end;
 
-procedure TParamsReader.KeyEvent(const _KeyWord: TKeyWord);
-var
-  ReadProc: TProcedure;
+procedure TParamsReader.InitSpecialSegments;
 begin
 
-  inherited KeyEvent(_KeyWord);
+  inherited InitSpecialSegments;
 
-  CheckParams(_KeyWord);
+  with KeyWords do begin
 
-  if ItemBody then begin
-
-    { Считывние }
-    if FReadSettings.GetReadProc(FState, _KeyWord.KeyType, ReadProc, Line, Cursor, LinePos) then
-
-      ReadProc
-
-    else Exit;
-
-    { Переключение состояния }
-    case _KeyWord.KeyType of
-
-      ktTypeIdent:           FState := stType;
-      ktAssigning:           FState := stValue;
-      ktLineEnd, ktSplitter: if FState = stValue then FState := stName;
-      ktString:              FState := stName;
-
-    end;
+    AddSpecialSegment(TSpecialSegment, GetKey(''''), GetKey(''''));
+    AddSpecialSegment(TSpecialSegment, GetKey('"' ), GetKey('"' ));
 
   end;
 
-
 end;
 
-procedure TParamsReader.MoveEvent;
+procedure TParamsReader.KeyEvent(const _KeyWord: TKeyWord);
+var
+  ReadProc: TReadProc;
 begin
 
-  inherited MoveEvent;
+  try
 
-  { TODO 1 -oVasilyevSM -cGeneral: ActionItem }
-//  with FStringSpecialSpace do
-//    if Active and CheckClosing(Source, Cursor) then
-//      KeyEvent(T KeyWord.Create(ClosingKeys[0].KeyType, ClosingKeys[0].StrValue));
+    inherited KeyEvent(_KeyWord);
 
-//  with FCommentSpecialSpace do
-//    if Active and CheckClosing(Source, Cursor) then
-//      KeyEvent(TK eyWord.Create(ClosingKey.KeyType, ClosingKey.StrValue));
+    CheckParams(_KeyWord);
+
+    if ItemBody then begin
+
+      { Считывние }
+      if FReadSettings.GetReadProc(FState, _KeyWord.KeyType, ReadProc, Line, Cursor, LinePos) then
+
+        ReadProc(_KeyWord)
+
+      else Exit;
+
+      { Переключение состояния }
+      case _KeyWord.KeyType of
+
+        ktTypeIdent:           FState := stType;
+        ktAssigning:           FState := stValue;
+        ktLineEnd, ktSplitter: if FState = stValue then FState := stName;
+        ktString:              FState := stName;
+
+      end;
+
+    end;
+
+  except
+    on E: Exception do
+      raise EParamsReadException.Create('Error Message', Line, Cursor - LinePos);
+  end;
 
 end;
 

@@ -6,6 +6,8 @@ unit uDataUtils;
 (*                                                       *)
 (*********************************************************)
 
+{ TODO -oVasilyevSM -cuDataUtils: Проискать на лишние функции }
+
 interface
 
 uses
@@ -20,10 +22,7 @@ function BooleanToInt(Value: Boolean): Int64;
 function BooleanToBLOB(Value: Boolean): BLOB;
 function IntToBoolean(Value: Int64): Boolean;
 function BLOBToBoolean(const Value: BLOB): Boolean;
-function DataToAnsiStr(const Value: TData; Offset: Integer = 0): AnsiString;
-{ TODO -oVasilyevSM -cuDataUtils: ->  uStrUtils }
-function DataToStr(const Value: TData; Offset: Integer = 0): String;
-function DataToGUID(const Value: TData): TGUID;
+function DataToAnsiStr(const Value: TData): AnsiString;
 { ^ Преобразование основных типов данных ^ }
 
 { v Cравнение действительных чисел с отбросом "мусорной" части v }
@@ -92,33 +91,13 @@ begin
 
 end;
 
-function _GetNewLength(Length, Offset: Integer): Integer;
-begin
-  if Length > Offset then Result := Length - Offset
-  else Result := 0;
-end;
-
-function DataToAnsiStr(const Value: TData; Offset: Integer = 0): AnsiString;
+function DataToAnsiStr(const Value: TData): AnsiString;
 var
   L: Integer;
 begin
-  L := _GetNewLength(Length(Value), Offset);
+  L := Length(Value);
   SetLength(Result, L);
-  Move(Value[Offset], Result[1], L);
-end;
-
-function DataToStr(const Value: TData; Offset: Integer = 0): String;
-var
-  L: Integer;
-begin
-  L := _GetNewLength(Length(Value), Offset);
-  SetLength(Result, L div 2);
-  Move(Value[Offset], Result[1], L);
-end;
-
-function DataToGUID(const Value: TData): TGUID;
-begin
-  Move(Value[0], Result, 16);
+  Move(Value[0], Result[1], L);
 end;
 
 function SameDouble(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;

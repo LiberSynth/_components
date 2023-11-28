@@ -6,6 +6,8 @@
 (*                                                       *)
 (*********************************************************)
 
+{ TODO -oVasilyevSM -cuStrUtils: Проискать на лишние функции }
+
 interface
 
 uses
@@ -18,7 +20,7 @@ uses
 function StrIsBoolean(const S: String): Boolean;
 function StrIsGUID(const Value: String): Boolean;
 
-{ TODO -oVasilyevSM -cuStrUtils: Продолжение следует: Extended, AnsiString, BLOB, TData }
+{ TODO -oVasilyevSM -cuStrUtils: Продолжение следует: Extended, AnsiString, BLOB }
 function BooleanToStr(Value: Boolean): String;
 function StrToBoolean(const S: String): Boolean;
 function IntToStr(Value: Integer): String;
@@ -33,6 +35,8 @@ function GUIDToStr(const Value: TGUID) : String;
 function StrToGUID(const Value: String): TGUID;
 function BLOBToHexStr(const Value: BLOB): String;
 function HexStrToBLOB(const Value: String): BLOB;
+function DataToStr(const Value: TData): String;
+function DataToGUID(const Value: TData): TGUID;
 { ^ Преобразование основных типов данных в строку и обратно ^ }
 
 { v Для парсинга и автоскриптов v }
@@ -453,6 +457,20 @@ begin
 
   end;
 
+end;
+
+function DataToStr(const Value: TData): String;
+var
+  L: Integer;
+begin
+  L := Length(Value);
+  SetLength(Result, L div 2);
+  Move(Value[0], Result[1], L);
+end;
+
+function DataToGUID(const Value: TData): TGUID;
+begin
+  Move(Value[0], Result, 16);
 end;
 
 function PosOf(Patterns: String; const Value: String; Start: Integer): Integer;

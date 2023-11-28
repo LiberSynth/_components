@@ -17,8 +17,11 @@ type
     KeyTypeInternal: Integer;
     StrValue: String;
     KeyLength: Integer;
+    QuotingSymbol: Boolean;
 
-    constructor Create(_KeyType: Integer; const _StrValue: String);
+    constructor Create(_KeyType: Integer; const _StrValue: String; _QuotingSymbol: Boolean = False);
+
+    function Equal(_Value: TKeyWord): Boolean;
 
   end;
 
@@ -26,7 +29,7 @@ type
 
   private
 
-    constructor Create(_KeyType: TKeyWordType; const _StrValue: String); overload;
+    constructor Create(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean = False); overload;
 
     function GetKeyType: TKeyWordType;
     procedure SetKeyType(const _Value: TKeyWordType);
@@ -39,34 +42,48 @@ type
 
   public
 
-    function AddKey(_KeyType: TKeyWordType; const _StrValue: String): TKeyWord;
+    function AddKey(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean = False): TKeyWord;
+    function GetKey(const _StrValue: String): TKeyWord;
 
   end;
 
-  TSpecialSpaceHandler = class
+  {
+
+    Объект, позволяющий НЕ считать ключевыми словами любые символы внутри особого сегента (строка, комментарий итд)
+    кроме закрывающего этото сегент ключа. Сегменты парсера настраиваются в потомках добавлением в виртуальном методе
+    InitSpecialSegments с помощью AddSpecialSegment. Класс обработчика можно пронаследовать (от TSpecialSegment), чтобы
+    расширить его поведение. Для строк работает без наследования.
+
+  }
+  TSpecialSegment = class
 
   strict private
 
     FActive: Boolean;
     FOpeningKey: TKeyWord;
-    FClosingKeys: TArray<TKeyWord>;
-    FCheckDoubling: Boolean;
+    FClosingKey: TKeyWord;
 
   private
 
-    procedure Open(
+    constructor Create(_OpeningKey, _ClosingKey: TKeyWord);
 
-        _OpeningKey: TKeyWord;
-        const _ClosingKeys: array of TKeyWord;
-        _CheckDoubling: Boolean
-
-    );
+    procedure Open;
     procedure Close;
-    function CheckClosing(const _Source: String; _Cursor: Int64): Boolean; virtual;
 
     property Active: Boolean read FActive;
     property OpeningKey: TKeyWord read FOpeningKey;
-    property ClosingKeys: TArray<TKeyWord> read FClosingKeys;
+    property ClosingKey: TKeyWord read FClosingKey;
+
+  end;
+
+  TSpecialSegmentClass = class of TSpecialSegment;
+
+  TSpecialSegmentList = class(TObjectList<TSpecialSegment>)
+
+  public
+
+    function Active(var _Value: TSpecialSegment): Boolean;
+    procedure Refresh(const _KeyWord: TKeyWord; _ActiveHandler: TSpecialSegment);
 
   end;
 
@@ -77,20 +94,24 @@ type
     FSource: String;
     FLength: Int64;
     FCursor: Int64;
-    FKeyWords: TKeyWordList;
-    FTerminated: Boolean;
 
+    FTerminated: Boolean;
     FItemBody: Boolean;
     FItemBegin: Int64;
 
     FLine: Int64;
     FLinePos: Int64;
 
-    function CheckKeys: Boolean;
-    procedure KeyFound(const _KeyWord: TKeyWord);
+    FKeyWords: TKeyWordList;
+    FSpecialSegments: TSpecialSegmentList;
+
+    function CheckKeys(var _Value: TKeyWord): Boolean;
     procedure IncLine(const _KeyWord: TKeyWord);
 
   protected
+
+    class procedure InitKeyWords(_KeyWords: TKeyWordList); virtual;
+    procedure InitSpecialSegments; virtual;
 
     function CheckKey(const _KeyWord: TKeyWord): Boolean;
     procedure Move(_Incrementer: Int64 = 1);
@@ -98,8 +119,8 @@ type
     procedure MoveEvent; virtual;
     procedure Terminate;
     function ReadItem: String;
-    { Функция, позволяющая НЕ считать ключевыми словами любые символы внутри какого-либо пространства (строки, комментарии итд) }
-    function SpecialSpace: Boolean; virtual;
+
+    procedure AddSpecialSegment(const _HandlerClass: TSpecialSegmentClass; const _OpeningKey, _ClosingKey: TKeyWord);
 
     property KeyWords: TKeyWordList read FKeyWords;
     property ItemBody: Boolean read FItemBody write FItemBody;
@@ -132,9 +153,7 @@ type
 
   public
 
-    { TODO -oVasilyevSM -cTCustomStringParser: В случае отрицательной позиции здесь нужно в принципе по-другому
-      отсчитывать строки, чтобы нормально спозиционироваться. И ItemBegin на момент генерации исключения может быть
-      сброшен, поэтому надо хранить последний актуальный ItemBegin и его возвращать здесь. }
+    { TODO -oVasilyevSM -cTCustomStringParser: Line и Position почти всегда считаются неправильно }
     constructor Create(const _Message: String; _Line, _Position: Int64);
     constructor CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64);
     constructor CreatePos(const _Message: String; _Line, _Position: Int64);
@@ -145,20 +164,32 @@ implementation
 
 { TKeyWord }
 
-constructor TKeyWord.Create(_KeyType: Integer; const _StrValue: String);
+constructor TKeyWord.Create(_KeyType: Integer; const _StrValue: String; _QuotingSymbol: Boolean);
 begin
 
   KeyTypeInternal := _KeyType;
   StrValue        := _StrValue;
   KeyLength       := Length(StrValue);
+  QuotingSymbol   := _QuotingSymbol;
+
+end;
+
+function TKeyWord.Equal(_Value: TKeyWord): Boolean;
+begin
+
+  Result :=
+
+      (_Value.KeyTypeInternal = KeyTypeInternal) and
+      (_Value.StrValue        = StrValue       ) and
+      (_Value.KeyLength       = KeyLength      );
 
 end;
 
 { TKeyWordHelper }
 
-constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String);
+constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean);
 begin
-  Create(Integer(_KeyType), _StrValue)
+  Create(Integer(_KeyType), _StrValue, _QuotingSymbol);
 end;
 
 function TKeyWordHelper.GetKeyType: TKeyWordType;
@@ -174,87 +205,95 @@ end;
 
 { TKeyWordList }
 
-function TKeyWordList.AddKey(_KeyType: TKeyWordType; const _StrValue: String): TKeyWord;
+function TKeyWordList.AddKey(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean): TKeyWord;
 begin
-  Result := TKeyWord.Create(Integer(_KeyType), _StrValue);
+  Result := TKeyWord.Create(Integer(_KeyType), _StrValue, _QuotingSymbol);
   Add(Result);
 end;
 
-{ TSpecialSpaceHandler }
-
-procedure TSpecialSpaceHandler.Open;
+function TKeyWordList.GetKey(const _StrValue: String): TKeyWord;
 var
-  i: Integer;
+  Item: TKeyWord;
 begin
 
-  FOpeningKey    := _OpeningKey;
-  FCheckDoubling := _CheckDoubling;
-  FActive        := True;
+  for Item in Self do
+    if Item.StrValue = _StrValue then
+      Exit(Item);
 
-  SetLength(FClosingKeys, Length(_ClosingKeys));
-  for i := Low(FClosingKeys) to High(FClosingKeys) do
-    FClosingKeys[i] := _ClosingKeys[i];
+  raise ECoreException.CreateFmt('KeyWord not found by StrValue ''%s''', [_StrValue]);
 
 end;
 
-procedure TSpecialSpaceHandler.Close;
+{ TSpecialSegment }
+
+constructor TSpecialSegment.Create(_OpeningKey, _ClosingKey: TKeyWord);
 begin
 
-  FOpeningKey := TKeyWord.Create(ktNone, '');
-  SetLength(FClosingKeys, 0);
-  FActive     := False;
+  inherited Create;
+
+  FOpeningKey := _OpeningKey;
+  FClosingKey := _ClosingKey;
 
 end;
 
-function TSpecialSpaceHandler.CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
+procedure TSpecialSegment.Open;
+begin
+  FActive := True;
+end;
+
+procedure TSpecialSegment.Close;
+begin
+  FActive := False;
+end;
+
+{ TSpecialSegmentList }
+
+function TSpecialSegmentList.Active(var _Value: TSpecialSegment): Boolean;
 var
-  ClosingKey: TKeyWord;
+  Handler: TSpecialSegment;
 begin
 
-  for ClosingKey in FClosingKeys do
+  for Handler in Self do
 
-    with ClosingKey do begin
+    if Handler.Active then begin
 
-      { Проверка задублированного закрывающего ключа }
-      if
-
-          { проверка включена в данном обработчике }
-          FCheckDoubling and
-          { закрывающий ключ в позиции курсора }
-          (StrValue = Copy(_Source, _Cursor, 1)) and
-          { только для ключей из одного символа }
-          (KeyLength = 1) and
-          (
-
-              { дубль в следующей позиции }
-              (Copy(_Source, _Cursor, 2) = StrValue + StrValue) or
-              { или в предыдущей }
-              ((_Cursor > 1) and (Copy(_Source, _Cursor - 1, 2) = StrValue + StrValue))
-
-          ) and
-          { при этом, если только это не последний ключ в тройке }
-          { TODO -oVasilyevSM -cTSpecialSpaceHandler: Четверка и более не сработает. Нужна функция, которая будет считать, сколько их там перед, чет-нечет }
-          not ((_Cursor > 2) and (Copy(_Source, _Cursor - 2, 3) = StrValue + StrValue + StrValue))
-
-      then Exit(False);
-
-      if
-
-          { Закрывающий ключ задан }
-          (KeyLength > 0) and
-          { И это он }
-          (Copy(_Source, _Cursor, KeyLength) = StrValue)
-
-      then begin
-
-        FActive := False;
-        Exit(True);
-
-      end;
+      _Value := Handler;
+      Exit(True);
 
     end;
 
   Result := False;
+
+end;
+
+procedure TSpecialSegmentList.Refresh(const _KeyWord: TKeyWord; _ActiveHandler: TSpecialSegment);
+var
+  Handler: TSpecialSegment;
+begin
+
+  { TODO -oVasilyevSM -cTSpecialSegmentList: Нужно проверять всю настройку где-то в дебаге. Ключи не должны
+    повторяться никак. То есть, открывающий ключ каждой зоны не должен быть закрывающим для другой. и наоборот. }
+
+  if Assigned(_ActiveHandler) then begin
+
+    with _ActiveHandler do
+      if ClosingKey.Equal(_KeyWord) then
+        Close;
+
+  end else begin
+
+    for Handler in Self do
+
+      with Handler do
+
+        if not Active and OpeningKey.Equal(_KeyWord) then begin
+
+          Open;
+          Break;
+
+        end;
+
+  end;
 
 end;
 
@@ -271,48 +310,40 @@ begin
   FLine    := _Line;
   FLinePos := _LinePos;
 
-  FKeyWords := TKeyWordList.Create;
+  FKeyWords        := TKeyWordList.       Create;
+  FSpecialSegments := TSpecialSegmentList.Create;
 
-  with FKeyWords do begin
-
-    AddKey(ktLineEnd, CRLF);
-    AddKey(ktLineEnd, CR  );
-    AddKey(ktLineEnd, LF  );
-
-  end;
+  InitKeyWords(KeyWords);
+  InitSpecialSegments;
 
 end;
 
 destructor TCustomStringParser.Destroy;
 begin
-  FreeAndNil(FKeyWords);
+
+  FreeAndNil(FSpecialSegments);
+  FreeAndNil(FKeyWords       );
+
   inherited Destroy;
+
 end;
 
-function TCustomStringParser.CheckKeys: Boolean;
+function TCustomStringParser.CheckKeys(var _Value: TKeyWord): Boolean;
 var
-  KW: TKeyWord;
+  KeyWord: TKeyWord;
 begin
 
-  if not SpecialSpace then
+  for KeyWord in FKeyWords do
 
-    for KW in FKeyWords do
+    if CheckKey(KeyWord) then begin
 
-      if CheckKey(KW) then begin
+      _Value := KeyWord;
+      Exit(True);
 
-        KeyFound(KW);
-        Exit(True);
-
-      end;
+    end;
 
   Result := False;
 
-end;
-
-procedure TCustomStringParser.KeyFound(const _KeyWord: TKeyWord);
-begin
-  KeyEvent(_KeyWord);
-  Move(_KeyWord.KeyLength);
 end;
 
 procedure TCustomStringParser.IncLine(const _KeyWord: TKeyWord);
@@ -321,9 +352,32 @@ begin
   LinePos := Cursor + _KeyWord.KeyLength;
 end;
 
+class procedure TCustomStringParser.InitKeyWords(_KeyWords: TKeyWordList);
+begin
+
+  with _KeyWords do begin
+
+    AddKey(ktLineEnd, CRLF, True);
+    AddKey(ktLineEnd, CR,   True);
+    AddKey(ktLineEnd, LF,   True);
+
+  end;
+
+end;
+
+procedure TCustomStringParser.InitSpecialSegments;
+begin
+end;
+
+procedure TCustomStringParser.AddSpecialSegment;
+begin
+  FSpecialSegments.Add(_HandlerClass.Create(_OpeningKey, _ClosingKey));
+end;
+
 function TCustomStringParser.CheckKey(const _KeyWord: TKeyWord): Boolean;
 begin
-  Result := SameText(_KeyWord.StrValue, Copy(Source, Cursor, _KeyWord.KeyLength));
+  with _KeyWord do
+    Result := StrValue = Copy(Source, Cursor, KeyLength);
 end;
 
 procedure TCustomStringParser.Move(_Incrementer: Int64);
@@ -348,21 +402,82 @@ begin
 end;
 
 procedure TCustomStringParser.Read;
+var
+  ActiveHandler: TSpecialSegment;
+  CursorKey: TKeyWord;
+
+  function _KeyDoubling: Boolean;
+  begin
+
+    with ActiveHandler.ClosingKey do
+
+      Result :=
+
+        (KeyLength = 1) and
+        (Length - Cursor > 2) and
+        (Copy(Source, Cursor, 2) = StrValue + StrValue);
+
+    { Если KeyDoubling, то это сразу MoveEvent. Никто больше ключи проверять не будет. }
+    if Result then
+      Move;
+
+  end;
+
+  function _IsKeyEvent: Boolean;
+  var
+    ActiveSegment, KeyFound: Boolean;
+  begin
+
+    ActiveSegment := FSpecialSegments.Active(ActiveHandler);
+    if ActiveSegment then begin
+
+      KeyFound := CheckKey(ActiveHandler.ClosingKey) and not _KeyDoubling;
+      if KeyFound then begin
+
+        { Активная зона закончилась, перед нами ее закрывающий ключ - KeyEvent }
+        ActiveSegment := False;
+        CursorKey := ActiveHandler.ClosingKey;
+
+      end; { Это MoveEvent, CursorKey не понадобится }
+
+    end else begin
+
+      ActiveHandler := nil;
+      { Активной зоны не было - проверяем, что перед нами, не ключ ли }
+      KeyFound := CheckKeys(CursorKey);
+
+    end;
+
+    Result := not ActiveSegment and KeyFound;
+
+  end;
+
 begin
 
-  while (Cursor <= Length) and not FTerminated do
+  while (Cursor <= Length) and not FTerminated do begin
 
-    if not CheckKeys then begin
+    if _IsKeyEvent then begin
 
+      KeyEvent(CursorKey);
+      Move(CursorKey.KeyLength);
+
+      { И обновляем состояние всех особых зон по текущему ключу }
+      FSpecialSegments.Refresh(CursorKey, ActiveHandler);
+
+    end else begin
+
+      { Иначе - простой шаг вперед }
       MoveEvent;
       Move;
 
     end;
 
+  end;
+
   KeyEvent(TKeyWord.Create(ktSourceEnd, ''));
 
   { Оборачивать этот метод в try except чревато. В on E do получается уничтоженный объект E. }
-  { TODO 1 -oVasilyevSM -ctry_except_end: Нужен эксперимент, откуда вызовется E.Free, если тут обернуть таки. }
+  { TODO -oVasilyevSM -ctry_except_end: Нужен эксперимент, откуда вызовется E.Free, если тут обернуть таки. }
 
 end;
 
@@ -379,11 +494,6 @@ begin
   ItemBody := False;
   ItemBegin := 0;
 
-end;
-
-function TCustomStringParser.SpecialSpace: Boolean;
-begin
-  Result := False;
 end;
 
 { EStringParserError }
