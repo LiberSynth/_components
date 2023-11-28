@@ -245,24 +245,72 @@ type
 
   TState = (stName, stType, stValue, stString, stShortComment, stLongComment);
 
-  TReadInfo = record
+  TReadInfo = class
 
     State: TState;
     EntryKeyTypes: TKeyWordTypes;
     Proc: TProcedure;
     ValidKeyTypes: TKeyWordTypes;
+    Related: TReadInfo;
+
+    constructor Create(
+
+        _State: TState;
+        _EntryKeyTypes: TKeyWordTypes;
+        _Proc: TProcedure;
+        _ValidKeyTypes: TKeyWordTypes
+
+    );
 
   end;
 
-  TSpecialSpaceHandler = record
+  TReadSettings = class(TList<TReadInfo>)
 
-    Active: Boolean;
-    OpeningKey: TKeyWord;
-    ClosingKey: TKeyWord;
+  private
 
-    procedure Open(_OpeningKey: TKeyWord; _ClosingKey: TKeyWord);
+    procedure Add(
+
+        _State: TState;
+        _EntryKeyTypes: TKeyWordTypes;
+        _Proc: TProcedure;
+        _ValidKeyTypes: TKeyWordTypes
+
+    );
+
+  end;
+
+  TSpecialSpaceHandler = class
+
+  strict private
+
+    FActive: Boolean;
+    FOpeningKey: TKeyWord;
+    FClosingKeys: TArray<TKeyWord>;
+    FCheckDoubling: Boolean;
+
+  private
+
+    procedure Open(
+
+        _OpeningKey: TKeyWord;
+        const _ClosingKeys: array of TKeyWord;
+        _CheckDoubling: Boolean
+
+    );
     procedure Close;
-    function CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
+    function CheckClosing(const _Source: String; _Cursor: Int64): Boolean; virtual;
+
+    property Active: Boolean read FActive;
+    property OpeningKey: TKeyWord read FOpeningKey;
+    property ClosingKeys: TArray<TKeyWord> read FClosingKeys;
+
+  end;
+
+  TCommentSpaceHandler = class(TSpecialSpaceHandler)
+
+  private
+
+    function CheckClosing(const _Source: String; _Cursor: Int64): Boolean; override;
 
   end;
 
@@ -277,8 +325,9 @@ type
     FCurrentName: String;
     FCurrentType: TParamDataType;
 
-    FReadSettings: array of TReadInfo;
+    FReadSettings: TReadSettings;
     FStringSpecialSpace: TSpecialSpaceHandler;
+    FCommentSpecialSpace: TSpecialSpaceHandler;
 
     procedure GetName;
     procedure GetType;
@@ -287,20 +336,14 @@ type
     procedure CheckType;
     procedure CheckParams(_KeyWord: TKeyWord);
     procedure CheckString(_KeyWord: TKeyWord);
+    procedure CheckComment(_KeyWord: TKeyWord);
     function ReadParams(_KeyWord: TKeyWord): Int64;
     function KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
     function KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
     function TrimDigital(const _Value: String): String;
     function UndoubleString(const _Value: String): String;
 
-    procedure AddReadSetting(
-
-        _State: TState;
-        _EntryKeyTypes: TKeyWordTypes;
-        _Proc: TProcedure;
-        _ValidKeyTypes: TKeyWordTypes
-
-    );
+    procedure InitKeyWords;
     procedure InitReadSetting;
     function GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
     function CheckExpectedKey: Boolean;
@@ -322,6 +365,7 @@ type
         _LinePos: Int64 = 1
 
     );
+    destructor Destroy; override;
 
   end;
 
@@ -1216,55 +1260,108 @@ begin
   Result := _Default;
 end;
 
-{ TSpecialSpaceHandler }
+{ TReadInfo }
 
-procedure TSpecialSpaceHandler.Open(_OpeningKey, _ClosingKey: TKeyWord);
+constructor TReadInfo.Create;
 begin
 
-  OpeningKey := _OpeningKey;
-  ClosingKey := _ClosingKey;
-  Active     := True;
+  State         := _State;
+  EntryKeyTypes := _EntryKeyTypes;
+  Proc          := _Proc;
+  ValidKeyTypes := _ValidKeyTypes;
+
+end;
+
+{ TReadSettings }
+
+procedure TReadSettings.Add;
+begin
+  inherited Add(TReadInfo.Create(_State, _EntryKeyTypes, _Proc, _ValidKeyTypes));
+end;
+
+{ TSpecialSpaceHandler }
+
+procedure TSpecialSpaceHandler.Open;
+var
+  i: Integer;
+begin
+
+  FOpeningKey    := _OpeningKey;
+  FCheckDoubling := _CheckDoubling;
+  FActive        := True;
+
+  SetLength(FClosingKeys, Length(_ClosingKeys));
+  for i := Low(FClosingKeys) to High(FClosingKeys) do
+    FClosingKeys[i] := _ClosingKeys[i];
 
 end;
 
 procedure TSpecialSpaceHandler.Close;
 begin
 
-  OpeningKey := TKeyWord.Create(0, '');
-  ClosingKey := TKeyWord.Create(0, '');
-  Active     := False;
+  FOpeningKey := TKeyWord.Create(0, '');
+  SetLength(FClosingKeys, 0);
+  FActive     := False;
 
 end;
 
 function TSpecialSpaceHandler.CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
+var
+  ClosingKey: TKeyWord;
 begin
 
-  with ClosingKey do begin
+  for ClosingKey in FClosingKeys do
 
-    { Проверка задублированного закрывающего ключа }
-    if
+    with ClosingKey do begin
 
-        (StrValue = StrValue) and
-        (KeyLength = 1) and
-        (
+      { Проверка задублированного закрывающего ключа }
+      if
 
-            (Copy(_Source, _Cursor, 2) = StrValue + StrValue) or
-            ((_Cursor > 1) and (Copy(_Source, _Cursor - 1, 2) = StrValue + StrValue))
+          { проверка включена в данном обработчике }
+          FCheckDoubling and
+          { закрывающий ключ в позиции курсора }
+          (StrValue = Copy(_Source, _Cursor, 1)) and
+          { только для ключей из одного символа }
+          (KeyLength = 1) and
+          (
 
-        ) and
-        not ((_Cursor > 2) and (Copy(_Source, _Cursor - 2, 3) = StrValue + StrValue + StrValue))
+              { дубль в следующей позиции }
+              (Copy(_Source, _Cursor, 2) = StrValue + StrValue) or
+              { или в предыдущей }
+              ((_Cursor > 1) and (Copy(_Source, _Cursor - 1, 2) = StrValue + StrValue))
 
-    then Exit(False);
+          ) and
+          { при этом, если только это не последний ключ в тройке }
+          { TODO -oVasilyevSM -cTSpecialSpaceHandler: Четверка и более не сработает. Нужна функция, которая будет считать, сколько их там перед, чет-нечет }
+          not ((_Cursor > 2) and (Copy(_Source, _Cursor - 2, 3) = StrValue + StrValue + StrValue))
 
-    if Copy(_Source, _Cursor, KeyLength) = StrValue then begin
+      then Exit(False);
 
-      Active := False;
-      Result := True;
+      if
 
-    end else Result := False;
+          { Закрывающий ключ задан }
+          (KeyLength > 0) and
+          { И это он }
+          (Copy(_Source, _Cursor, KeyLength) = StrValue)
 
-  end;
+      then begin
 
+        FActive := False;
+        Exit(True);
+
+      end;
+
+    end;
+
+  Result := False;
+
+end;
+
+{ TCommentSpaceHandler }
+
+function TCommentSpaceHandler.CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
+begin
+  Result := inherited or True;
 end;
 
 { TParamsReader }
@@ -1278,32 +1375,17 @@ begin
   FNested := _Cursor > 1;
 
   FState := stName;
+  FReadSettings := TReadSettings.Create;
 
-  AddKeyword(Integer(ktSpace), ' ');
-  AddKeyword(Integer(ktSpace), TAB);
-
-  AddKeyword(Integer(ktSplitter),  ';');
-
-  AddKeyword(Integer(ktTypeIdent), ':');
-  AddKeyword(Integer(ktAssigning), '=');
-
-  AddKeyword(Integer(ktString), '''');
-  AddKeyword(Integer(ktString), '"');
-
-  AddKeyword(Integer(ktOpeningBracket), '(');
-  AddKeyword(Integer(ktClosingBracket), ')');
-
-  AddKeyword(Integer(ktShortComment    ), '--');
-  AddKeyword(Integer(ktShortComment    ), '//');
-  AddKeyword(Integer(ktLongCommentBegin), '{');
-  AddKeyword(Integer(ktLongCommentBegin), '/*');
-  AddKeyword(Integer(ktLongCommentBegin), '(*');
-  AddKeyword(Integer(ktLongCommentEnd  ), '}');
-  AddKeyword(Integer(ktLongCommentEnd  ), '*/');
-  AddKeyword(Integer(ktLongCommentEnd  ), '*)');
-
+  InitKeyWords;
   InitReadSetting;
 
+end;
+
+destructor TParamsReader.Destroy;
+begin
+  FreeAndNil(FReadSettings);
+  inherited Destroy;
 end;
 
 procedure TParamsReader.GetName;
@@ -1338,6 +1420,7 @@ begin
   FCurrentName := '';
   FCurrentType := dtUnknown;
   FStringSpecialSpace.Close;
+  FCommentSpecialSpace.Close;
 
 end;
 
@@ -1384,13 +1467,35 @@ end;
 procedure TParamsReader.CheckString(_KeyWord: TKeyWord);
 begin
 
-  if (FCurrentType = dtString) and (FState = stValue) then begin
+  if (FCurrentType = dtString) and (FState = stValue) then
 
-    if (TKeyWordType(_KeyWord.KeyType) = ktString) and not ItemBody then
-      FStringSpecialSpace.Open(_KeyWord, _KeyWord);
+    with FStringSpecialSpace do begin
 
-    if FStringSpecialSpace.Active and (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd) then
-      raise EParamsReadException.Create('Unterminated string', Line, Cursor - LinePos);
+      if (TKeyWordType(_KeyWord.KeyType) = ktString) and not ItemBody then
+        Open(_KeyWord, _KeyWord, True);
+
+      if Active and (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd) then
+        raise EParamsReadException.Create('Unterminated string', Line, Cursor - LinePos);
+
+    end;
+
+end;
+
+procedure TParamsReader.CheckComment(_KeyWord: TKeyWord);
+begin
+
+  with FCommentSpecialSpace do begin
+
+    if KeyWordTypeInSet(_KeyWord, [ktShortComment, ktLongCommentBegin]) then
+      Open(_KeyWord, [KeyWords.GetRelated(_KeyWord)], False);
+
+    if
+
+        Active and
+        (TKeyWordType(OpeningKey.KeyType) = ktLongCommentBegin) and
+        (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd)
+
+    then raise EParamsReadException.Create('Unterminated comment', Line, Cursor - LinePos);
 
   end;
 
@@ -1456,7 +1561,7 @@ end;
 function TParamsReader.UndoubleString(const _Value: String): String;
 begin
 
-  with FStringSpecialSpace.ClosingKey do
+  with FStringSpecialSpace.ClosingKeys[0] do
 
     if TKeyWordType(KeyType) = ktString then
 
@@ -1466,20 +1571,40 @@ begin
 
 end;
 
-procedure TParamsReader.AddReadSetting(_State: TState; _EntryKeyTypes: TKeyWordTypes; _Proc: TProcedure; _ValidKeyTypes: TKeyWordTypes);
-var
-  L: Integer;
+procedure TParamsReader.InitKeyWords;
 begin
 
-  L := System.Length(FReadSettings);
-  SetLength(FReadSettings, L + 1);
+  with KeyWords do begin
 
-  with FReadSettings[L] do begin
+    Add(Integer(ktSpace           ), ' ' );
+    Add(Integer(ktSpace           ), TAB);
+    Add(Integer(ktSplitter        ), ';' );
+    Add(Integer(ktTypeIdent       ), ':' );
+    Add(Integer(ktAssigning       ), '=' );
+    Add(Integer(ktString          ), '''');
+    Add(Integer(ktString          ), '"' );
+    Add(Integer(ktOpeningBracket  ), '(' );
+    Add(Integer(ktClosingBracket  ), ')' );
+    Add(Integer(ktShortComment    ), '--');
+    Add(Integer(ktShortComment    ), '//');
+    Relate(
 
-    State :=         _State;
-    EntryKeyTypes := _EntryKeyTypes;
-    Proc :=          _Proc;
-    ValidKeyTypes := _ValidKeyTypes;
+      Add(Integer(ktLongCommentBegin), '{'),
+      Add(Integer(ktLongCommentEnd  ), '}')
+
+    );
+    Relate(
+
+      Add(Integer(ktLongCommentBegin), '/*'),
+      Add(Integer(ktLongCommentEnd  ), '*/')
+
+    );
+    Relate(
+
+      Add(Integer(ktLongCommentBegin), '(*'),
+      Add(Integer(ktLongCommentEnd  ), '*)')
+
+    );
 
   end;
 
@@ -1488,12 +1613,14 @@ end;
 procedure TParamsReader.InitReadSetting;
 begin
 
-  SetLength(FReadSettings, 0);
+  with FReadSettings do begin
 
-  AddReadSetting(stName,   [ktTypeIdent, ktAssigning],                                       GetName,  [ktSpace]);
-  AddReadSetting(stType,   [ktAssigning],                                                    GetType,  [ktSpace]);
-  AddReadSetting(stValue,  [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket, ktString], SetValue, [ktSpace]);
-  AddReadSetting(stString, [ktString],                                                       SetValue, []       );
+    Add(stName,   [ktTypeIdent, ktAssigning],                                       GetName,  [ktSpace]);
+    Add(stType,   [ktAssigning],                                                    GetType,  [ktSpace]);
+    Add(stValue,  [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket, ktString], SetValue, [ktSpace]);
+    Add(stString, [ktString],                                                       SetValue, []       );
+
+  end;
 
 end;
 
@@ -1540,7 +1667,7 @@ begin
     dtString:   Result := FStringSpecialSpace.Active;
 
   else
-    Result := inherited;
+    Result := FCommentSpecialSpace.Active or inherited;
   end;
 
 end;
@@ -1576,8 +1703,9 @@ begin
 
   inherited KeyEvent(_KeyWord);
 
-  CheckParams(_KeyWord);
-  CheckString(_KeyWord);
+  CheckParams (_KeyWord);
+  CheckString (_KeyWord);
+  CheckComment(_KeyWord);
 
   if ItemBody then begin
 
@@ -1609,6 +1737,10 @@ begin
   inherited MoveEvent;
 
   with FStringSpecialSpace do
+    if Active and CheckClosing(Source, Cursor) then
+      KeyEvent(TKeyWord.Create(ClosingKeys[0].KeyType, ClosingKeys[0].StrValue));
+
+  with FCommentSpecialSpace do
     if Active and CheckClosing(Source, Cursor) then
       KeyEvent(TKeyWord.Create(ClosingKey.KeyType, ClosingKey.StrValue));
 

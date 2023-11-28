@@ -22,7 +22,29 @@ type
 
   end;
 
+  TKeyWordRelations = class(TDictionary<TKeyWord, TKeyWord>)
+
+  private
+
+    procedure Add(_KeyWordA, _KeyWordB: TKeyWord);
+
+  end;
+
   TKeyWordList = class(TList<TKeyWord>)
+
+  strict private
+
+    FRelations: TKeyWordRelations;
+
+  public
+
+    constructor Create;
+    destructor Destroy; override;
+
+    function Add(_KeyType: Integer; const _StrValue: String): TKeyWord;
+    procedure Relate(_KeyWordA, _KeyWordB: TKeyWord);
+    function GetRelated(_KeyWord: TKeyWord): TKeyWord;
+
   end;
 
   TCustomStringParser = class
@@ -47,7 +69,6 @@ type
 
   protected
 
-    procedure AddKeyWord(_KeyType: Integer; const _StrValue: String);
     function CheckKey(const _KeyWord: TKeyWord): Boolean;
     procedure Move(_Incrementer: Int64 = 1);
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
@@ -110,6 +131,48 @@ begin
 
 end;
 
+{ TKeyWordRelations }
+
+procedure TKeyWordRelations.Add(_KeyWordA, _KeyWordB: TKeyWord);
+begin
+
+  if ContainsKey(_KeyWordA) then
+    raise ECoreException.Create('Key value is not unique');
+
+  inherited Add(_KeyWordA, _KeyWordB);
+
+end;
+
+{ TKeyWordList }
+
+constructor TKeyWordList.Create;
+begin
+  inherited Create;
+  FRelations := TKeyWordRelations.Create;
+end;
+
+destructor TKeyWordList.Destroy;
+begin
+  FreeAndNil(FRelations);
+  inherited Destroy;
+end;
+
+function TKeyWordList.Add(_KeyType: Integer; const _StrValue: String): TKeyWord;
+begin
+  Result := TKeyWord.Create(_KeyType, _StrValue);
+  inherited Add(Result);
+end;
+
+procedure TKeyWordList.Relate(_KeyWordA, _KeyWordB: TKeyWord);
+begin
+  FRelations.Add(_KeyWordA, _KeyWordB);
+end;
+
+function TKeyWordList.GetRelated(_KeyWord: TKeyWord): TKeyWord;
+begin
+  FRelations.TryGetValue(_KeyWord, Result);
+end;
+
 { TCustomStringParser }
 
 constructor TCustomStringParser.Create;
@@ -125,9 +188,13 @@ begin
 
   FKeyWords := TKeyWordList.Create;
 
-  AddKeyword(Integer(ktLineEnd), CRLF);
-  AddKeyword(Integer(ktLineEnd), CR  );
-  AddKeyword(Integer(ktLineEnd), LF  );
+  with FKeyWords do begin
+
+    Add(Integer(ktLineEnd), CRLF);
+    Add(Integer(ktLineEnd), CR  );
+    Add(Integer(ktLineEnd), LF  );
+
+  end;
 
 end;
 
@@ -167,11 +234,6 @@ procedure TCustomStringParser.IncLine(const _KeyWord: TKeyWord);
 begin
   Inc(FLine);
   LinePos := Cursor + _KeyWord.KeyLength;
-end;
-
-procedure TCustomStringParser.AddKeyWord(_KeyType: Integer; const _StrValue: String);
-begin
-  FKeyWords.Add(TKeyWord.Create(_KeyType, _StrValue));
 end;
 
 function TCustomStringParser.CheckKey(const _KeyWord: TKeyWord): Boolean;
