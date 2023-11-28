@@ -15,12 +15,13 @@ uses
   uConsts, uTypes;
 
 { v Преобразование основных типов данных v }
-{ Можно продолжать evyj;tybtv: Boolean, Integer, BigInt, Float, Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
+{ TODO -oVasilyevSM -cuDataUtils: Продолжение следует. Умножением: Boolean, Integer, BigInt, Float, Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
 function BooleanToInt(Value: Boolean): Int64;
 function BooleanToBLOB(Value: Boolean): BLOB;
 function IntToBoolean(Value: Int64): Boolean;
 function BLOBToBoolean(const Value: BLOB): Boolean;
 function DataToAnsiStr(const Value: TData; Offset: Integer = 0): AnsiString;
+{ TODO -oVasilyevSM -cuDataUtils: ->  uStrUtils }
 function DataToStr(const Value: TData; Offset: Integer = 0): String;
 function DataToGUID(const Value: TData): TGUID;
 { ^ Преобразование основных типов данных ^ }

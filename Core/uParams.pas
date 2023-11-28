@@ -24,7 +24,7 @@ uses
 
 type
 
-  { TODO -oVasilyevSM -cTParam: Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
+  { TODO -oVasilyevSM -cTParam: Продолжение следует. Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
   TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, {dtExtended, }dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
 
   TParams = class;
@@ -273,12 +273,11 @@ type
 
     function TrimDigital(const _Value: String): String;
     procedure CheckParams(_KeyWord: TKeyWord);
-    function CheckExpectedKey: Boolean;
     function KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
     function KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
     function ReadParams(_KeyWord: TKeyWord): Int64;
 
-    function GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
+    procedure InitReadSetting;
     procedure AddReadSetting(
 
         _State: TState;
@@ -287,7 +286,8 @@ type
         _ValidKeyTypes: TKeyWordTypes
 
     );
-    procedure InitReadSetting;
+    function GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
+    function CheckExpectedKey: Boolean;
 
   protected
 
@@ -1288,30 +1288,6 @@ begin
   Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
 end;
 
-function TParamsReader.CheckExpectedKey: Boolean;
-var
-  KW: TKeyWord;
-  RI: TReadInfo;
-  Expected: TKeyWordTypes;
-begin
-
-  Expected := [];
-  for RI in FReadSettings do
-    if RI.State = FState then begin
-
-      Expected := RI.EntryKeyTypes;
-      Break;
-
-    end;
-
-  for KW in KeyWords do
-    if CheckKey(KW) and KeyWordTypeInSet(KW, Expected) then
-      Exit(True);
-
-  Result := False;
-
-end;
-
 function TParamsReader.KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
 begin
   Result := TKeyWordType(_KeyWord.KeyType) in _Set;
@@ -1385,6 +1361,36 @@ begin
 
 end;
 
+procedure TParamsReader.InitReadSetting;
+begin
+
+  SetLength(FReadSettings, 0);
+
+  AddReadSetting(stName,  [ktTypeIdent, ktAssigning],                             GetName,  [ktSpace]);
+  AddReadSetting(stType,  [ktAssigning],                                          GetType,  [ktSpace]);
+  AddReadSetting(stValue, [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket], SetValue, [ktSpace]);
+
+end;
+
+procedure TParamsReader.AddReadSetting(_State: TState; _EntryKeyTypes: TKeyWordTypes; _Proc: TProcedure; _ValidKeyTypes: TKeyWordTypes);
+var
+  L: Integer;
+begin
+
+  L := System.Length(FReadSettings);
+  SetLength(FReadSettings, L + 1);
+
+  with FReadSettings[L] do begin
+
+    State :=         _State;
+    EntryKeyTypes := _EntryKeyTypes;
+    Proc :=          _Proc;
+    ValidKeyTypes := _ValidKeyTypes;
+
+  end;
+
+end;
+
 function TParamsReader.GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
 var
   RI: TReadInfo;
@@ -1419,33 +1425,27 @@ begin
 
 end;
 
-procedure TParamsReader.AddReadSetting(_State: TState; _EntryKeyTypes: TKeyWordTypes; _Proc: TProcedure; _ValidKeyTypes: TKeyWordTypes);
+function TParamsReader.CheckExpectedKey: Boolean;
 var
-  L: Integer;
+  KW: TKeyWord;
+  RI: TReadInfo;
+  Expected: TKeyWordTypes;
 begin
 
-  L := System.Length(FReadSettings);
-  SetLength(FReadSettings, L + 1);
+  Expected := [];
+  for RI in FReadSettings do
+    if RI.State = FState then begin
 
-  with FReadSettings[L] do begin
+      Expected := RI.EntryKeyTypes;
+      Break;
 
-    State :=         _State;
-    EntryKeyTypes := _EntryKeyTypes;
-    Proc :=          _Proc;
-    ValidKeyTypes := _ValidKeyTypes;
+    end;
 
-  end;
+  for KW in KeyWords do
+    if CheckKey(KW) and KeyWordTypeInSet(KW, Expected) then
+      Exit(True);
 
-end;
-
-procedure TParamsReader.InitReadSetting;
-begin
-
-  SetLength(FReadSettings, 0);
-
-  AddReadSetting(stName,  [ktTypeIdent, ktAssigning],                             GetName,  [ktSpace]);
-  AddReadSetting(stType,  [ktAssigning],                                          GetType,  [ktSpace]);
-  AddReadSetting(stValue, [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket], SetValue, [ktSpace]);
+  Result := False;
 
 end;
 

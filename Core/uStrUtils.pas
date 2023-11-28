@@ -14,11 +14,11 @@ uses
   { vSoft }
   uConsts, uTypes, uDataUtils;
 
-{ v Преобразование основных типов данных v }
+{ v Преобразование основных типов данных в строку и обратно v }
 function StrIsBoolean(const S: String): Boolean;
 function StrIsGUID(const Value: String): Boolean;
 
-{ Можно дополнить: Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
+{ TODO -oVasilyevSM -cuStrUtils: Продолжение следует: Extended, AnsiString, BLOB, TData }
 function BooleanToStr(Value: Boolean): String;
 function StrToBoolean(const S: String): Boolean;
 function IntToStr(Value: Integer): String;
@@ -30,11 +30,10 @@ function StrToDouble(const Value: String): Double;
 function DateTimeToStr(Value: TDateTime): String;
 function StrToDateTime(const Value: String): TDateTime;
 function GUIDToStr(const Value: TGUID) : String;
-function TryStrToGUID(const S: String; var Value: TGUID): Boolean;
 function StrToGUID(const Value: String): TGUID;
 function BLOBToHexStr(const Value: BLOB): String;
 function HexStrToBLOB(const Value: String): BLOB;
-{ ^ Преобразование основных типов данных ^ }
+{ ^ Преобразование основных типов данных в строку и обратно ^ }
 
 { v Для парсинга и автоскриптов v }
 function PosOf(Patterns: String; const Value: String; Start: Integer = 1): Integer;
@@ -391,77 +390,30 @@ begin
 
 end;
 
-function TryStrToGUID(const S: String; var Value: TGUID): Boolean;
-
-	function TryStrToGUID(Index: Integer): Boolean;
-
-    function _CheckDelimiter(_Index: Integer): Boolean;
-    begin
-      Result := S[Index + _Index] = '-';
-    end;
-
-    function _TryStrToInt(_PartIndex, _PartLength: Integer; var _Value: Boolean): Integer;
-    begin
-      _Value := SysUtils.TryStrToInt('$' + Copy(S, Index + _PartIndex, _PartLength), Result);
-    end;
-
-    function _TryHexToLongword(_PartIndex, _PartLength: Integer; var _Value: Longword): Boolean;
-    begin
-      _Value := Longword(_TryStrToInt(_PartIndex, _PartLength, Result));
-    end;
-
-    function _TryHexToWord(_PartIndex, _PartLength: Integer; var _Value: Word): Boolean;
-    begin
-      _Value := _TryStrToInt(_PartIndex, _PartLength, Result);
-    end;
-
-    function _TryHexToByte(_PartIndex, _PartLength: Integer; var _Value: Byte): Boolean;
-    begin
-      _Value := _TryStrToInt(_PartIndex, _PartLength, Result);
-    end;
-
-	begin
-
-    Result:=
-
-        _CheckDelimiter(9 ) and
-        _CheckDelimiter(14) and
-        _CheckDelimiter(19) and
-        _CheckDelimiter(24) and
-        _TryHexToLongword(1, 8, Value.D1) and
-        _TryHexToWord(10, 4, Value.D2) and
-        _TryHexToWord(15, 4, Value.D3) and
-        _TryHexToByte(20, 2, Value.D4[0]) and
-        _TryHexToByte(22, 2, Value.D4[1]) and
-        _TryHexToByte(25, 2, Value.D4[2]) and
-        _TryHexToByte(27, 2, Value.D4[3]) and
-        _TryHexToByte(29, 2, Value.D4[4]) and
-        _TryHexToByte(31, 2, Value.D4[5]) and
-        _TryHexToByte(33, 2, Value.D4[6]) and
-        _TryHexToByte(35, 2, Value.D4[7]);
-
-	end;
-
-begin
-
-  case Length(S) of
-
-    36: Result := TryStrToGUID(0);
-    38:
-
-      if (S[1] = '{') and (S[38] = '}') then Result := TryStrToGUID(1)
-      else Result := False;
-
-  else
-    Result := False;
-  end;
-
-end;
-
 function StrToGUID(const Value: String): TGUID;
+var
+  S: String;
 begin
-  if not TryStrToGUID(Value, Result) then
-    raise EConvertError.CreateFmt('Error converting String ''%s'' to GUID', [Value]);
+
+  if StrIsGUID(Value) then begin
+
+    if Length(Value) = 38 then S := Copy(S, 2, 36)
+    else S := Value;
+
+    Result.D1    := Cardinal(SysUtils.StrToInt('$' + Copy(S,  1, 8)));
+    Result.D2    :=          SysUtils.StrToInt('$' + Copy(S, 10, 4));
+    Result.D3    :=          SysUtils.StrToInt('$' + Copy(S, 15, 4));
+    Result.D4[0] :=          SysUtils.StrToInt('$' + Copy(S, 20, 2));
+    Result.D4[1] :=          SysUtils.StrToInt('$' + Copy(S, 22, 2));
+    Result.D4[2] :=          SysUtils.StrToInt('$' + Copy(S, 25, 2));
+    Result.D4[3] :=          SysUtils.StrToInt('$' + Copy(S, 27, 2));
+    Result.D4[4] :=          SysUtils.StrToInt('$' + Copy(S, 29, 2));
+    Result.D4[5] :=          SysUtils.StrToInt('$' + Copy(S, 31, 2));
+    Result.D4[6] :=          SysUtils.StrToInt('$' + Copy(S, 33, 2));
+    Result.D4[7] :=          SysUtils.StrToInt('$' + Copy(S, 35, 2));
+
+  end else raise EConvertError.CreateFmt('Error converting String ''%s'' to GUID', [Value]);
+
 end;
 
 function BLOBToHexStr(const Value: BLOB): String;
