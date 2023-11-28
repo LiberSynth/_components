@@ -10,11 +10,11 @@ uses
 
 type
 
-  TKeyWordType = (ktSourceEnd, ktLineEnd);
+  TKeyWordType = (ktNone, ktSourceEnd, ktLineEnd);
 
   TKeyWord = record
 
-    KeyType: Integer;
+    KeyTypeInternal: Integer;
     StrValue: String;
     KeyLength: Integer;
 
@@ -22,11 +22,24 @@ type
 
   end;
 
+  TKeyWordHelper = record helper for TKeyWord
+
+  private
+
+    constructor Create(_KeyType: TKeyWordType; const _StrValue: String); overload;
+
+    function GetKeyType: TKeyWordType;
+    procedure SetKeyType(const _Value: TKeyWordType);
+
+    property KeyType: TKeyWordType read GetKeyType write SetKeyType;
+
+  end;
+
   TKeyWordList = class(TList<TKeyWord>)
 
   public
 
-    function Add(_KeyType: Integer; const _StrValue: String): TKeyWord;
+    function AddKey(_KeyType: TKeyWordType; const _StrValue: String): TKeyWord;
 
   end;
 
@@ -135,18 +148,36 @@ implementation
 constructor TKeyWord.Create(_KeyType: Integer; const _StrValue: String);
 begin
 
-  KeyType := _KeyType;
-  StrValue := _StrValue;
-  KeyLength := Length(StrValue);
+  KeyTypeInternal := _KeyType;
+  StrValue        := _StrValue;
+  KeyLength       := Length(StrValue);
 
+end;
+
+{ TKeyWordHelper }
+
+constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String);
+begin
+  Create(Integer(_KeyType), _StrValue)
+end;
+
+function TKeyWordHelper.GetKeyType: TKeyWordType;
+begin
+  Result := TKeyWordType(KeyTypeInternal)
+end;
+
+procedure TKeyWordHelper.SetKeyType(const _Value: TKeyWordType);
+begin
+  if Integer(_Value) <> KeyTypeInternal then
+    KeyTypeInternal := Integer(_Value);
 end;
 
 { TKeyWordList }
 
-function TKeyWordList.Add(_KeyType: Integer; const _StrValue: String): TKeyWord;
+function TKeyWordList.AddKey(_KeyType: TKeyWordType; const _StrValue: String): TKeyWord;
 begin
-  Result := TKeyWord.Create(_KeyType, _StrValue);
-  inherited Add(Result);
+  Result := TKeyWord.Create(Integer(_KeyType), _StrValue);
+  Add(Result);
 end;
 
 { TSpecialSpaceHandler }
@@ -169,7 +200,7 @@ end;
 procedure TSpecialSpaceHandler.Close;
 begin
 
-  FOpeningKey := TKeyWord.Create(0, '');
+  FOpeningKey := TKeyWord.Create(ktNone, '');
   SetLength(FClosingKeys, 0);
   FActive     := False;
 
@@ -244,9 +275,9 @@ begin
 
   with FKeyWords do begin
 
-    Add(Integer(ktLineEnd), CRLF);
-    Add(Integer(ktLineEnd), CR  );
-    Add(Integer(ktLineEnd), LF  );
+    AddKey(ktLineEnd, CRLF);
+    AddKey(ktLineEnd, CR  );
+    AddKey(ktLineEnd, LF  );
 
   end;
 
@@ -302,7 +333,7 @@ end;
 
 procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);
 begin
-  if TKeyWordType(_KeyWord.KeyType) = ktLineEnd then
+  if _KeyWord.KeyType = ktLineEnd then
     IncLine(_KeyWord);
 end;
 
@@ -328,9 +359,10 @@ begin
 
     end;
 
-  KeyEvent(TKeyWord.Create(Integer(ktSourceEnd), ''));
+  KeyEvent(TKeyWord.Create(ktSourceEnd, ''));
 
   { Оборачивать этот метод в try except чревато. В on E do получается уничтоженный объект E. }
+  { TODO 1 -oVasilyevSM -ctry_except_end: Нужен эксперимент, откуда вызовется E.Free, если тут обернуть таки. }
 
 end;
 
