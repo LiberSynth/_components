@@ -22,28 +22,38 @@ type
 
   end;
 
-  TKeyWordRelations = class(TDictionary<TKeyWord, TKeyWord>)
-
-  private
-
-    procedure Add(_KeyWordA, _KeyWordB: TKeyWord);
-
-  end;
-
   TKeyWordList = class(TList<TKeyWord>)
-
-  strict private
-
-    FRelations: TKeyWordRelations;
 
   public
 
-    constructor Create;
-    destructor Destroy; override;
-
     function Add(_KeyType: Integer; const _StrValue: String): TKeyWord;
-    procedure Relate(_KeyWordA, _KeyWordB: TKeyWord);
-    function GetRelated(_KeyWord: TKeyWord): TKeyWord;
+
+  end;
+
+  TSpecialSpaceHandler = class
+
+  strict private
+
+    FActive: Boolean;
+    FOpeningKey: TKeyWord;
+    FClosingKeys: TArray<TKeyWord>;
+    FCheckDoubling: Boolean;
+
+  private
+
+    procedure Open(
+
+        _OpeningKey: TKeyWord;
+        const _ClosingKeys: array of TKeyWord;
+        _CheckDoubling: Boolean
+
+    );
+    procedure Close;
+    function CheckClosing(const _Source: String; _Cursor: Int64): Boolean; virtual;
+
+    property Active: Boolean read FActive;
+    property OpeningKey: TKeyWord read FOpeningKey;
+    property ClosingKeys: TArray<TKeyWord> read FClosingKeys;
 
   end;
 
@@ -131,31 +141,7 @@ begin
 
 end;
 
-{ TKeyWordRelations }
-
-procedure TKeyWordRelations.Add(_KeyWordA, _KeyWordB: TKeyWord);
-begin
-
-  if ContainsKey(_KeyWordA) then
-    raise ECoreException.Create('Key value is not unique');
-
-  inherited Add(_KeyWordA, _KeyWordB);
-
-end;
-
 { TKeyWordList }
-
-constructor TKeyWordList.Create;
-begin
-  inherited Create;
-  FRelations := TKeyWordRelations.Create;
-end;
-
-destructor TKeyWordList.Destroy;
-begin
-  FreeAndNil(FRelations);
-  inherited Destroy;
-end;
 
 function TKeyWordList.Add(_KeyType: Integer; const _StrValue: String): TKeyWord;
 begin
@@ -163,14 +149,82 @@ begin
   inherited Add(Result);
 end;
 
-procedure TKeyWordList.Relate(_KeyWordA, _KeyWordB: TKeyWord);
+{ TSpecialSpaceHandler }
+
+procedure TSpecialSpaceHandler.Open;
+var
+  i: Integer;
 begin
-  FRelations.Add(_KeyWordA, _KeyWordB);
+
+  FOpeningKey    := _OpeningKey;
+  FCheckDoubling := _CheckDoubling;
+  FActive        := True;
+
+  SetLength(FClosingKeys, Length(_ClosingKeys));
+  for i := Low(FClosingKeys) to High(FClosingKeys) do
+    FClosingKeys[i] := _ClosingKeys[i];
+
 end;
 
-function TKeyWordList.GetRelated(_KeyWord: TKeyWord): TKeyWord;
+procedure TSpecialSpaceHandler.Close;
 begin
-  FRelations.TryGetValue(_KeyWord, Result);
+
+  FOpeningKey := TKeyWord.Create(0, '');
+  SetLength(FClosingKeys, 0);
+  FActive     := False;
+
+end;
+
+function TSpecialSpaceHandler.CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
+var
+  ClosingKey: TKeyWord;
+begin
+
+  for ClosingKey in FClosingKeys do
+
+    with ClosingKey do begin
+
+      { Проверка задублированного закрывающего ключа }
+      if
+
+          { проверка включена в данном обработчике }
+          FCheckDoubling and
+          { закрывающий ключ в позиции курсора }
+          (StrValue = Copy(_Source, _Cursor, 1)) and
+          { только для ключей из одного символа }
+          (KeyLength = 1) and
+          (
+
+              { дубль в следующей позиции }
+              (Copy(_Source, _Cursor, 2) = StrValue + StrValue) or
+              { или в предыдущей }
+              ((_Cursor > 1) and (Copy(_Source, _Cursor - 1, 2) = StrValue + StrValue))
+
+          ) and
+          { при этом, если только это не последний ключ в тройке }
+          { TODO -oVasilyevSM -cTSpecialSpaceHandler: Четверка и более не сработает. Нужна функция, которая будет считать, сколько их там перед, чет-нечет }
+          not ((_Cursor > 2) and (Copy(_Source, _Cursor - 2, 3) = StrValue + StrValue + StrValue))
+
+      then Exit(False);
+
+      if
+
+          { Закрывающий ключ задан }
+          (KeyLength > 0) and
+          { И это он }
+          (Copy(_Source, _Cursor, KeyLength) = StrValue)
+
+      then begin
+
+        FActive := False;
+        Exit(True);
+
+      end;
+
+    end;
+
+  Result := False;
+
 end;
 
 { TCustomStringParser }

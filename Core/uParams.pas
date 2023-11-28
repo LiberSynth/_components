@@ -245,13 +245,12 @@ type
 
   TState = (stName, stType, stValue, stString, stShortComment, stLongComment);
 
-  TReadInfo = class
+  TReadInfo = record
 
     State: TState;
     EntryKeyTypes: TKeyWordTypes;
     Proc: TProcedure;
     ValidKeyTypes: TKeyWordTypes;
-    Related: TReadInfo;
 
     constructor Create(
 
@@ -276,41 +275,7 @@ type
         _ValidKeyTypes: TKeyWordTypes
 
     );
-
-  end;
-
-  TSpecialSpaceHandler = class
-
-  strict private
-
-    FActive: Boolean;
-    FOpeningKey: TKeyWord;
-    FClosingKeys: TArray<TKeyWord>;
-    FCheckDoubling: Boolean;
-
-  private
-
-    procedure Open(
-
-        _OpeningKey: TKeyWord;
-        const _ClosingKeys: array of TKeyWord;
-        _CheckDoubling: Boolean
-
-    );
-    procedure Close;
-    function CheckClosing(const _Source: String; _Cursor: Int64): Boolean; virtual;
-
-    property Active: Boolean read FActive;
-    property OpeningKey: TKeyWord read FOpeningKey;
-    property ClosingKeys: TArray<TKeyWord> read FClosingKeys;
-
-  end;
-
-  TCommentSpaceHandler = class(TSpecialSpaceHandler)
-
-  private
-
-    function CheckClosing(const _Source: String; _Cursor: Int64): Boolean; override;
+    function GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure; _Line, _Cursor, _LinePos: Int64): Boolean;
 
   end;
 
@@ -326,8 +291,6 @@ type
     FCurrentType: TParamDataType;
 
     FReadSettings: TReadSettings;
-    FStringSpecialSpace: TSpecialSpaceHandler;
-    FCommentSpecialSpace: TSpecialSpaceHandler;
 
     procedure GetName;
     procedure GetType;
@@ -335,24 +298,18 @@ type
 
     procedure CheckType;
     procedure CheckParams(_KeyWord: TKeyWord);
-    procedure CheckString(_KeyWord: TKeyWord);
-    procedure CheckComment(_KeyWord: TKeyWord);
-    function ReadParams(_KeyWord: TKeyWord): Int64;
+    procedure ReadParams(_KeyWord: TKeyWord);
     function KeyWordTypeInSet(_KeyWord: TKeyWord; _Set: TKeyWordTypes): Boolean;
-    function KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
     function TrimDigital(const _Value: String): String;
     function UndoubleString(const _Value: String): String;
 
     procedure InitKeyWords;
     procedure InitReadSetting;
-    function GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
-    function CheckExpectedKey: Boolean;
 
   protected
 
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
     procedure MoveEvent; override;
-    function SpecialSpace: Boolean; override;
 
   public
 
@@ -382,6 +339,11 @@ function ParamsToStr(Params: TParams; SingleString: Boolean = False): String;
 procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
+
+function _KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
+begin
+  Result := TKeyWordType(_KeyType) in _Set;
+end;
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 const
@@ -1279,90 +1241,40 @@ begin
   inherited Add(TReadInfo.Create(_State, _EntryKeyTypes, _Proc, _ValidKeyTypes));
 end;
 
-{ TSpecialSpaceHandler }
-
-procedure TSpecialSpaceHandler.Open;
+function TReadSettings.GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure; _Line, _Cursor, _LinePos: Int64): Boolean;
 var
-  i: Integer;
+  RI: TReadInfo;
 begin
 
-  FOpeningKey    := _OpeningKey;
-  FCheckDoubling := _CheckDoubling;
-  FActive        := True;
+  { Поиск результата }
+  for RI in Self do
 
-  SetLength(FClosingKeys, Length(_ClosingKeys));
-  for i := Low(FClosingKeys) to High(FClosingKeys) do
-    FClosingKeys[i] := _ClosingKeys[i];
+    if
 
-end;
+        (RI.State = _State) and
+        _KeyTypeInSet(_KeyType, RI.EntryKeyTypes)
 
-procedure TSpecialSpaceHandler.Close;
-begin
+    then begin
 
-  FOpeningKey := TKeyWord.Create(0, '');
-  SetLength(FClosingKeys, 0);
-  FActive     := False;
-
-end;
-
-function TSpecialSpaceHandler.CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
-var
-  ClosingKey: TKeyWord;
-begin
-
-  for ClosingKey in FClosingKeys do
-
-    with ClosingKey do begin
-
-      { Проверка задублированного закрывающего ключа }
-      if
-
-          { проверка включена в данном обработчике }
-          FCheckDoubling and
-          { закрывающий ключ в позиции курсора }
-          (StrValue = Copy(_Source, _Cursor, 1)) and
-          { только для ключей из одного символа }
-          (KeyLength = 1) and
-          (
-
-              { дубль в следующей позиции }
-              (Copy(_Source, _Cursor, 2) = StrValue + StrValue) or
-              { или в предыдущей }
-              ((_Cursor > 1) and (Copy(_Source, _Cursor - 1, 2) = StrValue + StrValue))
-
-          ) and
-          { при этом, если только это не последний ключ в тройке }
-          { TODO -oVasilyevSM -cTSpecialSpaceHandler: Четверка и более не сработает. Нужна функция, которая будет считать, сколько их там перед, чет-нечет }
-          not ((_Cursor > 2) and (Copy(_Source, _Cursor - 2, 3) = StrValue + StrValue + StrValue))
-
-      then Exit(False);
-
-      if
-
-          { Закрывающий ключ задан }
-          (KeyLength > 0) and
-          { И это он }
-          (Copy(_Source, _Cursor, KeyLength) = StrValue)
-
-      then begin
-
-        FActive := False;
-        Exit(True);
-
-      end;
+      _Proc := RI.Proc;
+      Exit(True);
 
     end;
 
-  Result := False;
+  { Проверка синтаксиса. Все допустимые типы ключевого слова для данного состояния пречислены в настройке. }
+  for RI in Self do
+
+    if
+
+        (RI.State = _State) and
+        _KeyTypeInSet(_KeyType, RI.ValidKeyTypes)
+
+    then Exit(False);
+
+  raise EParamsReadException.Create('Unexpected keyword', _Line, _Cursor - _LinePos);
 
 end;
 
-{ TCommentSpaceHandler }
-
-function TCommentSpaceHandler.CheckClosing(const _Source: String; _Cursor: Int64): Boolean;
-begin
-  Result := inherited or True;
-end;
 
 { TParamsReader }
 
@@ -1419,8 +1331,6 @@ begin
 
   FCurrentName := '';
   FCurrentType := dtUnknown;
-  FStringSpecialSpace.Close;
-  FCommentSpecialSpace.Close;
 
 end;
 
@@ -1446,62 +1356,33 @@ end;
 procedure TParamsReader.CheckParams(_KeyWord: TKeyWord);
 begin
 
-  if (FCurrentType = dtParams) and (FState = stValue) then begin
+  if FState = stValue then begin
 
-    if not KeyWordTypeInSet(_KeyWord, [ktSpace, ktLineEnd, ktOpeningBracket]) then
-      raise EParamsReadException.CreateFmt('''('' expected but ''%s'' found', [_KeyWord.StrValue], Line, Cursor - LinePos);
+    if FCurrentType = dtParams then begin
 
-    if TKeyWordType(_KeyWord.KeyType) = ktOpeningBracket then
-      Move(ReadParams(_KeyWord) - Cursor);
+      { Контейнер. Проверка синтаксиса. }
+      if not KeyWordTypeInSet(_KeyWord, [ktSpace, ktLineEnd, ktOpeningBracket]) then
+        raise EParamsReadException.CreateFmt('''('' expected but ''%s'' found', [_KeyWord.StrValue], Line, Cursor - LinePos);
+
+      { Контейнер. Вход во вложенную структуру. }
+      if TKeyWordType(_KeyWord.KeyType) = ktOpeningBracket then
+        ReadParams(_KeyWord);
+
+    end;
+
+    { Вложенный объект. Завершение. }
+    if TKeyWordType(_KeyWord.KeyType) = ktClosingBracket then
+      Terminate;
 
   end;
 
-  if TKeyWordType(_KeyWord.KeyType) = ktClosingBracket then
-    Terminate;
-
+  { Вложенный объект. Проверка синтаксиса. }
   if FNested and not Terminated and (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd) then
     raise EParamsReadException.Create('Unterminated nested params', Line, Cursor - LinePos);
 
 end;
 
-procedure TParamsReader.CheckString(_KeyWord: TKeyWord);
-begin
-
-  if (FCurrentType = dtString) and (FState = stValue) then
-
-    with FStringSpecialSpace do begin
-
-      if (TKeyWordType(_KeyWord.KeyType) = ktString) and not ItemBody then
-        Open(_KeyWord, _KeyWord, True);
-
-      if Active and (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd) then
-        raise EParamsReadException.Create('Unterminated string', Line, Cursor - LinePos);
-
-    end;
-
-end;
-
-procedure TParamsReader.CheckComment(_KeyWord: TKeyWord);
-begin
-
-  with FCommentSpecialSpace do begin
-
-    if KeyWordTypeInSet(_KeyWord, [ktShortComment, ktLongCommentBegin]) then
-      Open(_KeyWord, [KeyWords.GetRelated(_KeyWord)], False);
-
-    if
-
-        Active and
-        (TKeyWordType(OpeningKey.KeyType) = ktLongCommentBegin) and
-        (TKeyWordType(_KeyWord.KeyType) = ktSourceEnd)
-
-    then raise EParamsReadException.Create('Unterminated comment', Line, Cursor - LinePos);
-
-  end;
-
-end;
-
-function TParamsReader.ReadParams(_KeyWord: TKeyWord): Int64;
+procedure TParamsReader.ReadParams(_KeyWord: TKeyWord);
 var
   P: TParams;
 begin
@@ -1522,17 +1403,21 @@ begin
       try
 
         Read;
-        Self.Line := Line;
-        Self.LinePos := LinePos;
-        Result := Cursor - _KeyWord.KeyLength;
 
       finally
+
+        Self.Move(Cursor - _KeyWord.KeyLength - Self.Cursor);
+        Self.Line := Line;
+        Self.LinePos := LinePos;
         Free;
+
       end;
 
   finally
 
+    { Вот из-за чего этот класс не вынесен в отдельный модуль. SetAsParams надо держать в private. }
     FParams.GetParam(FCurrentName).SetAsParams(P);
+
     ItemBody := False;
     ItemBegin := 0;
     FCurrentName := '';
@@ -1548,11 +1433,6 @@ begin
   Result := TKeyWordType(_KeyWord.KeyType) in _Set;
 end;
 
-function TParamsReader.KeyTypeInSet(_KeyType: Integer; _Set: TKeyWordTypes): Boolean;
-begin
-  Result := TKeyWordType(_KeyType) in _Set;
-end;
-
 function TParamsReader.TrimDigital(const _Value: String): String;
 begin
   Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
@@ -1561,13 +1441,14 @@ end;
 function TParamsReader.UndoubleString(const _Value: String): String;
 begin
 
-  with FStringSpecialSpace.ClosingKeys[0] do
+  { TODO 1 -oVasilyevSM -cGeneral: ActionItem }
+  {with FStringSpecialSpace.ClosingKeys[0] do
 
     if TKeyWordType(KeyType) = ktString then
 
       Result := StringReplace(_Value, StrValue + StrValue, StrValue, [rfReplaceAll])
 
-    else Result := _Value;
+    else }Result := _Value;
 
 end;
 
@@ -1577,7 +1458,7 @@ begin
   with KeyWords do begin
 
     Add(Integer(ktSpace           ), ' ' );
-    Add(Integer(ktSpace           ), TAB);
+    Add(Integer(ktSpace           ), TAB );
     Add(Integer(ktSplitter        ), ';' );
     Add(Integer(ktTypeIdent       ), ':' );
     Add(Integer(ktAssigning       ), '=' );
@@ -1587,24 +1468,12 @@ begin
     Add(Integer(ktClosingBracket  ), ')' );
     Add(Integer(ktShortComment    ), '--');
     Add(Integer(ktShortComment    ), '//');
-    Relate(
-
-      Add(Integer(ktLongCommentBegin), '{'),
-      Add(Integer(ktLongCommentEnd  ), '}')
-
-    );
-    Relate(
-
-      Add(Integer(ktLongCommentBegin), '/*'),
-      Add(Integer(ktLongCommentEnd  ), '*/')
-
-    );
-    Relate(
-
-      Add(Integer(ktLongCommentBegin), '(*'),
-      Add(Integer(ktLongCommentEnd  ), '*)')
-
-    );
+    Add(Integer(ktLongCommentBegin), '{' );
+    Add(Integer(ktLongCommentEnd  ), '}' );
+    Add(Integer(ktLongCommentBegin), '/*');
+    Add(Integer(ktLongCommentEnd  ), '*/');
+    Add(Integer(ktLongCommentBegin), '(*');
+    Add(Integer(ktLongCommentEnd  ), '*)');
 
   end;
 
@@ -1624,78 +1493,6 @@ begin
 
 end;
 
-function TParamsReader.GetReadProc(_State: TState; _KeyType: Integer; var _Proc: TProcedure): Boolean;
-var
-  RI: TReadInfo;
-begin
-
-  { Поиск результата }
-  for RI in FReadSettings do
-
-    if
-
-        (RI.State = _State) and
-        KeyTypeInSet(_KeyType, RI.EntryKeyTypes)
-
-    then begin
-
-      _Proc := RI.Proc;
-      Exit(True);
-
-    end;
-
-  { Проверка на допустимый тип ключевого слова }
-  for RI in FReadSettings do
-
-    if
-
-        (RI.State = _State) and
-        KeyTypeInSet(_KeyType, RI.ValidKeyTypes)
-
-    then Exit(False);
-
-  raise EParamsReadException.Create('Unexpected keyword', Line, Cursor - LinePos);
-
-end;
-
-function TParamsReader.SpecialSpace: Boolean;
-begin
-
-  case FCurrentType of
-
-    dtDateTime: Result := not CheckExpectedKey;
-    dtString:   Result := FStringSpecialSpace.Active;
-
-  else
-    Result := FCommentSpecialSpace.Active or inherited;
-  end;
-
-end;
-
-function TParamsReader.CheckExpectedKey: Boolean;
-var
-  KW: TKeyWord;
-  RI: TReadInfo;
-  Expected: TKeyWordTypes;
-begin
-
-  Expected := [];
-  for RI in FReadSettings do
-    if RI.State = FState then begin
-
-      Expected := RI.EntryKeyTypes;
-      Break;
-
-    end;
-
-  for KW in KeyWords do
-    if CheckKey(KW) and KeyWordTypeInSet(KW, Expected) then
-      Exit(True);
-
-  Result := False;
-
-end;
-
 procedure TParamsReader.KeyEvent(const _KeyWord: TKeyWord);
 var
   ReadProc: TProcedure;
@@ -1703,14 +1500,12 @@ begin
 
   inherited KeyEvent(_KeyWord);
 
-  CheckParams (_KeyWord);
-  CheckString (_KeyWord);
-  CheckComment(_KeyWord);
+  CheckParams(_KeyWord);
 
   if ItemBody then begin
 
     { Считывние }
-    if GetReadProc(FState, _KeyWord.KeyType, ReadProc) then
+    if FReadSettings.GetReadProc(FState, _KeyWord.KeyType, ReadProc, Line, Cursor, LinePos) then
 
       ReadProc
 
@@ -1736,13 +1531,14 @@ begin
 
   inherited MoveEvent;
 
-  with FStringSpecialSpace do
-    if Active and CheckClosing(Source, Cursor) then
-      KeyEvent(TKeyWord.Create(ClosingKeys[0].KeyType, ClosingKeys[0].StrValue));
+  { TODO 1 -oVasilyevSM -cGeneral: ActionItem }
+//  with FStringSpecialSpace do
+//    if Active and CheckClosing(Source, Cursor) then
+//      KeyEvent(TKeyWord.Create(ClosingKeys[0].KeyType, ClosingKeys[0].StrValue));
 
-  with FCommentSpecialSpace do
-    if Active and CheckClosing(Source, Cursor) then
-      KeyEvent(TKeyWord.Create(ClosingKey.KeyType, ClosingKey.StrValue));
+//  with FCommentSpecialSpace do
+//    if Active and CheckClosing(Source, Cursor) then
+//      KeyEvent(TKeyWord.Create(ClosingKey.KeyType, ClosingKey.StrValue));
 
 end;
 
