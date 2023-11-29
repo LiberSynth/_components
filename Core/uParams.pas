@@ -364,6 +364,7 @@ function StrToParamDataType(Value: String): TParamDataType;
   RegisterParam. “аким образом, имеем два формата ини-файла, полный и краткий. ¬ StrToParams также можно просто на вход
   подавать пустой контейнер с готовой структурой. “огда она просто заполн€етс€ данными, типы известны и не требуют
   хранени€ в строке. }
+{ TODO 1 -oVasilyevSM -cParamsToStr: —корее всего это должно переехать в класс  }
 function ParamsToStr(Params: TParams; SingleString: Boolean = False): String;
 procedure StrToParams(const Value: String; Params: TParams);
 
@@ -610,16 +611,16 @@ begin
     case FDataType of
 
       dtUnknown:    Result := '';
-      dtBoolean:    Result := BooleanToStr(AsBoolean);
-      dtInteger:    Result := IntToStr(AsInteger);
-      dtBigInt:     Result := IntToStr(AsBigInt);
-      dtFloat:      Result := DoubleToStr(AsFloat);
-      dtDateTime:   Result := DateTimeToStr(AsDateTime);
-      dtGUID:       Result := GUIDToStr(AsGUID);
-      dtAnsiString: Result := String(AnsiString(FData));
-      dtString:     Result := String(FData);
-      dtBLOB:       Result := BLOBToHexStr(AsBLOB);
-      dtParams:     Result := ParamsToStr(TParams(FData));
+      dtBoolean:    Result := BooleanToStr       (AsBoolean  );
+      dtInteger:    Result := IntToStr           (AsInteger  );
+      dtBigInt:     Result := BigIntToStr        (AsBigInt   );
+      dtFloat:      Result := DoubleToStr        (AsFloat    );
+      dtDateTime:   Result := DateTimeToStr      (AsDateTime );
+      dtGUID:       Result := GUIDToStr          (AsGUID     );
+      dtAnsiString: Result := String(AnsiString  (FData     ));
+      dtString:     Result := String             (FData      );
+      dtBLOB:       Result := BLOBToHexStr       (AsBLOB     );
+      dtParams:     Result := ParamsToStr(TParams(FData     ));
 
     else
       raise EUncomplitedMethod.Create;
