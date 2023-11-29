@@ -10,7 +10,6 @@ unit uParams;
 { TODO -oVasilyevSM -cuParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
 { TODO -oVasilyevSM -cuParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
 { TODO -oVasilyevSM -cuParams: Нужен также компонент TRegParams }
-{ TODO -oVasilyevSM -cuParams: Можно дописывать TParamHelper }
 { TODO -oVasilyevSM -cuParams: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
 { TODO -oVasilyevSM -cuParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
 
@@ -237,7 +236,7 @@ type
 
   TKeyWordType = (
 
-      ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktString,
+      ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder,
       ktOpeningBracket, ktClosingBracket, ktShortComment, ktLongCommentBegin, ktLongCommentEnd
 
   );
@@ -302,6 +301,16 @@ type
 
   end;
 
+  TDateTimeSpecialSegment = class(TSpecialSegment)
+
+  protected
+
+    function CanOpen(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; override;
+    function CanClose(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; override;
+    function KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; override;
+
+  end;
+
   { TODO -oVasilyevSM -cTParamsReader: Надо его все равно в отдельный юнит положить как-то, не жертвуя закрытостью SetAsParams. }
   TParamsReader = class(TCustomStringParser)
 
@@ -332,6 +341,9 @@ type
   private
 
     class function QuotingSymbols: String;
+
+    property State: TState read FState;
+    property CurrentType: TParamDataType read FCurrentType;
 
   protected
 
@@ -369,6 +381,26 @@ function ParamsToStr(Params: TParams; SingleString: Boolean = False): String;
 procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
+
+const
+
+  KWR_SPACE:                TKeyWord = (KeyTypeInternal: Integer(ktSpace);            StrValue: ' ';   KeyLength: Length(' ');  QuotingSymbol: False);
+  KWR_TAB:                  TKeyWord = (KeyTypeInternal: Integer(ktSpace);            StrValue: TAB;   KeyLength: Length(TAB);  QuotingSymbol: False);
+  KWR_SPLITTER:             TKeyWord = (KeyTypeInternal: Integer(ktSplitter);         StrValue: ';';   KeyLength: Length(';');  QuotingSymbol: True );
+  KWR_TYPE_IDENT:           TKeyWord = (KeyTypeInternal: Integer(ktTypeIdent);        StrValue: ':';   KeyLength: Length(':');  QuotingSymbol: True );
+  KWR_ASSIGNING:            TKeyWord = (KeyTypeInternal: Integer(ktAssigning);        StrValue: '=';   KeyLength: Length('=');  QuotingSymbol: True );
+  KWR_QUOTE_SINGLE:         TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '''';  KeyLength: Length(''''); QuotingSymbol: True );
+  KWR_QUOTE_DOBLE:          TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '"';   KeyLength: Length('"');  QuotingSymbol: True );
+  KWR_OPENING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktOpeningBracket);   StrValue: '(';   KeyLength: Length('(');  QuotingSymbol: True );
+  KWR_CLOSING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktClosingBracket);   StrValue: ')';   KeyLength: Length(')');  QuotingSymbol: True );
+  KWR_SHORT_COMMENT_A:      TKeyWord = (KeyTypeInternal: Integer(ktShortComment);     StrValue: '--';  KeyLength: Length('--'); QuotingSymbol: False);
+  KWR_SHORT_COMMENT_B:      TKeyWord = (KeyTypeInternal: Integer(ktShortComment);     StrValue: '//';  KeyLength: Length('//'); QuotingSymbol: False);
+  KWR_LONG_COMMENT_BEGIN_A: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentBegin); StrValue: '{';   KeyLength: Length('{');  QuotingSymbol: True );
+  KWR_LONG_COMMENT_BEGIN_B: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentBegin); StrValue: '/*';  KeyLength: Length('/*'); QuotingSymbol: False); // здесь будет ошибка, если туда-обратно покидать
+  KWR_LONG_COMMENT_BEGIN_C: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentBegin); StrValue: '(*';  KeyLength: Length('(*'); QuotingSymbol: False); // здесь будет ошибка, если туда-обратно покидать
+  KWR_LONG_COMMENT_END_A:   TKeyWord = (KeyTypeInternal: Integer(ktLongCommentEnd);   StrValue: '}';   KeyLength: Length('}');  QuotingSymbol: True );
+  KWR_LONG_COMMENT_END_B:   TKeyWord = (KeyTypeInternal: Integer(ktLongCommentEnd);   StrValue: '*/';  KeyLength: Length('*/'); QuotingSymbol: False); // здесь будет ошибка, если туда-обратно покидать
+  KWR_LONG_COMMENT_END_C:   TKeyWord = (KeyTypeInternal: Integer(ktLongCommentEnd);   StrValue: '*)';  KeyLength: Length('*)'); QuotingSymbol: False); // здесь будет ошибка, если туда-обратно покидать
 
 function _KeyTypeInSet(_KeyType: TKeyWordType; _Set: TKeyWordTypes): Boolean;
 begin
@@ -1339,6 +1371,43 @@ end;
 
 { TParamsReader }
 
+{ TDateTimeSpecialSegment }
+
+function TDateTimeSpecialSegment.CanOpen(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
+begin
+  with _Parser as TParamsReader do
+    Result := (State = stValue) and (CurrentType = dtDateTime);
+end;
+
+function TDateTimeSpecialSegment.CanClose(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
+begin
+
+  Result :=
+
+      _Parser.CheckKey(KWR_LINE_END_CRLF) or
+      _Parser.CheckKey(KWR_LINE_END_CR  ) or
+      _Parser.CheckKey(KWR_LINE_END_LF  ) or
+      _Parser.CheckKey(KWR_SPLITTER     );
+
+end;
+
+function TDateTimeSpecialSegment.KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
+var
+  Pass: Boolean;
+begin
+
+  { TODO 1 -oVasilyevSM -cGeneral: Добавить паттерн inherited!!! }
+  Pass := (_Parser as TParamsReader).ItemBody and (
+
+    (_KeyWord.Equal(KWR_SPACE)) or
+    (_KeyWord.Equal(KWR_TYPE_IDENT))
+
+  );
+
+  Result := inherited or not Pass;
+
+end;
+
 constructor TParamsReader.Create;
 begin
 
@@ -1379,7 +1448,6 @@ begin
 
     dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean  (ReadItem);
     dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt      (TrimDigital(ReadItem));
-    { TODO 1 -oVasilyevSM -cTParamsReader: 2 147 483 648 -> -2147483648 }
     dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt   (TrimDigital(ReadItem));
     dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble   (TrimDigital(ReadItem));
     dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime (ReadItem);
@@ -1526,23 +1594,23 @@ begin
 
   with _KeyWords do begin
 
-    AddKey(ktSpace           , ' '       );
-    AddKey(ktSpace           , TAB       );
-    AddKey(ktSplitter        , ';',  True);
-    AddKey(ktTypeIdent       , ':',  True);
-    AddKey(ktAssigning       , '=',  True);
-    AddKey(ktString          , '''', True);
-    AddKey(ktString          , '"',  True);
-    AddKey(ktOpeningBracket  , '(',  True);
-    AddKey(ktClosingBracket  , ')',  True);
-    AddKey(ktShortComment    , '--'      );
-    AddKey(ktShortComment    , '//'      );
-    AddKey(ktLongCommentBegin, '{'       );
-    AddKey(ktLongCommentEnd  , '}'       );
-    AddKey(ktLongCommentBegin, '/*'      );
-    AddKey(ktLongCommentEnd  , '*/'      );
-    AddKey(ktLongCommentBegin, '(*'      );
-    AddKey(ktLongCommentEnd  , '*)'      );
+    Add(KWR_SPACE               );
+    Add(KWR_TAB                 );
+    Add(KWR_SPLITTER            );
+    Add(KWR_TYPE_IDENT          );
+    Add(KWR_ASSIGNING           );
+    Add(KWR_QUOTE_SINGLE        );
+    Add(KWR_QUOTE_DOBLE         );
+    Add(KWR_OPENING_BRACKET     );
+    Add(KWR_CLOSING_BRACKET     );
+    Add(KWR_SHORT_COMMENT_A     );
+    Add(KWR_SHORT_COMMENT_B     );
+    Add(KWR_LONG_COMMENT_BEGIN_A);
+    Add(KWR_LONG_COMMENT_BEGIN_B);
+    Add(KWR_LONG_COMMENT_BEGIN_C);
+    Add(KWR_LONG_COMMENT_END_A  );
+    Add(KWR_LONG_COMMENT_END_B  );
+    Add(KWR_LONG_COMMENT_END_C  );
 
   end;
 
@@ -1553,10 +1621,10 @@ begin
 
   with FReadSettings do begin
 
-    Add(stName,   [ktTypeIdent, ktAssigning],                                       GetName,  [ktSpace]);
-    Add(stType,   [ktAssigning],                                                    GetType,  [ktSpace]);
-    Add(stValue,  [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket, ktString], SetValue, [ktSpace]);
-    Add(stString, [ktString],                                                       SetValue, []       );
+    Add(stName,   [ktTypeIdent, ktAssigning],                                             GetName,  [ktSpace]);
+    Add(stType,   [ktAssigning],                                                          GetType,  [ktSpace]);
+    Add(stValue,  [ktLineEnd, ktSplitter, ktSourceEnd, ktClosingBracket, ktStringBorder], SetValue, [ktSpace]);
+    Add(stString, [ktStringBorder],                                                       SetValue, []       );
 
   end;
 
@@ -1569,8 +1637,9 @@ begin
 
   with KeyWords do begin
 
-    AddSpecialSegment(TSpecialSegment, GetKey(''''), GetKey(''''));
-    AddSpecialSegment(TSpecialSegment, GetKey('"' ), GetKey('"' ));
+    AddSpecialSegment(TSpecialSegment,         KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE);
+    AddSpecialSegment(TSpecialSegment,         KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE );
+    AddSpecialSegment(TDateTimeSpecialSegment, KWR_EMPTY,        KWR_EMPTY       );
 
   end;
 
@@ -1602,7 +1671,7 @@ begin
         ktTypeIdent:           FState := stType;
         ktAssigning:           FState := stValue;
         ktLineEnd, ktSplitter: if FState = stValue then FState := stName;
-        ktString:              FState := stName;
+        ktStringBorder:        FState := stName;
 
       end;
 

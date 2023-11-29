@@ -64,7 +64,7 @@ procedure ShiftText(Level: ShortInt; var Value: String); overload;
 
 { v Стандартное форматирование дат v }
 { v !!! Эти форматы строго зашиты в алгоритм функции StrToDateTime !!! v }
-function FormatDateTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True; ShowZeroDate: Boolean = False): String; overload;
+function FormatDateTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True; ShowZeroDate: Boolean = False; ShowZeroTime: Boolean = False): String; overload;
 function FormatDateTimeSorted(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
 function FormatDateTimeToFileName(Value: TDateTime; EmptyZero: Boolean = True): String;
 function FormatTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
@@ -797,6 +797,7 @@ const
   { Поэтому, они должны лежать именно здесь, а не в uConsts. Это одно целое. }
   SC_STRICT_DATE_FORMAT     = 'dd.mm.yyyy hh:nn:ss';
   SC_STRICT_DATE_FORMAT_MS  = 'dd.mm.yyyy hh:nn:ss.zzz';
+  SC_STRICT_DATE_FORMAT_WT  = 'dd.mm.yyyy';
   SC_STRICT_TIME_FORMAT     = 'hh:nn:ss';
   SC_STRICT_TIME_FORMAT_MS  = 'hh:nn:ss.zzz';
   SC_SORTING_DATE_FORMAT    = 'yyyy-mm-dd hh:nn:ss';
@@ -804,13 +805,15 @@ const
   { ^ !!! Эти форматы строго зашиты в алгоритм функции StrToDateTime !!! ^ }
   SC_FILENAME_DATE_FORMAT   = 'yyyymmdd_hhnnss_zzz';
 
-function FormatDateTime(Value: TDateTime; Milliseconds, EmptyZero: Boolean; ShowZeroDate: Boolean): String;
+function FormatDateTime(Value: TDateTime; Milliseconds, EmptyZero, ShowZeroDate, ShowZeroTime: Boolean): String;
 begin
 
   if EmptyZero and DoubleEqual(Value, 0) then
     Result := ''
   else if not ShowZeroDate and (Trunc(Value) = 0) then
     Result := FormatTime(Value, Milliseconds, EmptyZero)
+  else if not ShowZeroTime and DoubleEqual(Trunc(Value), Value) then
+    Result := FormatDateTime(SC_STRICT_DATE_FORMAT_WT, Value)
   else if Milliseconds then
     Result := FormatDateTime(SC_STRICT_DATE_FORMAT_MS, Value)
   else
