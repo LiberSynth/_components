@@ -17,9 +17,8 @@ type
     KeyTypeInternal: Integer;
     StrValue: String;
     KeyLength: Integer;
-    QuotingSymbol: Boolean;
 
-    constructor Create(_KeyType: Integer; const _StrValue: String; _QuotingSymbol: Boolean = False);
+    constructor Create(_KeyType: Integer; const _StrValue: String);
 
     function Equal(_Value: TKeyWord): Boolean;
 
@@ -29,7 +28,7 @@ type
 
   private
 
-    constructor Create(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean = False); overload;
+    constructor Create(_KeyType: TKeyWordType; const _StrValue: String); overload;
 
     function GetKeyType: TKeyWordType;
     procedure SetKeyType(const _Value: TKeyWordType);
@@ -39,18 +38,13 @@ type
   end;
 
   TKeyWordList = class(TList<TKeyWord>)
-
-  public
-
-    function AddKey(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean = False): TKeyWord;
-
   end;
 
   TCustomStringParser = class;
 
   {
 
-    Объект, позволяющий НЕ считать ключевыми словами любые символы внутри особого сегента (строка, комментарий итд)
+    Объект, позволяющий НЕ считать ключевыми словами любые символы внутри особого сегмента (строка, комментарий итд)
     кроме закрывающего этото сегент ключа или дополнительно заданных допустимых как ключи.
     Особые сегменты парсера настраиваются в потомках парсера добавлением в виртуальном методе InitSpecialSegments с
     помощью AddSpecialSegment.
@@ -61,7 +55,9 @@ type
     CanClose - условие закрытия особого сегмента
     KeyValid - условие пропуска ключа (как ключа, а не простого символа)
 
-    Для строк и комментариев работает без наследования.
+    Для строк в кавычках работает без наследования.
+    Сделан особый сегмент для строк без кавычек. Виртуозная штука, но оставил из интереса. Если проблем не создаст,
+    пусть живет.
 
   }
   TSpecialSegment = class
@@ -98,12 +94,13 @@ type
 
   public
 
-    function Active(var _Value: TSpecialSegment): Boolean;
+    function GetActiveSegment(var _Value: TSpecialSegment): Boolean;
     procedure Refresh(_Parser: TCustomStringParser; const _KeyWord: TKeyWord; _ActiveSegment: TSpecialSegment);
 
   end;
 
   TCustomStringParser = class
+  { TODO 1 -oVasilyevSM -cTCustomStringParser: Этот класс надо "заморозить". Отладить и больше не изменять его. }
 
   strict private
 
@@ -126,7 +123,7 @@ type
 
   protected
 
-    class procedure InitKeyWords(_KeyWords: TKeyWordList); virtual;
+    procedure InitKeyWords; virtual;
     procedure InitSpecialSegments; virtual;
 
     function CheckDoubling(_ActiveSegment: TSpecialSegment; _KeyWord: TKeyWord; var Doubling: Boolean): Boolean;
@@ -172,31 +169,30 @@ type
   public
 
     { TODO -oVasilyevSM -cTCustomStringParser: Line и Position почти всегда считаются неправильно }
-    constructor Create(const _Message: String; _Line, _Position: Int64);
-    constructor CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64);
+    constructor Create(const _Message: String; _Line, _Position: Int64); overload;
+    constructor CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64); overload;
     constructor CreatePos(const _Message: String; _Line, _Position: Int64);
 
   end;
 
 const
 
-  KWR_EMPTY:         TKeyWord = (KeyTypeInternal: Integer(ktNone);      StrValue: '';   KeyLength: 0;            QuotingSymbol: False);
-  KWR_SOURCE_END:    TKeyWord = (KeyTypeInternal: Integer(ktSourceEnd); StrValue: '';   KeyLength: 0;            QuotingSymbol: False);
-  KWR_LINE_END_CR:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CR;   KeyLength: Length(CR);   QuotingSymbol: True );
-  KWR_LINE_END_LF:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: LF;   KeyLength: Length(LF);   QuotingSymbol: True );
-  KWR_LINE_END_CRLF: TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CRLF; KeyLength: Length(CRLF); QuotingSymbol: True );
+  KWR_EMPTY:         TKeyWord = (KeyTypeInternal: Integer(ktNone);      StrValue: '';   KeyLength: 0           );
+  KWR_SOURCE_END:    TKeyWord = (KeyTypeInternal: Integer(ktSourceEnd); StrValue: '';   KeyLength: 0           );
+  KWR_LINE_END_CR:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CR;   KeyLength: Length(CR)  );
+  KWR_LINE_END_LF:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: LF;   KeyLength: Length(LF)  );
+  KWR_LINE_END_CRLF: TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CRLF; KeyLength: Length(CRLF));
 
 implementation
 
 { TKeyWord }
 
-constructor TKeyWord.Create(_KeyType: Integer; const _StrValue: String; _QuotingSymbol: Boolean);
+constructor TKeyWord.Create(_KeyType: Integer; const _StrValue: String);
 begin
 
   KeyTypeInternal := _KeyType;
   StrValue        := _StrValue;
   KeyLength       := Length(StrValue);
-  QuotingSymbol   := _QuotingSymbol;
 
 end;
 
@@ -213,9 +209,9 @@ end;
 
 { TKeyWordHelper }
 
-constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean);
+constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String);
 begin
-  Create(Integer(_KeyType), _StrValue, _QuotingSymbol);
+  Create(Integer(_KeyType), _StrValue);
 end;
 
 function TKeyWordHelper.GetKeyType: TKeyWordType;
@@ -227,14 +223,6 @@ procedure TKeyWordHelper.SetKeyType(const _Value: TKeyWordType);
 begin
   if Integer(_Value) <> KeyTypeInternal then
     KeyTypeInternal := Integer(_Value);
-end;
-
-{ TKeyWordList }
-
-function TKeyWordList.AddKey(_KeyType: TKeyWordType; const _StrValue: String; _QuotingSymbol: Boolean): TKeyWord;
-begin
-  Result := TKeyWord.Create(Integer(_KeyType), _StrValue, _QuotingSymbol);
-  Add(Result);
 end;
 
 { TSpecialSegment }
@@ -281,7 +269,7 @@ end;
 
 { TSpecialSegmentList }
 
-function TSpecialSegmentList.Active(var _Value: TSpecialSegment): Boolean;
+function TSpecialSegmentList.GetActiveSegment(var _Value: TSpecialSegment): Boolean;
 var
   Segment: TSpecialSegment;
 begin
@@ -338,10 +326,10 @@ begin
       if SSA <> SSB then
         if
 
-            SSA.OpeningKey.Equal(SSB.OpeningKey) or
-            SSA.OpeningKey.Equal(SSB.ClosingKey) or
-            SSA.ClosingKey.Equal(SSB.OpeningKey) or
-            SSA.ClosingKey.Equal(SSB.ClosingKey)
+            (not SSA.OpeningKey.Equal(KWR_EMPTY) and SSA.OpeningKey.Equal(SSB.OpeningKey)) or
+            (not SSA.OpeningKey.Equal(KWR_EMPTY) and SSA.OpeningKey.Equal(SSB.ClosingKey)) or
+            (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.OpeningKey)) or
+            (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.ClosingKey))
 
         then raise ECoreException.Create('Special segments setting is wrong. Some keys are intersected.');
 
@@ -364,7 +352,7 @@ begin
   FKeyWords        := TKeyWordList.       Create;
   FSpecialSegments := TSpecialSegmentList.Create;
 
-  InitKeyWords(KeyWords);
+  InitKeyWords;
   InitSpecialSegments;
 
   {$IFDEF DEBUG}
@@ -407,10 +395,10 @@ begin
   LinePos := Cursor + _KeyWord.KeyLength;
 end;
 
-class procedure TCustomStringParser.InitKeyWords(_KeyWords: TKeyWordList);
+procedure TCustomStringParser.InitKeyWords;
 begin
 
-  with _KeyWords do begin
+  with KeyWords do begin
 
     Add(KWR_LINE_END_CRLF);
     Add(KWR_LINE_END_LF  );
@@ -468,6 +456,7 @@ begin
 
     ItemBegin := Cursor;
     ItemBody := True;
+    FSpecialSegments.Refresh(Self, KWR_EMPTY, nil);
 
   end;
 
@@ -486,7 +475,7 @@ procedure TCustomStringParser.Read;
     Doubling       := False;
     Valid          := False;
 
-    Active := FSpecialSegments.Active(_ActiveSegment);
+    Active := FSpecialSegments.GetActiveSegment(_ActiveSegment);
     if Active then begin
 
       KeyFound := CheckKey(_ActiveSegment.ClosingKey) and not CheckDoubling(_ActiveSegment, _ActiveSegment.ClosingKey, Doubling);

@@ -40,7 +40,8 @@ function DataToGUID(const Value: TData): TGUID;
 { ^ Преобразование основных типов данных в строку и обратно ^ }
 
 { v Для парсинга и автоскриптов v }
-function PosOf(Patterns: String; const Value: String; Start: Integer = 1): Integer;
+function PosOf(Patterns: String; const Value: String; Start: Integer = 1): Integer; overload;
+function PosOf(const Patterns: TStringArray; const Value: String): Integer; overload;
 function ReadStrTo(var S: String; const Pattern: String; WithPattern: Boolean = False): String;
 function LastPos(const Pattern, Value: String): Integer;
 function StringReplicate(const Pattern: String; Count: Cardinal): String;
@@ -77,6 +78,8 @@ function FormatNowToFileName(EmptyZero: Boolean = True): String;
 function StrToArray(S: String; const Delim: String = ';'; DelimBehind: Boolean = True): TStringArray;
 function ArrayToStr(const SA: TStringArray; const Delim: String = ';'; DelimBehind: Boolean = False): String; overload;
 function ArrayToStr(const IA: TIntegerArray; const Delim: String = ';'; DelimBehind: Boolean = False): String; overload;
+function ExistsInArray(const SA: TStringArray; const Value: String): Boolean;
+procedure AddToStringArray(var SA: TStringArray; const Value: String; IgnoreEmpty: Boolean = False; Distinct: Boolean = False);
 
 procedure CleanUpAnsiString(var Value: AnsiString);
 procedure CleanUpString(var Value: String);
@@ -514,6 +517,25 @@ begin
 
 end;
 
+function PosOf(const Patterns: TStringArray; const Value: String): Integer;
+var
+  S: String;
+  p: Integer;
+begin
+
+  Result := MaxInt;
+  for S in Patterns do begin
+
+    p := Pos(S, Value);
+    if p > 0 then
+      Result := Min(Result, p);
+
+  end;
+
+  if Result = MaxInt then Result := 0;
+
+end;
+
 function ReadStrTo(var S: String; const Pattern: String; WithPattern: Boolean): String;
 var
   p: Integer;
@@ -915,6 +937,36 @@ begin
 
   if not DelimBehind then
     CutStr(Result, Length(Delim));
+
+end;
+
+function ExistsInArray(const SA: TStringArray; const Value: String): Boolean;
+var
+  S: String;
+begin
+
+  for S in SA do
+    if SameText(S, Value) then
+      Exit(True);
+
+  Result := False;
+
+end;
+
+procedure AddToStringArray(var SA: TStringArray; const Value: String; IgnoreEmpty: Boolean; Distinct: Boolean);
+begin
+
+  if
+
+      (not IgnoreEmpty or (Length(Value) > 0)) and
+      (not Distinct or not ExistsInArray(SA, Value))
+
+  then begin
+
+    SetLength(SA, Length(SA) + 1);
+    SA[High(SA)] := Value;
+
+  end;
 
 end;
 
