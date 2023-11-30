@@ -11,6 +11,7 @@ uses
 type
 
   TKeyWordType = (ktNone, ktSourceEnd, ktLineEnd);
+  TKeyWordTypes = set of TKeyWordType;
 
   TKeyWord = record
 
@@ -32,6 +33,10 @@ type
 
     function GetKeyType: TKeyWordType;
     procedure SetKeyType(const _Value: TKeyWordType);
+
+    {$HINTS OFF}
+    function TypeInSet(const _Set: TKeyWordTypes): Boolean;
+    {$HINTS ON}
 
     property KeyType: TKeyWordType read GetKeyType write SetKeyType;
 
@@ -61,7 +66,6 @@ type
 
   }
   TSpecialSegment = class
-  { TODO -oVasilyevSM -cTSpecialSegment: После отдадки даты проверить, не заработает ли мультистрока без кавычек }
 
   strict private
 
@@ -99,42 +103,53 @@ type
 
   end;
 
+  TLocation = record
+
+    Line: Int64;
+    LineStart: Int64;
+    LastItemBegin: Int64;
+
+    function Position: Int64;
+
+  end;
+
   TCustomStringParser = class
-  { TODO 1 -oVasilyevSM -cTCustomStringParser: Этот класс надо "заморозить". Отладить и больше не изменять его. }
+  { TODO 2 -oVasilyevSM -cTCustomStringParser: Этот класс надо "заморозить". Отладить и больше не изменять его. }
 
   strict private
 
     FSource: String;
-    FLength: Int64;
+    FSrcLen: Int64;
     FCursor: Int64;
+    FNestedLevel: Word;
 
     FTerminated: Boolean;
     FItemBody: Boolean;
     FItemBegin: Int64;
 
-    FLine: Int64;
-    FLinePos: Int64;
+    FLocation: TLocation;
 
     FKeyWords: TKeyWordList;
     FSpecialSegments: TSpecialSegmentList;
 
     function CheckKeys(var _Value: TKeyWord): Boolean;
-    procedure IncLine(const _KeyWord: TKeyWord);
+    procedure IncLine;
 
   protected
 
-    procedure InitKeyWords; virtual;
-    procedure InitSpecialSegments; virtual;
-
-    function CheckDoubling(_ActiveSegment: TSpecialSegment; _KeyWord: TKeyWord; var Doubling: Boolean): Boolean;
-    procedure Move(_Incrementer: Int64 = 1);
+    procedure InitParser; virtual;
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
     procedure MoveEvent; virtual;
+
+    function Nested: Boolean;
+    function CheckDoubling(_ActiveSegment: TSpecialSegment; _KeyWord: TKeyWord; var Doubling: Boolean): Boolean;
+    procedure Move(_Incrementer: Int64 = 1);
     procedure Terminate;
     function ReadItem: String;
 
     procedure AddSpecialSegment(const _SegmentClass: TSpecialSegmentClass; const _OpeningKey, _ClosingKey: TKeyWord);
 
+    property NestedLevel: Word read FNestedLevel;
     property KeyWords: TKeyWordList read FKeyWords;
     property ItemBody: Boolean read FItemBody write FItemBody;
     property ItemBegin: Int64 read FItemBegin write FItemBegin;
@@ -145,11 +160,12 @@ type
     constructor Create(
 
         const _Source: String;
-        _Cursor: Int64 = 1;
-        _Line: Int64 = 1;
-        _LinePos: Int64 = 1
+        _Cursor: Int64;
+        _NestedLevel: Word;
+        const _Location: TLocation
 
-    );
+    ); overload;
+    constructor Create(const _Source: String); overload;
     destructor Destroy; override;
 
     procedure Read;
@@ -157,23 +173,13 @@ type
     function CheckKey(const _KeyWord: TKeyWord): Boolean;
 
     property Source: String read FSource;
-    property Length: Int64 read FLength;
+    property SrcLen: Int64 read FSrcLen;
     property Cursor: Int64 read FCursor;
-    property Line: Int64 read FLine write FLine;
-    property LinePos: Int64 read FLinePos write FLinePos;
+    property Location: TLocation read FLocation write FLocation;
 
   end;
 
-  EStringParserException = class(ECoreException)
-
-  public
-
-    { TODO -oVasilyevSM -cTCustomStringParser: Line и Position почти всегда считаются неправильно }
-    constructor Create(const _Message: String; _Line, _Position: Int64); overload;
-    constructor CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64); overload;
-    constructor CreatePos(const _Message: String; _Line, _Position: Int64);
-
-  end;
+  EStringParserException = class(ECoreException);
 
 const
 
@@ -182,6 +188,8 @@ const
   KWR_LINE_END_CR:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CR;   KeyLength: Length(CR)  );
   KWR_LINE_END_LF:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: LF;   KeyLength: Length(LF)  );
   KWR_LINE_END_CRLF: TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CRLF; KeyLength: Length(CRLF));
+
+  LOC_INITIAL: TLocation = (Line: 1; LineStart: 1; LastItemBegin: 1);
 
 implementation
 
@@ -223,6 +231,11 @@ procedure TKeyWordHelper.SetKeyType(const _Value: TKeyWordType);
 begin
   if Integer(_Value) <> KeyTypeInternal then
     KeyTypeInternal := Integer(_Value);
+end;
+
+function TKeyWordHelper.TypeInSet(const _Set: TKeyWordTypes): Boolean;
+begin
+  Result := KeyType in _Set;
 end;
 
 { TSpecialSegment }
@@ -336,29 +349,40 @@ begin
 end;
 {$ENDIF}
 
+{ TLocation }
+
+function TLocation.Position: Int64;
+begin
+  Result := LastItemBegin - LineStart + 1;
+end;
+
 { TCustomStringParser }
 
-constructor TCustomStringParser.Create;
+constructor TCustomStringParser.Create(const _Source: String; _Cursor: Int64; _NestedLevel: Word; const _Location: TLocation);
 begin
 
   inherited Create;
 
-  FSource  := _Source;
-  FLength  := System.Length(_Source);
-  FCursor  := _Cursor;
-  FLine    := _Line;
-  FLinePos := _LinePos;
+  FSource      := _Source;
+  FSrcLen      := Length(_Source);
+  FCursor      := _Cursor;
+  FNestedLevel := _NestedLevel;
+  FLocation    := _Location;
 
   FKeyWords        := TKeyWordList.       Create;
   FSpecialSegments := TSpecialSegmentList.Create;
 
-  InitKeyWords;
-  InitSpecialSegments;
+  InitParser;
 
   {$IFDEF DEBUG}
   CheckSpecialSegments(FSpecialSegments);
   {$ENDIF}
 
+end;
+
+constructor TCustomStringParser.Create(const _Source: String);
+begin
+  Create(_Source, 1, 0, LOC_INITIAL);
 end;
 
 destructor TCustomStringParser.Destroy;
@@ -389,13 +413,26 @@ begin
 
 end;
 
-procedure TCustomStringParser.IncLine(const _KeyWord: TKeyWord);
+procedure TCustomStringParser.IncLine;
 begin
-  Inc(FLine);
-  LinePos := Cursor + _KeyWord.KeyLength;
+
+  if
+
+      (Copy(Source, Cursor - 2, 2) = CRLF) or
+      CharInSet(Source[Cursor - 1], [CR, LF])
+
+  then begin
+
+    Inc(FLocation.Line);
+    { TODO 4 -oVasilyevSM -cTCustomStringParser: Проверить, как будет считаться по CR или LF. }
+    FLocation.LineStart := Cursor;
+    FLocation.LastItemBegin := Cursor;
+
+  end;
+
 end;
 
-procedure TCustomStringParser.InitKeyWords;
+procedure TCustomStringParser.InitParser;
 begin
 
   with KeyWords do begin
@@ -408,8 +445,22 @@ begin
 
 end;
 
-procedure TCustomStringParser.InitSpecialSegments;
+procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);
 begin
+end;
+
+procedure TCustomStringParser.MoveEvent;
+begin
+
+  if not ItemBody then begin
+
+    ItemBegin := Cursor;
+    FLocation.LastItemBegin := Cursor;
+    ItemBody := True;
+//    FSpecialSegments.Refresh(Self, KWR_EMPTY, nil);
+
+  end;
+
 end;
 
 procedure TCustomStringParser.AddSpecialSegment;
@@ -423,6 +474,11 @@ begin
     Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
 end;
 
+function TCustomStringParser.Nested: Boolean;
+begin
+  Result := NestedLevel > 0;
+end;
+
 function TCustomStringParser.CheckDoubling(_ActiveSegment: TSpecialSegment; _KeyWord: TKeyWord; var Doubling: Boolean): Boolean;
 begin
 
@@ -431,7 +487,7 @@ begin
     Result :=
 
       (KeyLength = 1) and
-      (Length - Cursor > 2) and
+      (SrcLen - Cursor > 2) and
       (Copy(Source, Cursor, 2) = StrValue + StrValue);
 
   if Result then Doubling := True;
@@ -443,115 +499,108 @@ begin
   Inc(FCursor, _Incrementer);
 end;
 
-procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);
-begin
-  if _KeyWord.KeyType = ktLineEnd then
-    IncLine(_KeyWord);
-end;
-
-procedure TCustomStringParser.MoveEvent;
-begin
-
-  if not ItemBody then begin
-
-    ItemBegin := Cursor;
-    ItemBody := True;
-    FSpecialSegments.Refresh(Self, KWR_EMPTY, nil);
-
-  end;
-
-end;
-
 procedure TCustomStringParser.Read;
 
-  function _IsKeyEvent(var _ActiveSegment: TSpecialSegment; var _CursorKey: TKeyWord): Boolean;
-  { TODO 1 -oVasilyevSM -cTCustomStringParser: -> в класс ^ }
-  var
-    Active, KeyFound, Doubling, Valid: Boolean;
-  begin
-
-    _ActiveSegment := nil;
-    _CursorKey     := KWR_EMPTY;
-    Doubling       := False;
-    Valid          := False;
-
-    Active := FSpecialSegments.GetActiveSegment(_ActiveSegment);
-    if Active then begin
-
-      KeyFound := CheckKey(_ActiveSegment.ClosingKey) and not CheckDoubling(_ActiveSegment, _ActiveSegment.ClosingKey, Doubling);
-      if KeyFound then begin
-
-        { Активная зона закончилась, перед нами ее закрывающий ключ - KeyEvent }
-        Active := False;
-        _CursorKey := _ActiveSegment.ClosingKey;
-
-      end else begin
-
-        { Кастомные приблуды. Пробуем взять ключ из контекста }
-        KeyFound := CheckKeys(_CursorKey) and not CheckDoubling(_ActiveSegment, _CursorKey, Doubling);
-        if KeyFound then begin
-
-          { Если взялся, проверяем, не закрывается ли этим ключом активный сегмент }
-          Active := not _ActiveSegment.CanClose(Self, _CursorKey);
-
-          { Если не закрывается, спрашиваем у него, пропускает он такой ключ или блокирует }
-          if Active then
-            Valid := _ActiveSegment.KeyValid(Self, _CursorKey) and not CheckDoubling(_ActiveSegment, _CursorKey, Doubling);
-
-          { Активный сегмент пропускает такой ключ }
-          if Active and not Valid then begin
-
-            KeyFound := False;
-            _CursorKey := KWR_EMPTY;
-
-          end;
-
-        end;
-
-      end
-
-    end else begin
-
-      _ActiveSegment := nil;
-      { Активной зоны не было - проверяем, что перед нами, не ключ ли }
-      KeyFound := CheckKeys(_CursorKey);
-
-    end;
-
-    if Doubling then Move;
-
-    Result := KeyFound and (not Active or Valid);
-
-  end;
+//  function _IsKeyEvent(var _ActiveSegment: TSpecialSegment; var _CursorKey: TKeyWord): Boolean;
+//  var
+//    Active, KeyFound, Doubling, Valid: Boolean;
+//  begin
+//
+//    _ActiveSegment := nil;
+//    _CursorKey     := KWR_EMPTY;
+//    Doubling       := False;
+//    Valid          := False;
+//
+//    Active := FSpecialSegments.GetActiveSegment(_ActiveSegment);
+//    if Active then begin
+//
+//      KeyFound := CheckKey(_ActiveSegment.ClosingKey) and not CheckDoubling(_ActiveSegment, _ActiveSegment.ClosingKey, Doubling);
+//      if KeyFound then begin
+//
+//        { Активная зона закончилась, перед нами ее закрывающий ключ - KeyEvent }
+//        Active := False;
+//        _CursorKey := _ActiveSegment.ClosingKey;
+//
+//      end else begin
+//
+//        { Кастомные приблуды. Пробуем взять ключ из контекста }
+//        KeyFound := CheckKeys(_CursorKey) and not CheckDoubling(_ActiveSegment, _CursorKey, Doubling);
+//        if KeyFound then begin
+//
+//          { Если взялся, проверяем, не закрывается ли этим ключом активный сегмент }
+//          Active := not _ActiveSegment.CanClose(Self, _CursorKey);
+//
+//          { Если не закрывается, спрашиваем у него, пропускает он такой ключ или блокирует }
+//          if Active then
+//            Valid := _ActiveSegment.KeyValid(Self, _CursorKey) and not CheckDoubling(_ActiveSegment, _CursorKey, Doubling);
+//
+//          { Активный сегмент пропускает такой ключ }
+//          if Active and not Valid then begin
+//
+//            KeyFound := False;
+//            _CursorKey := KWR_EMPTY;
+//
+//          end;
+//
+//        end;
+//
+//      end
+//
+//    end else begin
+//
+//      _ActiveSegment := nil;
+//      { Активной зоны не было - проверяем, что перед нами, не ключ ли }
+//      KeyFound := CheckKeys(_CursorKey);
+//
+//    end;
+//
+//    if Doubling then Move;
+//
+//    Result := KeyFound and (not Active or Valid);
+//
+//  end;
 
 var
-  ActiveSegment: TSpecialSegment;
+//  ActiveSegment: TSpecialSegment;
   CursorKey: TKeyWord;
 begin
 
-  while (Cursor <= Length) and not FTerminated do begin
+  try
 
-    if _IsKeyEvent(ActiveSegment, CursorKey) then begin
+    while (Cursor <= SrcLen) and not FTerminated do begin
 
-      KeyEvent(CursorKey);
-      { И обновляем состояние всех особых зон по текущему ключу }
-      FSpecialSegments.Refresh(Self, CursorKey, ActiveSegment);
-      Move(CursorKey.KeyLength);
+      { TODO 1 -oVasilyevSM -cTSpecialSegment: Сначала проверяем сегменты, если произошло переключение, вызываем
+        отдельное событие. TSpecialSegmentList.Active - это его свойство и оно посто выставляется по переключению.
+        Соответственно переключаем им же, а не напрямую. Тогда здесь все прозрачное будет. Так и быстрее будет. }
+      if CheckKeys(CursorKey) then begin
 
-    end else begin
+        KeyEvent(CursorKey);
+        Move(CursorKey.KeyLength);
 
-      { Иначе - простой шаг вперед }
-      MoveEvent;
-      Move;
+      end else begin
+
+        { Иначе - простой шаг вперед }
+        MoveEvent;
+        Move;
+
+      end;
+
+      IncLine;
 
     end;
 
+    KeyEvent(KWR_SOURCE_END);
+
+  except
+
+    on E: Exception do
+
+      if Nested then
+        raise
+      else
+        raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Position: %d', [E.Message, Location.Line, Location.Position]);
+
   end;
-
-  KeyEvent(KWR_SOURCE_END);
-
-  { Оборачивать этот метод в try except чревато. В on E do получается уничтоженный объект E. }
-  { TODO -oVasilyevSM -ctry_except_end: Нужен эксперимент, откуда вызовется E.Free, если тут обернуть таки. }
 
 end;
 
@@ -563,28 +612,12 @@ end;
 function TCustomStringParser.ReadItem: String;
 begin
 
-  Result := Trim(Copy(Source, ItemBegin, Cursor - ItemBegin));
+  if ItemBegin > 0 then
+    Result := Trim(Copy(Source, ItemBegin, Cursor - ItemBegin));
 
   ItemBody := False;
   ItemBegin := 0;
 
-end;
-
-{ EStringParserError }
-
-constructor EStringParserException.Create(const _Message: String; _Line, _Position: Int64);
-begin
- inherited CreateFmt('%s [Line = %d, before position = %d]', [_Message, _Line, _Position]);
-end;
-
-constructor EStringParserException.CreateFmt(const _Message: String; const _Args: array of const; _Line, _Position: Int64);
-begin
-  Create(Format(_Message, _Args), _Line, _Position);
-end;
-
-constructor EStringParserException.CreatePos(const _Message: String; _Line, _Position: Int64);
-begin
- inherited CreateFmt('%s [Line = %d, position = %d]', [_Message, _Line, _Position]);
 end;
 
 end.

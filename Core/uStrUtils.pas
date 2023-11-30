@@ -128,7 +128,7 @@ function StrIsGUID(const Value: String): Boolean;
         if S[i] <> '-' then Exit(False)
         else
 
-      else if not CharInSet(S[i], AC_HEX_CHARS_SET) then Exit(False);
+      else if not CharInSet(S[i], SC_HEX_CHARS_SET) then Exit(False);
 
     Result := True;
 
@@ -189,6 +189,7 @@ end;
 
 function StrToDouble(const Value: String): Double;
 begin
+  { TODO -oVasilyevSM -cStrToDouble: Дельфина округляет до 6 знаков после запятой. }
   Result := SysUtils.StrToFloat(GetFloatStr(Value));
 end;
 
@@ -212,16 +213,16 @@ var
 
     Result :=
 
-        CharInSet(V[ 1], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 2], AC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 1], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 2], SC_INTEGER_CHARS_SET) and
         (V[ 3] = '.') and
-        CharInSet(V[ 4], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 5], AC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 4], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 5], SC_INTEGER_CHARS_SET) and
         (V[ 6] = '.') and
-        CharInSet(V[ 7], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 8], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 9], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[10], AC_INTEGER_CHARS_SET);
+        CharInSet(V[ 7], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 8], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 9], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[10], SC_INTEGER_CHARS_SET);
 
   end;
 
@@ -230,16 +231,16 @@ var
 
     Result :=
 
-        CharInSet(V[ 1], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 2], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 3], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 4], AC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 1], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 2], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 3], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 4], SC_INTEGER_CHARS_SET) and
         (V[ 5] = '-') and
-        CharInSet(V[ 6], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 7], AC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 6], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 7], SC_INTEGER_CHARS_SET) and
         (V[ 8] = '-') and
-        CharInSet(V[ 9], AC_INTEGER_CHARS_SET) and
-        CharInSet(V[10], AC_INTEGER_CHARS_SET);
+        CharInSet(V[ 9], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[10], SC_INTEGER_CHARS_SET);
 
   end;
 
@@ -253,7 +254,7 @@ var
   begin
 
     for i := 1 to TimePartLength do
-      if not CharInSet(TimePart[1], AC_INTEGER_CHARS_SET) then
+      if not CharInSet(TimePart[1], SC_INTEGER_CHARS_SET) then
         Exit(False);
 
     Result := True;
@@ -1057,7 +1058,7 @@ begin
 
     S := Copy(Value, 3, 2);
     for i := 1 to Length(S) do
-      if not CharInSet(S[i], AC_HEX_CHARS_SET) then Exit(False);
+      if not CharInSet(S[i], SC_HEX_CHARS_SET) then Exit(False);
 
   end;
 
@@ -1092,7 +1093,7 @@ function HexCharStrToStr(const Value: String): String;
     i: Integer;
   begin
     for i := 1 to Length(S) do
-      if not CharInSet(S[i], AC_HEX_CHARS_SET) then _Raise;
+      if not CharInSet(S[i], SC_HEX_CHARS_SET) then _Raise;
   end;
 
 var

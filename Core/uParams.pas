@@ -19,7 +19,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { vSoft }
-  uConsts, uTypes, uCore, uDataUtils, uStrUtils, uCustomStringParser;
+  uConsts, uTypes, uCore, uDataUtils, uStrUtils;
 
 type
 
@@ -49,6 +49,8 @@ type
     function DataSize: Cardinal;
     procedure PresetData(_DataType: TParamDataType);
 
+    procedure CheckNameValue(const _Value: String);
+
   private
 
     { v Using FData methods v }
@@ -72,7 +74,7 @@ type
     procedure SetAsAnsiString(const _Value: AnsiString);
     procedure SetAsString(const _Value: String);
     procedure SetAsBLOB(const _Value: RawByteString);
-    procedure SetAsParams(_Value: TParams);
+    protected procedure SetAsParams(_Value: TParams); { TODO 4 -oVasilyevSM -cTParam: protected is a croked public }
     { ^ Using FData methods ^ }
 
   protected
@@ -91,6 +93,8 @@ type
     property DataType: TParamDataType read FDataType;
     property IsNull: Boolean read FIsNull write SetIsNull;
     property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
+    { TODO -oVasilyevSM -cTParam: Тип разделителя может быть не только '.', но и '/' или '\'. И эти символы должны быть
+      недопустимы в оконечных именах. Как и многое другое непечатное. }
     property Name: String read FName;
 
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
@@ -175,8 +179,9 @@ type
     procedure SetAsAnsiString(_Path: String; const _Value: AnsiString);
     procedure SetAsString(_Path: String; const _Value: String);
     procedure SetAsBLOB(_Path: String; const _Value: BLOB);
+    protected procedure SetAsParams(_Path: String; _Value: TParams); { TODO 4 -oVasilyevSM -cTParam: protected is a croked public }
 
-  private
+  strict private
 
     function GetParam(_Path: String): TParam;
 
@@ -234,130 +239,6 @@ type
 
   EParamsException = class(ECoreException);
 
-  TKeyWordType = (
-
-      ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktOpeningBracket,
-      ktClosingBracket
-
-  );
-  TKeyWordTypes = set of TKeyWordType;
-
-  TKeyWordHelper = record helper for TKeyWord
-
-  private
-
-    constructor Create(_KeyType: TKeyWordType; const _StrValue: String); overload;
-
-    function GetKeyType: TKeyWordType;
-    procedure SetKeyType(const _Value: TKeyWordType);
-
-    property KeyType: TKeyWordType read GetKeyType write SetKeyType;
-
-  end;
-
-  TKeyWordListHelper = class helper for TKeyWordList
-  end;
-
-  TState = (stName, stType, stValue);
-
-  TReadProc = procedure (const KeyWord: TKeyWord) of object;
-
-  TReadInfo = record
-
-    State: TState;
-    EntryKeyTypes: TKeyWordTypes;
-    ReadProc: TReadProc;
-    ValidKeyTypes: TKeyWordTypes;
-
-    constructor Create(
-
-        _State: TState;
-        _EntryKeyTypes: TKeyWordTypes;
-        _ReadProc: TReadProc;
-        _ValidKeyTypes: TKeyWordTypes
-
-    );
-
-  end;
-
-  TReadSettings = class(TList<TReadInfo>)
-
-  private
-
-    procedure Add(
-
-        _State: TState;
-        _EntryKeyTypes: TKeyWordTypes;
-        _ReadProc: TReadProc;
-        _ValidKeyTypes: TKeyWordTypes
-
-    );
-    function GetReadProc(_State: TState; _KeyWord: TKeyWord; var _Proc: TReadProc; _Line, _Cursor, _LinePos: Int64): Boolean;
-
-  end;
-
-  { TODO 2 -oVasilyevSM -cTParamsReader: Надо его все равно в отдельный юнит положить как-то, не жертвуя закрытостью SetAsParams. }
-  {
-
-    Просто параметры НЕ ДОЛЖНЫ поддерживать комментарии. Комментарии должны обрабатываться пронаследованным классом
-    TIniParamsReader.
-
-  }
-  TParamsReader = class(TCustomStringParser)
-
-  strict private
-
-    FParams: TParams;
-    FNested: Boolean;
-
-    FState: TState;
-    FCurrentName: String;
-    FCurrentType: TParamDataType;
-
-    FReadSettings: TReadSettings;
-
-    procedure GetName(const _KeyWord: TKeyWord);
-    procedure GetType(const _KeyWord: TKeyWord);
-    procedure SetValue(const _KeyWord: TKeyWord);
-
-    procedure CheckType;
-    procedure CheckParams(_KeyWord: TKeyWord);
-    procedure ReadParams(_KeyWord: TKeyWord);
-
-    function TrimDigital(const _Value: String): String;
-    function UndoubleSymbols(const _Value, _KeyWord: String): String;
-
-    procedure InitReadSetting;
-
-  private
-
-    property State: TState read FState;
-    property CurrentType: TParamDataType read FCurrentType;
-
-  protected
-
-    procedure InitKeyWords; override;
-    procedure InitSpecialSegments; override;
-
-    procedure KeyEvent(const _KeyWord: TKeyWord); override;
-
-  public
-
-    constructor Create(
-
-        const _Source: String;
-        _Params: TParams;
-        _Cursor: Int64 = 1;
-        _Line: Int64 = 1;
-        _LinePos: Int64 = 1
-
-    );
-    destructor Destroy; override;
-
-  end;
-
-  EParamsReadException = class(EStringParserException);
-
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
 { TODO -oVasilyevSM -cParamsToStr: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле
@@ -365,49 +246,13 @@ function StrToParamDataType(Value: String): TParamDataType;
   RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams также можно просто на вход
   подавать пустой контейнер с готовой структурой. Тогда она просто заполняется данными, типы известны и не требуют
   хранения в строке. }
-{ TODO -oVasilyevSM -cParamsToStr: Скорее всего это должно переехать в класс  }
-function ParamsToStr(Params: TParams; SingleString: Boolean = False): String;
-procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
 
-const
-
-  KWR_SPACE:                TKeyWord = (KeyTypeInternal: Integer(ktSpace);            StrValue: ' ';   KeyLength: Length(' ') );
-  KWR_TAB:                  TKeyWord = (KeyTypeInternal: Integer(ktSpace);            StrValue: TAB;   KeyLength: Length(TAB) );
-  KWR_SPLITTER:             TKeyWord = (KeyTypeInternal: Integer(ktSplitter);         StrValue: ';';   KeyLength: Length(';') );
-  KWR_TYPE_IDENT:           TKeyWord = (KeyTypeInternal: Integer(ktTypeIdent);        StrValue: ':';   KeyLength: Length(':') );
-  KWR_ASSIGNING:            TKeyWord = (KeyTypeInternal: Integer(ktAssigning);        StrValue: '=';   KeyLength: Length('=') );
-  KWR_QUOTE_SINGLE:         TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '''';  KeyLength: Length(''''));
-  KWR_QUOTE_DOBLE:          TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '"';   KeyLength: Length('"') );
-  KWR_OPENING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktOpeningBracket);   StrValue: '(';   KeyLength: Length('(') );
-  KWR_CLOSING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktClosingBracket);   StrValue: ')';   KeyLength: Length(')') );
-
-type
-
-  TDateTimeSpecialSegment = class(TSpecialSegment)
-
-  protected
-
-    function CanOpen(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; override;
-    function CanClose(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; override;
-    function KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; override;
-
-  end;
-
-  TStringSpecialSegment = class(TSpecialSegment)
-
-  protected
-
-    function CanOpen(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; override;
-    function CanClose(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; override;
-
-  end;
-
-function _KeyTypeInSet(_KeyType: TKeyWordType; _Set: TKeyWordTypes): Boolean;
-begin
-  Result := _KeyType in _Set;
-end;
+uses
+  { vSoft }
+  { TODO 3 -oVasilyevSM -cuParams: Прям никак без циркулярной ссылки? }
+  uParamsReader;
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 const
@@ -445,100 +290,6 @@ begin
 
 end;
 
-function ParamsToStr(Params: TParams; SingleString: Boolean): String;
-const
-
-  SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
-  SC_SingleParamSingleStringFormat = '%s: %s = %s;';
-
-  SC_NestedParamsMultiStringFormat =
-
-      '%s: %s = (' + CRLF +
-      '%s' +
-      ')' + CRLF;
-
-  SC_NestedParamsSingleStringFormat =
-
-      '%s: %s = (%s);';
-
-  function _NestedParamsFormat: String;
-  begin
-    if SingleString then Result := SC_NestedParamsSingleStringFormat
-    else Result := SC_NestedParamsMultiStringFormat;
-  end;
-
-  function _SingleParamFormat: String;
-  begin
-    if SingleString then Result := SC_SingleParamSingleStringFormat
-    else Result := SC_SingleParamMultiStringFormat;
-  end;
-
-  function _GetNested(_Param: TParam): String;
-  begin
-    Result := ParamsToStr(_Param.AsParams, SingleString);
-    if not SingleString then ShiftText(1, Result);
-  end;
-
-  function _QuoteString(_Param: TParam): String;
-  begin
-
-    Result := _Param.AsString;
-
-    if
-
-        (_Param.DataType = dtString) and 
-        ((Pos(';', Result) > 0) or (Pos(CR, Result) > 0) or (Pos(LF, Result) > 0))
-
-    then Result := QuoteStr(Result);
-
-  end;
-
-var
-  Param: TParam;
-begin
-
-  Result := '';
-  for Param in Params do
-
-    if Param.DataType = dtParams then
-
-      Result := Result + Format(_NestedParamsFormat, [
-
-          Param.Name,
-          ParamDataTypeToStr(Param.DataType),
-          _GetNested(Param)
-
-      ])
-
-    else
-
-      Result := Result + Format(_SingleParamFormat, [
-
-          Param.Name,
-          ParamDataTypeToStr(Param.DataType),
-          _QuoteString(Param)
-
-      ]);
-
-  if SingleString then CutStr(Result, 1);
-
-end;
-
-procedure StrToParams(const Value: String; Params: TParams);
-begin
-
-  with TParamsReader.Create(Value, Params) do
-
-    try
-
-      Read;
-
-    finally
-      Free;
-    end;
-
-end;
-
 { TParam }
 
 constructor TParam.Create;
@@ -547,7 +298,8 @@ begin
   inherited Create;
 
   FIsNull := True;
-  FName   := _Name;
+  CheckNameValue(_Name);
+  FName := _Name;
 
 end;
 
@@ -738,6 +490,17 @@ begin
     FreeData;
 
   end;
+
+end;
+
+procedure TParam.CheckNameValue(const _Value: String);
+var
+  i: Integer;
+begin
+
+  for i := 1 to Length(_Value) do
+    if not CharInSet(_Value[i], SC_TYPED_CHARS_SET) then
+      raise EParamsException.CreateFmt('Character #%d in invalid in param name', [Ord(_Value[i])]);
 
 end;
 
@@ -1024,6 +787,11 @@ begin
   GetParam(_Path).AsBLOB := _Value;
 end;
 
+procedure TParams.SetAsParams(_Path: String; _Value: TParams);
+begin
+  GetParam(_Path).SetAsParams(_Value);
+end;
+
 function TParams.GetParam(_Path: String): TParam;
 var
   SingleName: String;
@@ -1284,387 +1052,6 @@ function TParams.AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
 begin
   if not FindBLOB(_Path, Result) then AsBLOB[_Path] := _Default;
   Result := _Default;
-end;
-
-{ TKeyWordHelper }
-
-constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String);
-begin
-  Create(Integer(_KeyType), _StrValue);
-end;
-
-function TKeyWordHelper.GetKeyType: TKeyWordType;
-begin
-  Result := TKeyWordType(KeyTypeInternal)
-end;
-
-procedure TKeyWordHelper.SetKeyType(const _Value: TKeyWordType);
-begin
-  if Integer(_Value) <> KeyTypeInternal then
-    KeyTypeInternal := Integer(_Value)
-end;
-
-{ TReadInfo }
-
-constructor TReadInfo.Create;
-begin
-
-  State         := _State;
-  EntryKeyTypes := _EntryKeyTypes;
-  ReadProc      := _ReadProc;
-  ValidKeyTypes := _ValidKeyTypes;
-
-end;
-
-{ TReadSettings }
-
-procedure TReadSettings.Add;
-begin
-  inherited Add(TReadInfo.Create(_State, _EntryKeyTypes, _ReadProc, _ValidKeyTypes));
-end;
-
-function TReadSettings.GetReadProc(_State: TState; _KeyWord: TKeyWord; var _Proc: TReadProc; _Line, _Cursor, _LinePos: Int64): Boolean;
-var
-  RI: TReadInfo;
-begin
-
-  { Поиск результата }
-  for RI in Self do
-
-    if
-
-        (RI.State = _State) and
-        _KeyTypeInSet(_KeyWord.KeyType, RI.EntryKeyTypes)
-
-    then begin
-
-      _Proc := RI.ReadProc;
-      Exit(True);
-
-    end;
-
-  { Проверка синтаксиса. Все допустимые типы ключевого слова для данного состояния пречислены в настройке. }
-  for RI in Self do
-
-    if
-
-        (RI.State = _State) and
-        _KeyTypeInSet(_KeyWord.KeyType, RI.ValidKeyTypes)
-
-    then Exit(False);
-
-  raise EParamsReadException.CreateFmt('Unexpected keyword ''%s''', [_KeyWord.StrValue]);
-
-end;
-
-
-{ TParamsReader }
-
-constructor TParamsReader.Create;
-begin
-
-  inherited Create(_Source, _Cursor, _Line, _LinePos);
-
-  FParams := _Params;
-  FNested := _Cursor > 1;
-
-  FState := stName;
-  FReadSettings := TReadSettings.Create;
-
-  InitReadSetting;
-
-end;
-
-destructor TParamsReader.Destroy;
-begin
-  FreeAndNil(FReadSettings);
-  inherited Destroy;
-end;
-
-procedure TParamsReader.GetName;
-begin
-  FCurrentName := ReadItem;
-end;
-
-procedure TParamsReader.GetType;
-begin
-  FCurrentType := StrToParamDataType(ReadItem);
-end;
-
-procedure TParamsReader.SetValue(const _KeyWord: TKeyWord);
-begin
-
-  CheckType;
-
-  case CurrentType of
-
-    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(ReadItem);
-    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(TrimDigital(ReadItem));
-    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(ReadItem));
-    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(ReadItem));
-    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(ReadItem);
-    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(ReadItem);
-    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(ReadItem);
-    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(ReadItem, _KeyWord.StrValue);
-    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(ReadItem);
-
-  end;
-
-  FCurrentName := '';
-  FCurrentType := dtUnknown;
-
-end;
-
-procedure TParamsReader.CheckType;
-var
-  P: TParam;
-begin
-
-  { Определенный заранее тип данных }
-  if
-
-      (CurrentType = dtUnknown) and
-      FParams.FindParam(FCurrentName, P) and
-      (P.DataType <> dtUnknown)
-
-  then FCurrentType := P.DataType;
-
-  if CurrentType = dtUnknown then
-    raise EParamsReadException.Create('Unknown data type');
-
-end;
-
-procedure TParamsReader.CheckParams(_KeyWord: TKeyWord);
-begin
-
-  if (State = stValue) and (CurrentType = dtParams) then begin
-
-    { Контейнер. Проверка синтаксиса. }
-    if not _KeyTypeInSet(_KeyWord.KeyType, [ktSpace, ktLineEnd, ktOpeningBracket]) then
-      raise EParamsReadException.CreateFmt('''('' expected but ''%s'' found', [_KeyWord.StrValue]);
-
-    { Контейнер. Вход во вложенную структуру. }
-    if _KeyWord.KeyType = ktOpeningBracket then
-      ReadParams(_KeyWord);
-
-  end;
-
-  { Вложенный объект. Завершение. }
-  if _KeyWord.KeyType = ktClosingBracket then
-    Terminate;
-
-  { Вложенный объект. Проверка синтаксиса. }
-  if FNested and not Terminated and (_KeyWord.KeyType = ktSourceEnd) then
-    raise EParamsReadException.Create('Unterminated nested params');
-
-end;
-
-procedure TParamsReader.ReadParams(_KeyWord: TKeyWord);
-var
-  P: TParams;
-begin
-
-  P := TParams.Create;
-  try
-
-    with TParamsReader.Create(
-
-        Source,
-        P,
-        Cursor + _KeyWord.KeyLength,
-        Line,
-        LinePos
-
-    ) do
-
-      try
-
-        Read;
-
-      finally
-
-        Self.Move(Cursor - _KeyWord.KeyLength - Self.Cursor);
-        Self.Line := Line;
-        Self.LinePos := LinePos;
-        Free;
-
-      end;
-
-  finally
-
-    { Вот из-за чего этот класс не вынесен в отдельный модуль. SetAsParams надо держать в private. }
-    FParams.GetParam(FCurrentName).SetAsParams(P);
-
-    ItemBody := False;
-    ItemBegin := 0;
-    FCurrentName := '';
-    FCurrentType := dtUnknown;
-    FState := stName;
-
-  end;
-
-end;
-
-function TParamsReader.TrimDigital(const _Value: String): String;
-begin
-  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
-end;
-
-function TParamsReader.UndoubleSymbols(const _Value, _KeyWord: String): String;
-begin
-  Result := StringReplace(_Value, _KeyWord + _KeyWord, _KeyWord, [rfReplaceAll])
-end;
-
-procedure TParamsReader.InitKeyWords;
-begin
-
-  inherited InitKeyWords;
-
-  with KeyWords do begin
-
-    Add(KWR_SPACE               );
-    Add(KWR_TAB                 );
-    Add(KWR_SPLITTER            );
-    Add(KWR_TYPE_IDENT          );
-    Add(KWR_ASSIGNING           );
-    Add(KWR_QUOTE_SINGLE        );
-    Add(KWR_QUOTE_DOBLE         );
-    Add(KWR_OPENING_BRACKET     );
-    Add(KWR_CLOSING_BRACKET     );
-
-  end;
-
-end;
-
-procedure TParamsReader.InitReadSetting;
-const
-
-  SC_NAME_ENTRY  = [ktTypeIdent, ktAssigning];
-  SC_TYPE_ENTRY  = [ktAssigning];
-  SC_VALUE_ENTRY = [ktLineEnd, ktSplitter, ktClosingBracket, ktStringBorder, ktSourceEnd];
-
-begin
-
-  with FReadSettings do begin
-
-    Add(stName,  SC_NAME_ENTRY,  GetName,  [ktSpace]);
-    Add(stType,  SC_TYPE_ENTRY,  GetType,  [ktSpace]);
-    Add(stValue, SC_VALUE_ENTRY, SetValue, [ktSpace]);
-
-  end;
-
-end;
-
-procedure TParamsReader.InitSpecialSegments;
-begin
-
-  inherited InitSpecialSegments;
-
-  with KeyWords do begin
-
-    AddSpecialSegment(TSpecialSegment,         KWR_QUOTE_SINGLE,          KWR_QUOTE_SINGLE      );
-    AddSpecialSegment(TSpecialSegment,         KWR_QUOTE_DOBLE,           KWR_QUOTE_DOBLE       );
-    AddSpecialSegment(TStringSpecialSegment,   KWR_EMPTY,                 KWR_EMPTY             );
-    AddSpecialSegment(TDateTimeSpecialSegment, KWR_EMPTY,                 KWR_EMPTY             );
-
-  end;
-
-end;
-
-procedure TParamsReader.KeyEvent(const _KeyWord: TKeyWord);
-var
-  ReadProc: TReadProc;
-begin
-
-  try
-
-    inherited KeyEvent(_KeyWord);
-
-    CheckParams(_KeyWord);
-
-    if ItemBody then begin
-
-      { Считывние }
-      if FReadSettings.GetReadProc(State, _KeyWord, ReadProc, Line, Cursor, LinePos) then
-
-        ReadProc(_KeyWord)
-
-      else Exit;
-
-      { Переключение состояния }
-      case _KeyWord.KeyType of
-
-        ktTypeIdent:           FState := stType;
-        ktAssigning:           FState := stValue;
-        ktLineEnd, ktSplitter: if State = stValue then FState := stName;
-        ktStringBorder:        FState := stName;
-
-      end;
-
-    end;
-
-  except
-    on E: Exception do
-      raise EParamsReadException.CreateFmt('%s: %s', [E.ClassName, E.Message], Line, Cursor - LinePos);
-  end;
-
-end;
-
-{ TDateTimeSpecialSegment }
-
-function TDateTimeSpecialSegment.CanOpen(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
-begin
-  with _Parser as TParamsReader do
-    Result := (State = stValue) and (CurrentType = dtDateTime);
-end;
-
-function TDateTimeSpecialSegment.CanClose(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
-begin
-
-  Result :=
-
-      _Parser.CheckKey(KWR_LINE_END_CRLF) or
-      _Parser.CheckKey(KWR_LINE_END_CR  ) or
-      _Parser.CheckKey(KWR_LINE_END_LF  ) or
-      _Parser.CheckKey(KWR_SPLITTER     );
-
-end;
-
-function TDateTimeSpecialSegment.KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
-var
-  Pass: Boolean;
-begin
-
-  { TODO 1 -oVasilyevSM -cGeneral: Добавить паттерн inherited!!! }
-  Pass := (_Parser as TParamsReader).ItemBody and (
-
-    (_KeyWord.Equal(KWR_SPACE     )) or
-    (_KeyWord.Equal(KWR_TYPE_IDENT))
-
-  );
-
-  Result := inherited or not Pass;
-
-end;
-
-{ TStringSpecialSegment }
-
-function TStringSpecialSegment.CanOpen(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
-begin
-  with _Parser as TParamsReader do
-    Result := (State = stValue) and (CurrentType in [dtAnsiString, dtString]) and ItemBody;
-end;
-
-function TStringSpecialSegment.CanClose(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
-begin
-
-  Result :=
-
-      _Parser.CheckKey(KWR_LINE_END_CRLF) or
-      _Parser.CheckKey(KWR_LINE_END_CR  ) or
-      _Parser.CheckKey(KWR_LINE_END_LF  ) or
-      _Parser.CheckKey(KWR_SPLITTER     );
-
 end;
 
 end.
