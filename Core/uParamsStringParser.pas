@@ -537,12 +537,13 @@ begin
     Add(etName, True,    False, [ktClosingBracket, ktSourceEnd]           );
     Add(etType, True,    False, [ktClosingBracket, ktLineEnd, ktSourceEnd]);
     Add(etType, True,    True,  [ktClosingBracket, ktLineEnd, ktSourceEnd]);
+    { TODO 3 -oVasilyevSM -cSyntax: Extreme: String = ''' }
 
   end;
 
-  {                RegionClass     OpeningKey        ClosingKe       }
-  AddSpecialRegion(TSpecialRegion, KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE);
-  AddSpecialRegion(TSpecialRegion, KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE );
+  {                RegionClass     OpeningKey        ClosingKey      }
+  AddSpecialRegion(TSpecialRegion, KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE, 'Unterminated string');
+  AddSpecialRegion(TSpecialRegion, KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE,  'Unterminated string');
 
 end;
 

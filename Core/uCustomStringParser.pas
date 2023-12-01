@@ -63,20 +63,28 @@ type
 
   }
   TSpecialRegion = class
-  { TODO 3 -oVasilyevSM -cTSpecialRegion: Extreme: String = '''''''''''''''''' }
   strict private
 
     FOpeningKey: TKeyWord;
     FClosingKey: TKeyWord;
+    FUnterminatedMessage: String;
 
     function Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 
   private
 
-    constructor Create(_OpeningKey, _ClosingKey: TKeyWord);
+    constructor Create(
+
+        const _OpeningKey: TKeyWord;
+        const _ClosingKey: TKeyWord;
+        const _UnterminatedMessage: String
+
+    );
 
     procedure Open(_Parser: TCustomStringParser);
     procedure Close(_Parser: TCustomStringParser);
+
+    procedure CheckUnterminating;
 
   protected
 
@@ -102,6 +110,7 @@ type
   private
 
     procedure Refresh(_Parser: TCustomStringParser; var _Handled: Boolean);
+    procedure CheckCompleted;
 
     property Active: Boolean read FActive;
 
@@ -168,7 +177,14 @@ type
     procedure Terminate;
     function ReadItem(_Trim: Boolean): String;
     procedure CompleteItem;
-    procedure AddSpecialRegion(const _RegionClass: TSpecialRegionClass; const _OpeningKey, _ClosingKey: TKeyWord);
+    procedure AddSpecialRegion(
+
+        const _RegionClass: TSpecialRegionClass;
+        const _OpeningKey: TKeyWord;
+        const _ClosingKey: TKeyWord;
+        const _UnterminatedMessage: String
+
+    );
 
     { Главный рабочий метод }
     procedure Read;
@@ -245,13 +261,14 @@ end;
 
 { TSpecialRegion }
 
-constructor TSpecialRegion.Create(_OpeningKey, _ClosingKey: TKeyWord);
+constructor TSpecialRegion.Create;
 begin
 
   inherited Create;
 
-  FOpeningKey := _OpeningKey;
-  FClosingKey := _ClosingKey;
+  FOpeningKey          := _OpeningKey;
+  FClosingKey          := _ClosingKey;
+  FUnterminatedMessage := _UnterminatedMessage;
 
 end;
 
@@ -261,11 +278,12 @@ begin
   Result :=
 
     (ClosingKey.KeyLength = 1) and
-    (_Parser.SrcLen - _Parser.Cursor > 2) and
+    (_Parser.SrcLen - _Parser.Cursor + 1 >= 2) and
     (Copy(_Parser.Source, _Parser.Cursor, 2) = ClosingKey.StrValue + ClosingKey.StrValue);
 
   if Result then begin
 
+    _Parser.MoveEvent;
     _Parser.Move(2);
     _Handled := True;
 
@@ -281,6 +299,12 @@ end;
 procedure TSpecialRegion.Close(_Parser: TCustomStringParser);
 begin
   _Parser.Move(ClosingKey.KeyLength);
+end;
+
+procedure TSpecialRegion.CheckUnterminating;
+begin
+  if not ClosingKey.Equal(KWR_EMPTY) then
+    raise EStringParserException.Create(FUnterminatedMessage);
 end;
 
 function TSpecialRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
@@ -332,6 +356,12 @@ begin
 
       end;
 
+end;
+
+procedure TSpecialRegionList.CheckCompleted;
+begin
+  if Active then
+    FActiveRegion.CheckUnterminating;
 end;
 
 {$IFDEF DEBUG}
@@ -476,6 +506,8 @@ end;
 
 procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);
 begin
+  if (_KeyWord.KeyType = ktSourceEnd) then
+    FSpecialRegions.CheckCompleted;
 end;
 
 procedure TCustomStringParser.MoveEvent;
@@ -483,9 +515,9 @@ begin
 
   if not ItemBody then begin
 
+    ItemBody := True;
     ItemStart := Cursor;
     FLocation.LastItemBegin := Cursor;
-    ItemBody := True;
 
   end;
 
@@ -501,7 +533,7 @@ end;
 
 procedure TCustomStringParser.AddSpecialRegion;
 begin
-  FSpecialRegions.Add(_RegionClass.Create(_OpeningKey, _ClosingKey));
+  FSpecialRegions.Add(_RegionClass.Create(_OpeningKey, _ClosingKey, _UnterminatedMessage));
 end;
 
 function TCustomStringParser.Nested: Boolean;
