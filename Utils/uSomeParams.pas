@@ -1,5 +1,11 @@
 unit uSomeParams;
 
+(**********************************************************)
+(*                                                        *)
+(*                     Liber Sunth Co                     *)
+(*                                                        *)
+(**********************************************************)
+
 { TODO -oVasilyevSM -cTParams: Режим "сохранять строки всегда в кавычках" }
 { TODO -oVasilyevSM -cuParams: Нужна оболочка TFileParams, которая будет сохраняться в файл. Вот она-то и должна поддерживать комментарии итд. }
 { TODO -oVasilyevSM -cuParams: Режим TFileParams.AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }

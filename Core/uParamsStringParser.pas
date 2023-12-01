@@ -1,5 +1,13 @@
 unit uParamsStringParser;
 
+(**********************************************************)
+(*                                                        *)
+(*                     Liber Sunth Co                     *)
+(*                                                        *)
+(**********************************************************)
+
+{ TODO 5 -oVasilyevSM -cTCustomStringParser: Этот юнит надо отладить и "заморозить". }
+
 interface
 
 uses
@@ -537,7 +545,6 @@ begin
     Add(etName, True,    False, [ktClosingBracket, ktSourceEnd]           );
     Add(etType, True,    False, [ktClosingBracket, ktLineEnd, ktSourceEnd]);
     Add(etType, True,    True,  [ktClosingBracket, ktLineEnd, ktSourceEnd]);
-    { TODO 3 -oVasilyevSM -cSyntax: Extreme: String = ''' }
 
   end;
 

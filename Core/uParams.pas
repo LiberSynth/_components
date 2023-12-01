@@ -1,10 +1,10 @@
 unit uParams;
 
-(*********************************************************)
-(*                                                       *)
-(*                        Hello!)                        *)
-(*                                                       *)
-(*********************************************************)
+(**********************************************************)
+(*                                                        *)
+(*                     Liber Sunth Co                     *)
+(*                                                        *)
+(**********************************************************)
 
 { TODO -oVasilyevSM -cuParams: Кроме SaveToString/LoadFromString нужны SaveToStream/LoadFromStream }
 
@@ -1314,27 +1314,27 @@ end;
 procedure TParamsReader.ReadParams(const _KeyWord: TKeyWord);
 var
   P: TParams;
-  Nested: TParamsReader;
+  NestedReader: TParamsReader;
   NestedCursor: Int64;
 begin
 
   P := TParams.Create;
   try
 
-    Nested := TParamsReader.CreateNested(FParser, P, _KeyWord.KeyLength);
+    NestedReader := TParamsReader.CreateNested(FParser, P, _KeyWord.KeyLength);
 
     try
 
-      Nested.Read;
+      NestedReader.Read;
 
     finally
 
-      NestedCursor := Nested.Parser.Cursor;
+      NestedCursor := NestedReader.Parser.Cursor;
 
       FParser.Move(NestedCursor - _KeyWord.KeyLength - FParser.Cursor);
-      FParser.Location := Nested.Parser.Location;
+      FParser.Location := NestedReader.Parser.Location;
 
-      Nested.Free;
+      NestedReader.Free;
 
     end;
 

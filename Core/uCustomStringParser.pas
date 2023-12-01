@@ -1,5 +1,11 @@
 unit uCustomStringParser;
 
+(**********************************************************)
+(*                                                        *)
+(*                     Liber Sunth Co                     *)
+(*                                                        *)
+(**********************************************************)
+
 interface
 
 uses
@@ -128,7 +134,6 @@ type
   end;
 
   TCustomStringParser = class
-  { TODO 5 -oVasilyevSM -cTCustomStringParser: Этот класс надо "заморозить". Отладить и больше не изменять его. }
 
   strict private
 
@@ -484,6 +489,7 @@ begin
 
   then begin
 
+    { TODO 3 -oVasilyevSM -cSyntax: Extreme: String = ''' отрицательный столбец }
     Inc(FLocation.Line);
     FLocation.LineStart := Cursor;
 
