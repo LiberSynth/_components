@@ -157,7 +157,7 @@ type
   public
 
     constructor Create(const _Source: String);
-    constructor CreateNested(_Master: TCustomStringParser);
+    constructor CreateNested(_Master: TCustomStringParser; _CursorShift: Int64);
 
     destructor Destroy; override;
 
@@ -358,6 +358,7 @@ end;
 
 function TLocation.Position: Int64;
 begin
+  { TODO 2 -oVasilyevSM -cTLocation: Для вложенных сбивается на 1 }
   Result := LastItemBegin - LineStart + 1;
 end;
 
@@ -385,7 +386,7 @@ begin
 
 end;
 
-constructor TCustomStringParser.CreateNested(_Master: TCustomStringParser);
+constructor TCustomStringParser.CreateNested(_Master: TCustomStringParser; _CursorShift: Int64);
 begin
 
   inherited Create;
@@ -393,7 +394,7 @@ begin
   FSource := _Master.Source;
   FSrcLen := Length(Source);
 
-  FCursor      := _Master.Cursor;
+  FCursor      := _Master.Cursor + _CursorShift;
   FLocation    := _Master.Location;
   FNestedLevel := _Master.NestedLevel + 1;
 

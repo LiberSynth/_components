@@ -76,12 +76,14 @@ type
   TSyntaxInfo = record
 
     Element: TElement;
+    ItemBody: Boolean;
     Nested: Boolean;
     InvalidKeys: TKeyWordTypes;
 
     constructor Create(
 
         _Element: TElement;
+        _ItemBody: Boolean;
         _Nested: Boolean;
         _InvalidKeys: TKeyWordTypes
 
@@ -96,6 +98,7 @@ type
     procedure Add(
 
         _Element: TElement;
+        _ItemBody: Boolean;
         _Nested: Boolean;
         _InvalidKeys: TKeyWordTypes
 
@@ -150,12 +153,11 @@ type
 
   strict private
 
-    FReaderWrapper: TReaderWrapper;
-
     FElement: TElement;
 
     FReading: TReadInfoList;
     FSyntax: TSyntaxInfoList;
+    FReaderWrapper: TReaderWrapper;
 
     FDoublingChar: Char;
 
@@ -307,16 +309,19 @@ end;
 
 constructor TSyntaxInfo.Create;
 begin
+
   Element     := _Element;
+  ItemBody    := _ItemBody;
   Nested      := _Nested;
   InvalidKeys := _InvalidKeys;
+
 end;
 
 { TSyntaxInfoList }
 
 procedure TSyntaxInfoList.Add;
 begin
-  inherited Add(TSyntaxInfo.Create(_Element, _Nested, _InvalidKeys));
+  inherited Add(TSyntaxInfo.Create(_Element, _ItemBody, _Nested, _InvalidKeys));
 end;
 
 { TParamsStringParser }
@@ -339,7 +344,7 @@ begin
   FReading := TReadInfoList.Create;
   FSyntax  := TSyntaxInfoList.Create;
 
-  inherited CreateNested(_Master);
+  inherited CreateNested(_Master, _CursorShift);
 
   FReaderWrapper := _ReaderWrapper;
 
@@ -402,19 +407,18 @@ var
   SI: TSyntaxInfo;
 begin
 
-  if ItemBody then
+  for SI in FSyntax do
 
-    for SI in FSyntax do
+    if
 
-      if
+        (SI.Element = Element) and
+        (SI.ItemBody = ItemBody) and
+        (SI.Nested = Nested) and
+        _KeyWord.TypeInSet(SI.InvalidKeys)
 
-          (SI.Element = Element) and
-          (SI.Nested = Nested) and
-          _KeyWord.TypeInSet(SI.InvalidKeys)
+    then
 
-      then
-
-        raise EParamsReadException.CreateFmt('Unexcpected keyword ''%s''', [_KeyWord.StrValue]);
+      raise EParamsReadException.CreateFmt('Unexcpected keyword ''%s''', [_KeyWord.StrValue]);
 
 end;
 
@@ -481,7 +485,6 @@ procedure TParamsStringParser.ReadParams(const _KeyWord: TKeyWord);
 begin
   FReaderWrapper.WriteParams(_KeyWord);
   FElement := etName;
-
 end;
 
 procedure TParamsStringParser.InitParser;
@@ -505,32 +508,38 @@ begin
 
   with FReading do begin
 
-    Add(etName,  ktTypeIdent,      False, etType,  ReadName );
-    Add(etName,  ktTypeIdent,      True,  etType,  ReadName );
-    Add(etName,  ktAssigning,      False, etValue, ReadName );
-    Add(etName,  ktAssigning,      True,  etValue, ReadName );
-    Add(etType,  ktAssigning,      False, etValue, ReadType );
-    Add(etType,  ktAssigning,      True,  etValue, ReadType );
-    Add(etValue, ktLineEnd,        False, etName,  ReadValue);
-    Add(etValue, ktLineEnd,        True,  etName,  ReadValue);
-    Add(etValue, ktSplitter,       False, etName,  ReadValue);
-    Add(etValue, ktSplitter,       True,  etName,  ReadValue);
-    Add(etValue, ktClosingBracket, True,  etName,  ReadValue);
-    Add(etValue, ktSourceEnd,      False, etName,  ReadValue);
-    Add(etValue, ktSourceEnd,      True,  etName,  ReadValue);
-    Add(etValue, ktStringBorder,   True,  etName,  ReadValue);
-    Add(etValue, ktStringBorder,   False, etName,  ReadValue);
+    {   Element  Terminator        Nested NextElement ReadFunc }
+    Add(etName,  ktTypeIdent,      False, etType,     ReadName );
+    Add(etName,  ktTypeIdent,      True,  etType,     ReadName );
+    Add(etName,  ktAssigning,      False, etValue,    ReadName );
+    Add(etName,  ktAssigning,      True,  etValue,    ReadName );
+    Add(etType,  ktAssigning,      False, etValue,    ReadType );
+    Add(etType,  ktAssigning,      True,  etValue,    ReadType );
+    Add(etValue, ktLineEnd,        False, etName,     ReadValue);
+    Add(etValue, ktLineEnd,        True,  etName,     ReadValue);
+    Add(etValue, ktSplitter,       False, etName,     ReadValue);
+    Add(etValue, ktSplitter,       True,  etName,     ReadValue);
+    Add(etValue, ktClosingBracket, True,  etName,     ReadValue);
+    Add(etValue, ktSourceEnd,      False, etName,     ReadValue);
+    Add(etValue, ktSourceEnd,      True,  etName,     ReadValue);
+    Add(etValue, ktStringBorder,   True,  etName,     ReadValue);
+    Add(etValue, ktStringBorder,   False, etName,     ReadValue);
 
   end;
 
   with FSyntax do begin
 
-    Add(etName,  False, [ktClosingBracket, ktSourceEnd]);
-    Add(etType,  False, [ktClosingBracket, ktLineEnd, ktSourceEnd]);
-    Add(etType,  True,  [ktClosingBracket, ktLineEnd, ktSourceEnd]);
+    {   Element ItemBody Nested InvalidKeys                               }
+    Add(etName, False,   False, [ktOpeningBracket, ktClosingBracket]      );
+    Add(etName, False,   True,  [ktOpeningBracket]                        );
+    Add(etName, True,    True,  [ktClosingBracket]                        );
+    Add(etName, True,    False, [ktClosingBracket, ktSourceEnd]           );
+    Add(etType, True,    False, [ktClosingBracket, ktLineEnd, ktSourceEnd]);
+    Add(etType, True,    True,  [ktClosingBracket, ktLineEnd, ktSourceEnd]);
 
   end;
 
+  {                RegionClass     OpeningKey        ClosingKe       }
   AddSpecialRegion(TSpecialRegion, KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE);
   AddSpecialRegion(TSpecialRegion, KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE );
 

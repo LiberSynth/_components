@@ -6,6 +6,9 @@ unit uParams;
 (*                                                       *)
 (*********************************************************)
 
+{ TODO 2 -oVasilyevSM -cTParams: Тип разделителя может быть не только '.', но и '/' или '\'. И эти символы должны быть
+  недопустимы в оконечных именах. }
+{ TODO 2 -oVasilyevSM -cTParams: Режим "сохранять строки всегда в кавычках }
 { TODO -oVasilyevSM -cuParams: Кроме SaveToString/LoadFromString нужны SaveToStream/LoadFromStream }
 
 interface
@@ -87,8 +90,6 @@ type
     property DataType: TParamDataType read FDataType;
     property IsNull: Boolean read FIsNull write SetIsNull;
     property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
-    { TODO 2 -oVasilyevSM -cTParam: Тип разделителя может быть не только '.', но и '/' или '\'. И эти символы должны быть
-      недопустимы в оконечных именах. Как и многое другое непечатное. }
     property Name: String read FName;
 
     property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
@@ -257,11 +258,16 @@ type
     FCurrentName: String;
     FCurrentType: TParamDataType;
 
+    function CreateNewReaderWrapper: TReaderWrapper;
+
+    { v Для ReaderWrapper v }
+    { TODO 1 -oVasilyevSM -cTParamsReader: Write...->Read... }
     procedure WriteName(const _Value: String);
     procedure WriteType(const _Value: String);
     procedure WriteValue(const _Value: String);
     procedure WriteParams(const _KeyWord: TKeyWord);
     function CurrentTypeIsParams: Boolean;
+    { ^ Для ReaderWrapper ^ }
 
     procedure CheckPresetType;
     function TrimDigital(const _Value: String): String;
@@ -370,7 +376,9 @@ const
             (Pos(LF,   Result) > 0) or
             (Pos(';',  Result) > 0) or
             (Pos('''', Result) > 0) or
-            (Pos('"',  Result) > 0)
+            (Pos('"',  Result) > 0) or
+            (Pos('(',  Result) > 0) or
+            (Pos(')',  Result) > 0)
 
         )
 
@@ -1199,45 +1207,13 @@ end;
 
 { TParamsReader }
 
-procedure TParamsReader.CheckPresetType;
-var
-  P: TParam;
-begin
-
-  { Определенный заранее тип данных }
-  if
-
-      (FCurrentType = dtUnknown) and
-      FParams.FindParam(FCurrentName, P) and
-      (P.DataType <> dtUnknown)
-
-  then FCurrentType := P.DataType;
-
-  if FCurrentType = dtUnknown then
-    raise EParamsReadException.Create('Unknown param data type');
-
-end;
-
 constructor TParamsReader.Create(const _Source: String; _Params: TParams);
 begin
 
   inherited Create;
 
   FParams := _Params;
-  FParser := TParamsStringParser.Create(
-
-      _Source,
-      TReaderWrapper.Create(
-
-          WriteName,
-          WriteType,
-          WriteValue,
-          WriteParams,
-          CurrentTypeIsParams
-
-      )
-
-  );
+  FParser := TParamsStringParser.Create(_Source, CreateNewReaderWrapper);
 
 end;
 
@@ -1246,28 +1222,15 @@ begin
 
   inherited Create;
 
-  FParams       := _Params;
-  FParser       := TParamsStringParser.CreateNested(
+  FParams := _Params;
+  FParser := TParamsStringParser.CreateNested(
 
       _MasterParser,
       _CursorShift,
-      TReaderWrapper.Create(
-
-          WriteName,
-          WriteType,
-          WriteValue,
-          WriteParams,
-          CurrentTypeIsParams
-
-      )
+      CreateNewReaderWrapper
 
   );
 
-end;
-
-function TParamsReader.CurrentTypeIsParams: Boolean;
-begin
-  Result := FCurrentType = dtParams;
 end;
 
 destructor TParamsReader.Destroy;
@@ -1276,20 +1239,19 @@ begin
   inherited Destroy;
 end;
 
-procedure TParamsReader.Read;
+function TParamsReader.CreateNewReaderWrapper: TReaderWrapper;
 begin
-  FParser.Read;
-end;
 
-function TParamsReader.TrimDigital(const _Value: String): String;
-begin
-  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
-end;
+  Result := TReaderWrapper.Create(
 
-function TParamsReader.UndoubleSymbols(const _Value: String): String;
-begin
-  if Assigned(FParser) then
-    Result := FParser.UndoubleSymbols(_Value);
+      WriteName,
+      WriteType,
+      WriteValue,
+      WriteParams,
+      CurrentTypeIsParams
+
+  );
+
 end;
 
 procedure TParamsReader.WriteName(const _Value: String);
@@ -1366,6 +1328,46 @@ begin
 
   end;
 
+end;
+
+function TParamsReader.CurrentTypeIsParams: Boolean;
+begin
+  Result := FCurrentType = dtParams;
+end;
+
+procedure TParamsReader.CheckPresetType;
+var
+  P: TParam;
+begin
+
+  { Определенный заранее тип данных }
+  if
+
+      (FCurrentType = dtUnknown) and
+      FParams.FindParam(FCurrentName, P) and
+      (P.DataType <> dtUnknown)
+
+  then FCurrentType := P.DataType;
+
+  if FCurrentType = dtUnknown then
+    raise EParamsReadException.Create('Unknown param data type');
+
+end;
+
+function TParamsReader.TrimDigital(const _Value: String): String;
+begin
+  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
+end;
+
+function TParamsReader.UndoubleSymbols(const _Value: String): String;
+begin
+  if Assigned(FParser) then
+    Result := FParser.UndoubleSymbols(_Value);
+end;
+
+procedure TParamsReader.Read;
+begin
+  FParser.Read;
 end;
 
 end.
