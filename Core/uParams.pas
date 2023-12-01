@@ -261,11 +261,10 @@ type
     function CreateNewReaderWrapper: TReaderWrapper;
 
     { v Для ReaderWrapper v }
-    { TODO 1 -oVasilyevSM -cTParamsReader: Write...->Read... }
-    procedure WriteName(const _Value: String);
-    procedure WriteType(const _Value: String);
-    procedure WriteValue(const _Value: String);
-    procedure WriteParams(const _KeyWord: TKeyWord);
+    procedure ReadName(const _Value: String);
+    procedure ReadType(const _Value: String);
+    procedure ReadValue(const _Value: String);
+    procedure ReadParams(const _KeyWord: TKeyWord);
     function CurrentTypeIsParams: Boolean;
     { ^ Для ReaderWrapper ^ }
 
@@ -1244,29 +1243,29 @@ begin
 
   Result := TReaderWrapper.Create(
 
-      WriteName,
-      WriteType,
-      WriteValue,
-      WriteParams,
+      ReadName,
+      ReadType,
+      ReadValue,
+      ReadParams,
       CurrentTypeIsParams
 
   );
 
 end;
 
-procedure TParamsReader.WriteName(const _Value: String);
+procedure TParamsReader.ReadName(const _Value: String);
 begin
   TParam.ValidateName(_Value);
   FCurrentName := _Value;
 end;
 
-procedure TParamsReader.WriteType(const _Value: String);
+procedure TParamsReader.ReadType(const _Value: String);
 begin
   FCurrentType := StrToParamDataType(_Value);
   CheckPresetType;
 end;
 
-procedure TParamsReader.WriteValue(const _Value: String);
+procedure TParamsReader.ReadValue(const _Value: String);
 begin
 
   { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
@@ -1291,7 +1290,7 @@ begin
 
 end;
 
-procedure TParamsReader.WriteParams(const _KeyWord: TKeyWord);
+procedure TParamsReader.ReadParams(const _KeyWord: TKeyWord);
 var
   P: TParams;
   Nested: TParamsReader;

@@ -63,7 +63,7 @@ type
 
   }
   TSpecialRegion = class
-
+  { TODO 3 -oVasilyevSM -cTSpecialRegion: Extreme: String = '''''''''''''''''' }
   strict private
 
     FOpeningKey: TKeyWord;
@@ -358,7 +358,6 @@ end;
 
 function TLocation.Position: Int64;
 begin
-  { TODO 2 -oVasilyevSM -cTLocation: Для вложенных сбивается на 1 }
   Result := LastItemBegin - LineStart + 1;
 end;
 
@@ -548,7 +547,7 @@ begin
       if Nested then
         raise
       else
-        raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Position: %d', [E.Message, Location.Line, Location.Position]);
+                                                                                                                                                                            raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Position: %d', [E.Message, Location.Line, Location.Position]);
 
   end;
 

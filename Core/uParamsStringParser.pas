@@ -112,18 +112,18 @@ type
 
   TReaderWrapper = record
 
-    WriteName: TWriteValueProc;
-    WriteType: TWriteValueProc;
-    WriteValue: TWriteValueProc;
-    WriteParams: TWriteParamsProc;
+    ReadName: TWriteValueProc;
+    ReadType: TWriteValueProc;
+    ReadValue: TWriteValueProc;
+    ReadParams: TWriteParamsProc;
     CurrentTypeIsParams: TBooleanFunc;
 
     constructor Create(
 
-        _WriteName: TWriteValueProc;
-        _WriteType: TWriteValueProc;
-        _WriteValue: TWriteValueProc;
-        _WriteParams: TWriteParamsProc;
+        _ReadName: TWriteValueProc;
+        _ReadType: TWriteValueProc;
+        _ReadValue: TWriteValueProc;
+        _ReadParams: TWriteParamsProc;
         _CurrentTypeIsParams: TBooleanFunc
 
     );
@@ -142,13 +142,14 @@ type
 
     Элементы параметров: имя, тип, значение. Тип уже здесь необязательный, но тогда для считывания надо заранее создать
     параметр с нужным типом. В него считается значение.
-    Указывать тип на следующей строке допустется. Значение - нет. Конец строки или ';' - это конец параметра.
-    Между элементами имя - тип и между параметрами допускается любое количество пробелов, табуляций и переходов на
+    Указывать тип на следующей строке допустется. Значение, указанное после '=' на следующей строке нельзя. Конец
+    строки или ';' - это конец параметра.
+    Между элементами "имя" и "тип" и между параметрами допускается любое количество пробелов, табуляций и переходов на
     следующую строку. Перед значением - только пробелы и табуляция.
+    Все что вызывает неадекватное чтение или неадекватную ошибку должно контролироваться в проверке синтаксиса.
+    Настройка синтаксиса - InitParser - FSyntax.Add. Можно?пополнять по мере обнаружения.
 
   }
-  { TODO 2 -oVasilyevSM -cTParamsStringParser: Все что вызывает неадекватное чтение или неадекватную ошибку должно
-    контролироваться в проверке синтаксиса. }
   TParamsStringParser = class(TCustomStringParser)
 
   strict private
@@ -436,19 +437,19 @@ end;
 
 function TParamsStringParser.ReadName(const _KeyWord: TKeyWord): Boolean;
 begin
-  FReaderWrapper.WriteName(ReadItem(True));
+  FReaderWrapper.ReadName(ReadItem(True));
   Result := True;
 end;
 
 function TParamsStringParser.ReadType(const _KeyWord: TKeyWord): Boolean;
 begin
-  FReaderWrapper.WriteType(ReadItem(True));
+  FReaderWrapper.ReadType(ReadItem(True));
   Result := True;
 end;
 
 function TParamsStringParser.ReadValue(const _KeyWord: TKeyWord): Boolean;
 begin
-  FReaderWrapper.WriteValue(ReadItem(False));
+  FReaderWrapper.ReadValue(ReadItem(False));
   Result := True;
 end;
 
@@ -483,7 +484,7 @@ end;
 
 procedure TParamsStringParser.ReadParams(const _KeyWord: TKeyWord);
 begin
-  FReaderWrapper.WriteParams(_KeyWord);
+  FReaderWrapper.ReadParams(_KeyWord);
   FElement := etName;
 end;
 
@@ -584,10 +585,10 @@ end;
 constructor TReaderWrapper.Create;
 begin
 
-  WriteName           := _WriteName;
-  WriteType           := _WriteType;
-  WriteValue          := _WriteValue;
-  WriteParams         := _WriteParams;
+  ReadName            := _ReadName;
+  ReadType            := _ReadType;
+  ReadValue           := _ReadValue;
+  ReadParams          := _ReadParams;
   CurrentTypeIsParams := _CurrentTypeIsParams;
 
 end;
