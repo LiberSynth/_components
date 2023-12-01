@@ -104,9 +104,17 @@ type
   end;
 
   {
-    Просто параметры НЕ ДОЛЖНЫ поддерживать комментарии. Комментарии должны обрабатываться пронаследованным классом
-    TIniParamsReader.
+
+    Просто параметры НЕ ДОЛЖНЫ:
+
+      1. Поддерживать комментарии. Комментарии должны обрабатываться пронаследованным классом TIniParamsReader.
+      2. Уметь назначать значения по умолчанию, когда после = ничего не указано. Исключение - тип строка.
+
+    Указывать тип на следующе строке допустимо.
+
   }
+  { TODO 2 -oVasilyevSM -cTParamsReader: Все что вызывает неадекватное чтение или неадекватную ошибку должно
+    контролироваться в проверке синтаксиса. }
   TParamsReader = class(TCustomStringParser)
 
   strict private
@@ -482,14 +490,9 @@ var
   Next: TElement;
 begin
 
-  if
-
-      ElementTerminating(_KeyWord, Next, ReadFunc) and
-      ReadFunc(_KeyWord)
-
-  then
-
-    FElement := Next;
+  if ElementTerminating(_KeyWord, Next, ReadFunc) then
+    if ReadFunc(_KeyWord) then
+      FElement := Next;
 
 end;
 

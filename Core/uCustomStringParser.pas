@@ -47,6 +47,7 @@ type
 
   TCustomStringParser = class;
 
+  { TODO 2 -oVasilyevSM -cTCustomStringParser: Segment -> Area, сегмент -> область }
   {
 
     Объект, позволяющий НЕ считать ключевыми словами любые символы внутри особого сегмента (строка, комментарий итд)
@@ -72,7 +73,7 @@ type
     FOpeningKey: TKeyWord;
     FClosingKey: TKeyWord;
 
-    function Doubling(_Parser: TCustomStringParser): Boolean;
+    function Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 
   private
 
@@ -84,7 +85,7 @@ type
   protected
 
     function CanOpen(_Parser: TCustomStringParser): Boolean; virtual;
-    function CanClose(_Parser: TCustomStringParser): Boolean; virtual;
+    function CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; virtual;
     function KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; virtual;
 
   public
@@ -258,7 +259,7 @@ begin
 
 end;
 
-function TSpecialSegment.Doubling(_Parser: TCustomStringParser): Boolean;
+function TSpecialSegment.Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
 
   Result :=
@@ -267,8 +268,12 @@ begin
     (_Parser.SrcLen - _Parser.Cursor > 2) and
     (Copy(_Parser.Source, _Parser.Cursor, 2) = ClosingKey.StrValue + ClosingKey.StrValue);
 
-  if Result then
+  if Result then begin
+
     _Parser.Move(2);
+    _Handled := True;
+
+  end;
 
 end;
 
@@ -287,9 +292,9 @@ begin
   Result := _Parser.IsCursorKey(OpeningKey);
 end;
 
-function TSpecialSegment.CanClose(_Parser: TCustomStringParser): Boolean;
+function TSpecialSegment.CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
-  Result := _Parser.IsCursorKey(ClosingKey) and not Doubling(_Parser);
+  Result := _Parser.IsCursorKey(ClosingKey) and not Doubling(_Parser, _Handled);
 end;
 
 function TSpecialSegment.KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
@@ -308,7 +313,7 @@ begin
 
   if FActive then
 
-    if FActiveSegment.CanClose(_Parser) then begin
+    if FActiveSegment.CanClose(_Parser, _Handled) then begin
 
       FActiveSegment.Close(_Parser);
       _Parser.SpecialSegmentClosed(FActiveSegment);
