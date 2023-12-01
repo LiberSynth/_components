@@ -47,26 +47,22 @@ type
 
   TCustomStringParser = class;
 
-  { TODO 2 -oVasilyevSM -cTCustomStringParser: Segment -> Area, сегмент -> область }
   {
 
-    Объект, позволяющий НЕ считать ключевыми словами любые символы внутри особого сегмента (строка, комментарий итд)
-    кроме закрывающего этото сегент ключа или дополнительно заданных допустимых как ключи.
-    Особые сегменты парсера настраиваются в потомках парсера добавлением в виртуальном методе InitSpecialSegments с
-    помощью AddSpecialSegment.
-    Для настройки специфицеской особой зоны нужно пронаследовать класс обработчика (от TSpecialSegment) и воспользовться
-    тремя виртуальными методами:
+    Объект, позволяющий НЕ считать ключевыми словами любые символы внутри особого региона (строка, комментарий итд)
+    кроме закрывающего этото регион ключа.
+    Особые регионы настраиваются в потомках парсера добавлением в виртуальном методе InitParser с помощью
+    AddSpecialRegion.
+    Для настройки специфического региона нужно пронаследовать класс обработчика (от TSpecialRegion) и воспользовться
+    двумя виртуальными методами:
 
-    CanOpen  - условие открытия особого сегмента
-    CanClose - условие закрытия особого сегмента
-    KeyValid - условие пропуска ключа (как ключа, а не простого символа)
+    CanOpen  - условие открытия особого региона
+    CanClose - условие закрытия особого региона
 
     Для строк в кавычках работает без наследования.
-    Сделан особый сегмент для строк без кавычек. Виртуозная штука, но оставил из интереса. Если проблем не создаст,
-    пусть живет.
 
   }
-  TSpecialSegment = class
+  TSpecialRegion = class
 
   strict private
 
@@ -86,7 +82,6 @@ type
 
     function CanOpen(_Parser: TCustomStringParser): Boolean; virtual;
     function CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; virtual;
-    function KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; virtual;
 
   public
 
@@ -95,14 +90,14 @@ type
 
   end;
 
-  TSpecialSegmentClass = class of TSpecialSegment;
+  TSpecialRegionClass = class of TSpecialRegion;
 
-  TSpecialSegmentList = class(TObjectList<TSpecialSegment>)
+  TSpecialRegionList = class(TObjectList<TSpecialRegion>)
 
   strict private
 
     FActive: Boolean;
-    FActiveSegment: TSpecialSegment;
+    FActiveRegion: TSpecialRegion;
 
   private
 
@@ -139,7 +134,7 @@ type
     FLocation: TLocation;
 
     FKeyWords: TKeyWordList;
-    FSpecialSegments: TSpecialSegmentList;
+    FSpecialRegions: TSpecialRegionList;
 
     function GetCursorKey(var _Value: TKeyWord): Boolean;
     procedure UpdateLocation;
@@ -156,8 +151,8 @@ type
     procedure InitParser; virtual;
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
     procedure MoveEvent; virtual;
-    procedure SpecialSegmentOpened(_Segment: TSpecialSegment); virtual;
-    procedure SpecialSegmentClosed(_Segment: TSpecialSegment); virtual;
+    procedure SpecialRegionOpened(_Region: TSpecialRegion); virtual;
+    procedure SpecialRegionClosed(_Region: TSpecialRegion); virtual;
 
     { Методы и свойства для потомков }
     function Nested: Boolean;
@@ -165,7 +160,7 @@ type
     procedure Terminate;
     function ReadItem: String;
     procedure CompleteItem;
-    procedure AddSpecialSegment(const _SegmentClass: TSpecialSegmentClass; const _OpeningKey, _ClosingKey: TKeyWord);
+    procedure AddSpecialRegion(const _RegionClass: TSpecialRegionClass; const _OpeningKey, _ClosingKey: TKeyWord);
 
     property Source: String read FSource;
     property SrcLen: Int64 read FSrcLen;
@@ -247,9 +242,9 @@ begin
   Result := KeyType in _Set;
 end;
 
-{ TSpecialSegment }
+{ TSpecialRegion }
 
-constructor TSpecialSegment.Create(_OpeningKey, _ClosingKey: TKeyWord);
+constructor TSpecialRegion.Create(_OpeningKey, _ClosingKey: TKeyWord);
 begin
 
   inherited Create;
@@ -259,7 +254,7 @@ begin
 
 end;
 
-function TSpecialSegment.Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
+function TSpecialRegion.Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
 
   Result :=
@@ -277,48 +272,43 @@ begin
 
 end;
 
-procedure TSpecialSegment.Open(_Parser: TCustomStringParser);
+procedure TSpecialRegion.Open(_Parser: TCustomStringParser);
 begin
   _Parser.Move(OpeningKey.KeyLength);
 end;
 
-procedure TSpecialSegment.Close(_Parser: TCustomStringParser);
+procedure TSpecialRegion.Close(_Parser: TCustomStringParser);
 begin
   _Parser.Move(ClosingKey.KeyLength);
 end;
 
-function TSpecialSegment.CanOpen(_Parser: TCustomStringParser): Boolean;
+function TSpecialRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
 begin
   Result := _Parser.IsCursorKey(OpeningKey);
 end;
 
-function TSpecialSegment.CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
+function TSpecialRegion.CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
   Result := _Parser.IsCursorKey(ClosingKey) and not Doubling(_Parser, _Handled);
 end;
 
-function TSpecialSegment.KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
-begin
-  Result := _KeyWord.Equal(OpeningKey) or _KeyWord.Equal(ClosingKey);
-end;
+{ TSpecialRegionList }
 
-{ TSpecialSegmentList }
-
-procedure TSpecialSegmentList.Refresh(_Parser: TCustomStringParser; var _Handled: Boolean);
+procedure TSpecialRegionList.Refresh(_Parser: TCustomStringParser; var _Handled: Boolean);
 var
-  Segment: TSpecialSegment;
+  Region: TSpecialRegion;
 begin
 
   _Handled:= False;
 
   if FActive then
 
-    if FActiveSegment.CanClose(_Parser, _Handled) then begin
+    if FActiveRegion.CanClose(_Parser, _Handled) then begin
 
-      FActiveSegment.Close(_Parser);
-      _Parser.SpecialSegmentClosed(FActiveSegment);
+      FActiveRegion.Close(_Parser);
+      _Parser.SpecialRegionClosed(FActiveRegion);
 
-      FActiveSegment := nil;
+      FActiveRegion := nil;
       FActive := False;
       _Handled:= True;
 
@@ -326,16 +316,16 @@ begin
 
   else
 
-    for Segment in Self do
+    for Region in Self do
 
-      if Segment.CanOpen(_Parser) then begin
+      if Region.CanOpen(_Parser) then begin
 
-        Segment.Open(_Parser);
-      _Parser.SpecialSegmentOpened(Segment);
+        Region.Open(_Parser);
+        _Parser.SpecialRegionOpened(Region);
 
-        FActiveSegment := Segment;
-        FActive := True;
-        _Handled:= True;
+        FActiveRegion := Region;
+        FActive       := True;
+        _Handled      := True;
 
         Break;
 
@@ -344,13 +334,13 @@ begin
 end;
 
 {$IFDEF DEBUG}
-procedure CheckSpecialSegments(_SpecialSegments: TSpecialSegmentList);
+procedure CheckSpecialRegions(_SpecialRegions: TSpecialRegionList);
 var
-  SSA, SSB: TSpecialSegment;
+  SSA, SSB: TSpecialRegion;
 begin
 
-  for SSA in _SpecialSegments do
-    for SSB in _SpecialSegments do
+  for SSA in _SpecialRegions do
+    for SSB in _SpecialRegions do
       if SSA <> SSB then
         if
 
@@ -359,7 +349,7 @@ begin
             (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.OpeningKey)) or
             (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.ClosingKey))
 
-        then raise ECoreException.Create('Special segments setting is wrong. Some keys are intersected.');
+        then raise ECoreException.Create('Special regions setting is wrong. Some keys are intersected.');
 
 end;
 {$ENDIF}
@@ -384,13 +374,13 @@ begin
   FCursor   := 1;
   FLocation := LOC_INITIAL;
 
-  FKeyWords        := TKeyWordList.       Create;
-  FSpecialSegments := TSpecialSegmentList.Create;
+  FKeyWords       := TKeyWordList.       Create;
+  FSpecialRegions := TSpecialRegionList.Create;
 
   InitParser;
 
   {$IFDEF DEBUG}
-  CheckSpecialSegments(FSpecialSegments);
+  CheckSpecialRegions(FSpecialRegions);
   {$ENDIF}
 
 end;
@@ -407,8 +397,8 @@ begin
   FLocation    := _Master.Location;
   FNestedLevel := _Master.NestedLevel + 1;
 
-  FKeyWords        := TKeyWordList.       Create;
-  FSpecialSegments := TSpecialSegmentList.Create;
+  FKeyWords       := TKeyWordList.      Create;
+  FSpecialRegions := TSpecialRegionList.Create;
 
   InitParser;
 
@@ -417,8 +407,8 @@ end;
 destructor TCustomStringParser.Destroy;
 begin
 
-  FreeAndNil(FSpecialSegments);
-  FreeAndNil(FKeyWords       );
+  FreeAndNil(FSpecialRegions);
+  FreeAndNil(FKeyWords      );
 
   inherited Destroy;
 
@@ -496,17 +486,17 @@ begin
 
 end;
 
-procedure TCustomStringParser.SpecialSegmentClosed(_Segment: TSpecialSegment);
+procedure TCustomStringParser.SpecialRegionClosed(_Region: TSpecialRegion);
 begin
 end;
 
-procedure TCustomStringParser.SpecialSegmentOpened(_Segment: TSpecialSegment);
+procedure TCustomStringParser.SpecialRegionOpened(_Region: TSpecialRegion);
 begin
 end;
 
-procedure TCustomStringParser.AddSpecialSegment;
+procedure TCustomStringParser.AddSpecialRegion;
 begin
-  FSpecialSegments.Add(_SegmentClass.Create(_OpeningKey, _ClosingKey));
+  FSpecialRegions.Add(_RegionClass.Create(_OpeningKey, _ClosingKey));
 end;
 
 function TCustomStringParser.Nested: Boolean;
@@ -529,10 +519,10 @@ begin
 
     while (Cursor <= SrcLen) and not FTerminated do begin
 
-      FSpecialSegments.Refresh(Self, Handled);
+      FSpecialRegions.Refresh(Self, Handled);
       if not Handled then
 
-        if not FSpecialSegments.Active and GetCursorKey(CursorKey) then begin
+        if not FSpecialRegions.Active and GetCursorKey(CursorKey) then begin
 
           KeyEvent(CursorKey);
           Move(CursorKey.KeyLength);

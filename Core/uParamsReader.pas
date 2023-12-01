@@ -8,6 +8,7 @@ uses
   { vSoft }
   uConsts, uCustomStringParser, uParams, uStrUtils;
 
+  { TODO 1 -oVasilyevSM -cTParamsReader: Кодировка сбивается для русских букв. }
 type
 
   TElement = (etName, etType, etValue);
@@ -161,7 +162,7 @@ type
     procedure InitParser; override;
     { Осоновная работа здесь }
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
-    procedure SpecialSegmentClosed(_Segment: TSpecialSegment); override;
+    procedure SpecialRegionClosed(_Region: TSpecialRegion); override;
 
   public
 
@@ -616,7 +617,6 @@ begin
 
   finally
 
-    { TODO 2 -oVasilyevSM -cTParamsReader: Вот из-за чего этот класс не вынесен в отдельный модуль. SetAsParams надо держать в private. }
     FParams.SetAsParams(FCurrentName, P);
 
     CompleteItem;
@@ -630,8 +630,9 @@ end;
 
 function TParamsReader.UndoubleSymbols(const _Value: String): String;
 begin
-  { Дублировать нужно только закрывающую строковый сегмент кавычку, поэтому и раздублировать только ее надо при
-    условии, что значение считывается сегментом. Поэтому, символ задается событием сегмента. }
+  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
+    условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
+    потому что дублирование не нужно в комментариях. }
   if FDoublingChar > #0 then Result := UndoubleStr(_Value, FDoublingChar)
   else Result := _Value;
 end;
@@ -688,8 +689,8 @@ begin
 
   end;
 
-  AddSpecialSegment(TSpecialSegment, KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE);
-  AddSpecialSegment(TSpecialSegment, KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE );
+  AddSpecialRegion(TSpecialRegion, KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE);
+  AddSpecialRegion(TSpecialRegion, KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE );
 
 end;
 
@@ -705,10 +706,10 @@ begin
 
 end;
 
-procedure TParamsReader.SpecialSegmentClosed(_Segment: TSpecialSegment);
+procedure TParamsReader.SpecialRegionClosed(_Region: TSpecialRegion);
 begin
 
-  with _Segment do begin
+  with _Region do begin
 
     if ClosingKey.KeyLength = 1 then
       FDoublingChar := ClosingKey.StrValue[1];
@@ -716,10 +717,10 @@ begin
     Move(- ClosingKey.KeyLength);
     try
 
-      CompleteElement(_Segment.ClosingKey);
+      CompleteElement(_Region.ClosingKey);
 
     finally
-      Move(_Segment.ClosingKey.KeyLength);
+      Move(_Region.ClosingKey.KeyLength);
       FDoublingChar := #0;
     end;
 
