@@ -6,12 +6,7 @@ unit uParams;
 (*                                                       *)
 (*********************************************************)
 
-{ TODO -oVasilyevSM -cuParams: Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. }
 { TODO -oVasilyevSM -cuParams: Кроме SaveToString/LoadFromString нужны SaveToStream/LoadFromStream }
-{ TODO -oVasilyevSM -cuParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
-{ TODO -oVasilyevSM -cuParams: Нужен также компонент TRegParams }
-{ TODO -oVasilyevSM -cuParams: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
-{ TODO -oVasilyevSM -cuParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
 
 interface
 
@@ -23,7 +18,7 @@ uses
 
 type
 
-  { TODO -oVasilyevSM -cTParam: Продолжение следует. Насчет Extended нужно еще раз сравнить датабазные возможности Float и дельфевые }
+  { TODO -oVasilyevSM -cTParam: Продолжение следует. Насчет Extended, в Вордстоке он. }
   TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, {dtExtended, }dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
 
   TParams = class;
@@ -92,7 +87,7 @@ type
     property DataType: TParamDataType read FDataType;
     property IsNull: Boolean read FIsNull write SetIsNull;
     property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
-    { TODO -oVasilyevSM -cTParam: Тип разделителя может быть не только '.', но и '/' или '\'. И эти символы должны быть
+    { TODO 2 -oVasilyevSM -cTParam: Тип разделителя может быть не только '.', но и '/' или '\'. И эти символы должны быть
       недопустимы в оконечных именах. Как и многое другое непечатное. }
     property Name: String read FName;
 

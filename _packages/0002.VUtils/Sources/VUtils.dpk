@@ -34,6 +34,7 @@ requires
 
 contains
   uUtils in '..\..\..\Utils\uUtils.pas',
+  uSomeParams in '..\..\..\Utils\uSomeParams.pas',
   vClipboard in '..\..\..\Utils\vClipboard.pas',
   vConsts in '..\..\..\Utils\vConsts.pas',
   vDataUtils in '..\..\..\Utils\vDataUtils.pas',
