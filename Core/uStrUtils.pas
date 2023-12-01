@@ -49,8 +49,10 @@ function SpaceReplicate(Count: Cardinal): String;
 function CompleteStr(const Value: String; Completer: Char; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function CompleteStr(const Value: String; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function StrCount(const Value: String; Pattern: String): Integer;
-function QuoteStr(const Value: String; PercentDoubling: Boolean = False): String;
-function UnquoteStr(const Value: String; PercentDoubling: Boolean = False): String;
+function QuoteStr(const Value: String; const Quote: Char = ''''): String;
+function UnquoteStr(const Value: String; const Quote: Char = ''''): String;
+function DoubleStr(const Value: String; const Quote: Char = ''''): String;
+function UndoubleStr(const Value: String; const Quote: Char = ''''): String;
 function CutStr(var Value: String; Count: Integer): Boolean;
 function SameText(const Value: String; Patterns: TStringArray): Boolean; overload;
 
@@ -128,7 +130,7 @@ function StrIsGUID(const Value: String): Boolean;
         if S[i] <> '-' then Exit(False)
         else
 
-      else if not CharInSet(S[i], SC_HEX_CHARS_SET) then Exit(False);
+      else if not CharInSet(S[i], SC_HEX_CHARS) then Exit(False);
 
     Result := True;
 
@@ -213,16 +215,16 @@ var
 
     Result :=
 
-        CharInSet(V[ 1], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 2], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 1], SC_INTEGER_CHARS) and
+        CharInSet(V[ 2], SC_INTEGER_CHARS) and
         (V[ 3] = '.') and
-        CharInSet(V[ 4], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 5], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 4], SC_INTEGER_CHARS) and
+        CharInSet(V[ 5], SC_INTEGER_CHARS) and
         (V[ 6] = '.') and
-        CharInSet(V[ 7], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 8], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 9], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[10], SC_INTEGER_CHARS_SET);
+        CharInSet(V[ 7], SC_INTEGER_CHARS) and
+        CharInSet(V[ 8], SC_INTEGER_CHARS) and
+        CharInSet(V[ 9], SC_INTEGER_CHARS) and
+        CharInSet(V[10], SC_INTEGER_CHARS);
 
   end;
 
@@ -231,16 +233,16 @@ var
 
     Result :=
 
-        CharInSet(V[ 1], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 2], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 3], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 4], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 1], SC_INTEGER_CHARS) and
+        CharInSet(V[ 2], SC_INTEGER_CHARS) and
+        CharInSet(V[ 3], SC_INTEGER_CHARS) and
+        CharInSet(V[ 4], SC_INTEGER_CHARS) and
         (V[ 5] = '-') and
-        CharInSet(V[ 6], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[ 7], SC_INTEGER_CHARS_SET) and
+        CharInSet(V[ 6], SC_INTEGER_CHARS) and
+        CharInSet(V[ 7], SC_INTEGER_CHARS) and
         (V[ 8] = '-') and
-        CharInSet(V[ 9], SC_INTEGER_CHARS_SET) and
-        CharInSet(V[10], SC_INTEGER_CHARS_SET);
+        CharInSet(V[ 9], SC_INTEGER_CHARS) and
+        CharInSet(V[10], SC_INTEGER_CHARS);
 
   end;
 
@@ -254,7 +256,7 @@ var
   begin
 
     for i := 1 to TimePartLength do
-      if not CharInSet(TimePart[1], SC_INTEGER_CHARS_SET) then
+      if not CharInSet(TimePart[1], SC_INTEGER_CHARS) then
         Exit(False);
 
     Result := True;
@@ -627,14 +629,12 @@ begin
 
 end;
 
-function QuoteStr(const Value: String; PercentDoubling: Boolean): String;
+function QuoteStr(const Value: String; const Quote: Char): String;
 begin
-  Result := '''' + StringReplace(Value, '''', '''''', [rfReplaceAll]) + '''';
-  if PercentDoubling then
-    Result := StringReplace(Result, '%', '%%', [rfReplaceAll])
+  Result := Quote + StringReplace(Value, Quote, Quote + Quote, [rfReplaceAll]) + Quote;
 end;
 
-function UnquoteStr(const Value: String; PercentDoubling: Boolean): String;
+function UnquoteStr(const Value: String; const Quote: Char): String;
 var
   L: Integer;
 begin
@@ -643,19 +643,26 @@ begin
   if
 
       (L > 1) and
-      (Value[1] = '''') and
-      (Value[L] = '''')
+      (Value[1] = Quote) and
+      (Value[L] = Quote)
 
   then begin
 
     Result := Copy(Value, 2, L - 2);
-
-    Result := StringReplace(Result, '''''', '''', [rfReplaceAll]);
-    if PercentDoubling then
-      Result := StringReplace(Result, '%%', '%', [rfReplaceAll]);
+    Result := StringReplace(Result, Quote + Quote, Quote, [rfReplaceAll]);
 
   end else Result := Value;
 
+end;
+
+function DoubleStr(const Value: String; const Quote: Char = ''''): String;
+begin
+  Result := StringReplace(Value, Quote, Quote + Quote, [rfReplaceAll]);
+end;
+
+function UndoubleStr(const Value: String; const Quote: Char = ''''): String;
+begin
+  Result := StringReplace(Value, Quote + Quote, Quote, [rfReplaceAll]);
 end;
 
 function CutStr(var Value: String; Count: Integer): Boolean;
@@ -1058,7 +1065,7 @@ begin
 
     S := Copy(Value, 3, 2);
     for i := 1 to Length(S) do
-      if not CharInSet(S[i], SC_HEX_CHARS_SET) then Exit(False);
+      if not CharInSet(S[i], SC_HEX_CHARS) then Exit(False);
 
   end;
 
@@ -1093,7 +1100,7 @@ function HexCharStrToStr(const Value: String): String;
     i: Integer;
   begin
     for i := 1 to Length(S) do
-      if not CharInSet(S[i], SC_HEX_CHARS_SET) then _Raise;
+      if not CharInSet(S[i], SC_HEX_CHARS) then _Raise;
   end;
 
 var

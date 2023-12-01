@@ -120,6 +120,8 @@ type
     FReading: TReadInfoList;
     FSyntax: TSyntaxInfoList;
 
+    FDoublingChar: Char;
+
     function ElementTerminating(
 
         const _KeyWord: TKeyWord;
@@ -128,6 +130,7 @@ type
 
     ): Boolean;
     procedure CheckSyntax(const _KeyWord: TKeyWord);
+    procedure CompleteElement(const _KeyWord: TKeyWord);
 
     function ReadName(const _KeyWord: TKeyWord): Boolean;
     function ReadType(const _KeyWord: TKeyWord): Boolean;
@@ -148,25 +151,15 @@ type
   protected
 
     procedure InitParser; override;
+    { Осоновная работа здесь }
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
+    procedure SpecialSegmentClosed(_Segment: TSpecialSegment); override;
 
   public
 
-    constructor Create(
+    constructor Create(const _Source: String; _Params: TParams);
+    constructor CreateNested(_Master: TCustomStringParser; _Params: TParams; _CursorShift: Int64);
 
-        const _Source: String;
-        _Params: TParams;
-        _Cursor: Int64;
-        _NestedLevel: Word;
-        const _Location: TLocation
-
-    ); overload;
-    constructor Create(
-
-        const _Source: String;
-        _Params: TParams
-
-    ); overload;
     destructor Destroy; override;
 
   end;
@@ -277,7 +270,15 @@ const
     if
 
         (_Param.DataType = dtString) and
-        ((Pos(';', Result) > 0) or (Pos(CR, Result) > 0) or (Pos(LF, Result) > 0))
+        { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
+        (
+            (Pos(CR,   Result) > 0) or
+            (Pos(LF,   Result) > 0) or
+            (Pos(';',  Result) > 0) or
+            (Pos('''', Result) > 0) or
+            (Pos('"',  Result) > 0)
+
+        )
 
     then Result := QuoteStr(Result);
 
@@ -390,23 +391,28 @@ end;
 
 { TParamsReader }
 
-constructor TParamsReader.Create(const _Source: String; _Params: TParams; _Cursor: Int64; _NestedLevel: Word; const _Location: TLocation);
+constructor TParamsReader.Create(const _Source: String; _Params: TParams);
 begin
 
   FReading := TReadInfoList.Create;
   FSyntax  := TSyntaxInfoList.Create;
 
-  inherited Create(_Source, _Cursor, _NestedLevel, _Location);
+  inherited Create(_Source);
 
   FParams := _Params;
 
-  FElement := etName;
-
 end;
 
-constructor TParamsReader.Create(const _Source: String; _Params: TParams);
+constructor TParamsReader.CreateNested(_Master: TCustomStringParser; _Params: TParams; _CursorShift: Int64);
 begin
-  Create(_Source, _Params, 1, 0, LOC_INITIAL);
+
+  FReading := TReadInfoList.Create;
+  FSyntax  := TSyntaxInfoList.Create;
+
+  inherited CreateNested(_Master);
+
+  FParams := _Params;
+
 end;
 
 destructor TParamsReader.Destroy;
@@ -470,21 +476,41 @@ begin
 
 end;
 
+procedure TParamsReader.CompleteElement(const _KeyWord: TKeyWord);
+var
+  ReadFunc: TReadFunc;
+  Next: TElement;
+begin
+
+  if
+
+      ElementTerminating(_KeyWord, Next, ReadFunc) and
+      ReadFunc(_KeyWord)
+
+  then
+
+    FElement := Next;
+
+end;
+
 function TParamsReader.ReadName(const _KeyWord: TKeyWord): Boolean;
 begin
 
   FCurrentName := ReadItem;
+  TParam.ValidateName(FCurrentName);
 
-  Result := Length(FCurrentName) > 0;
-  if not Result then
-    raise EParamsReadException.Create('Empty name');
+  Result := True;
+
 end;
 
 function TParamsReader.ReadType(const _KeyWord: TKeyWord): Boolean;
 begin
+
   FCurrentType := StrToParamDataType(ReadItem);
   CheckPresetType;
+
   Result := True;
+
 end;
 
 function TParamsReader.ReadValue(const _KeyWord: TKeyWord): Boolean;
@@ -509,6 +535,7 @@ begin
 
   FCurrentName := '';
   FCurrentType := dtUnknown;
+
   Result := True;
 
 end;
@@ -569,16 +596,7 @@ begin
   P := TParams.Create;
   try
 
-    with TParamsReader.Create(
-
-        Source,
-        P,
-        Cursor + _KeyWord.KeyLength,
-        NestedLevel + 1,
-        Location
-
-
-    ) do
+    with TParamsReader.CreateNested(Self, P, _KeyWord.KeyLength) do
 
       try
 
@@ -588,20 +606,20 @@ begin
 
         Self.Move(Cursor - _KeyWord.KeyLength - Self.Cursor);
         Self.Location := Location;
+
         Free;
 
       end;
 
   finally
 
-    { Вот из-за чего этот класс не вынесен в отдельный модуль. SetAsParams надо держать в private. }
+    { TODO 2 -oVasilyevSM -cTParamsReader: Вот из-за чего этот класс не вынесен в отдельный модуль. SetAsParams надо держать в private. }
     FParams.SetAsParams(FCurrentName, P);
 
-    ItemBody     := False;
-    ItemBegin    := 0;
+    CompleteItem;
     FCurrentName := '';
     FCurrentType := dtUnknown;
-    FElement     := etName;
+    FElement := etName;
 
   end;
 
@@ -609,10 +627,9 @@ end;
 
 function TParamsReader.UndoubleSymbols(const _Value: String): String;
 begin
-  { TODO 2 -oVasilyevSM -cTParamsReader: Дублировать нужно только кавычки, поэтому и раздублировать только их надо при
-    условии, что значение считывается заключенное в соответствующие кавычки. То есть, из сегмента надо узнать, какую
-    конкретно кавычку раздублировать. }
-  if False then Result := UnquoteStr(_Value)
+  { Дублировать нужно только закрывающую строковый сегмент кавычку, поэтому и раздублировать только ее надо при
+    условии, что значение считывается сегментом. Поэтому, символ задается событием сегмента. }
+  if FDoublingChar > #0 then Result := UndoubleStr(_Value, FDoublingChar)
   else Result := _Value;
 end;
 
@@ -655,6 +672,8 @@ begin
     Add(etValue, ktClosingBracket, True,  etName,  ReadValue);
     Add(etValue, ktSourceEnd,      False, etName,  ReadValue);
     Add(etValue, ktSourceEnd,      True,  etName,  ReadValue);
+    Add(etValue, ktStringBorder,   True,  etName,  ReadValue);
+    Add(etValue, ktStringBorder,   False, etName,  ReadValue);
 
   end;
 
@@ -672,9 +691,6 @@ begin
 end;
 
 procedure TParamsReader.KeyEvent(const _KeyWord: TKeyWord);
-var
-  ReadFunc: TReadFunc;
-  Next: TElement;
 begin
 
   inherited KeyEvent(_KeyWord);
@@ -682,13 +698,29 @@ begin
   CheckSyntax(_KeyWord);
   CheckParams(_KeyWord);
 
-  { Завершение, считывние }
-  if ElementTerminating(_KeyWord, Next, ReadFunc) then // ItemBody or (Element = etValue) + по структуре FReading
+  CompleteElement(_KeyWord);
 
-    if ReadFunc(_KeyWord) then
+end;
 
-      { Переключение состояния }
-      FElement := Next;
+procedure TParamsReader.SpecialSegmentClosed(_Segment: TSpecialSegment);
+begin
+
+  with _Segment do begin
+
+    if ClosingKey.KeyLength = 1 then
+      FDoublingChar := ClosingKey.StrValue[1];
+
+    Move(- ClosingKey.KeyLength);
+    try
+
+      CompleteElement(_Segment.ClosingKey);
+
+    finally
+      Move(_Segment.ClosingKey.KeyLength);
+      FDoublingChar := #0;
+    end;
+
+  end;
 
 end;
 

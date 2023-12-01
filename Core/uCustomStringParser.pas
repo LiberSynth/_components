@@ -69,26 +69,28 @@ type
 
   strict private
 
-    FActive: Boolean;
     FOpeningKey: TKeyWord;
     FClosingKey: TKeyWord;
+
+    function Doubling(_Parser: TCustomStringParser): Boolean;
 
   private
 
     constructor Create(_OpeningKey, _ClosingKey: TKeyWord);
 
-    procedure Open;
-    procedure Close;
-
-    property Active: Boolean read FActive;
-    property OpeningKey: TKeyWord read FOpeningKey;
-    property ClosingKey: TKeyWord read FClosingKey;
+    procedure Open(_Parser: TCustomStringParser);
+    procedure Close(_Parser: TCustomStringParser);
 
   protected
 
-    function CanOpen(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; virtual;
-    function CanClose(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; virtual;
+    function CanOpen(_Parser: TCustomStringParser): Boolean; virtual;
+    function CanClose(_Parser: TCustomStringParser): Boolean; virtual;
     function KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean; virtual;
+
+  public
+
+    property OpeningKey: TKeyWord read FOpeningKey;
+    property ClosingKey: TKeyWord read FClosingKey;
 
   end;
 
@@ -96,10 +98,16 @@ type
 
   TSpecialSegmentList = class(TObjectList<TSpecialSegment>)
 
-  public
+  strict private
 
-    function GetActiveSegment(var _Value: TSpecialSegment): Boolean;
-    procedure Refresh(_Parser: TCustomStringParser; const _KeyWord: TKeyWord; _ActiveSegment: TSpecialSegment);
+    FActive: Boolean;
+    FActiveSegment: TSpecialSegment;
+
+  private
+
+    procedure Refresh(_Parser: TCustomStringParser; var _Handled: Boolean);
+
+    property Active: Boolean read FActive;
 
   end;
 
@@ -114,7 +122,7 @@ type
   end;
 
   TCustomStringParser = class
-  { TODO 2 -oVasilyevSM -cTCustomStringParser: Этот класс надо "заморозить". Отладить и больше не изменять его. }
+  { TODO 5 -oVasilyevSM -cTCustomStringParser: Этот класс надо "заморозить". Отладить и больше не изменять его. }
 
   strict private
 
@@ -125,57 +133,57 @@ type
 
     FTerminated: Boolean;
     FItemBody: Boolean;
-    FItemBegin: Int64;
+    FItemStart: Int64;
 
     FLocation: TLocation;
 
     FKeyWords: TKeyWordList;
     FSpecialSegments: TSpecialSegmentList;
 
-    function CheckKeys(var _Value: TKeyWord): Boolean;
-    procedure IncLine;
+    function GetCursorKey(var _Value: TKeyWord): Boolean;
+    procedure UpdateLocation;
+
+    property NestedLevel: Word read FNestedLevel;
+
+  private
+
+    function IsCursorKey(const _KeyWord: TKeyWord): Boolean;
 
   protected
 
+    { События для потомков }
     procedure InitParser; virtual;
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
     procedure MoveEvent; virtual;
+    procedure SpecialSegmentOpened(_Segment: TSpecialSegment); virtual;
+    procedure SpecialSegmentClosed(_Segment: TSpecialSegment); virtual;
 
+    { Методы и свойства для потомков }
     function Nested: Boolean;
-    function CheckDoubling(_ActiveSegment: TSpecialSegment; _KeyWord: TKeyWord; var Doubling: Boolean): Boolean;
     procedure Move(_Incrementer: Int64 = 1);
     procedure Terminate;
     function ReadItem: String;
-
+    procedure CompleteItem;
     procedure AddSpecialSegment(const _SegmentClass: TSpecialSegmentClass; const _OpeningKey, _ClosingKey: TKeyWord);
-
-    property NestedLevel: Word read FNestedLevel;
-    property KeyWords: TKeyWordList read FKeyWords;
-    property ItemBody: Boolean read FItemBody write FItemBody;
-    property ItemBegin: Int64 read FItemBegin write FItemBegin;
-    property Terminated: Boolean read FTerminated;
-
-  public
-
-    constructor Create(
-
-        const _Source: String;
-        _Cursor: Int64;
-        _NestedLevel: Word;
-        const _Location: TLocation
-
-    ); overload;
-    constructor Create(const _Source: String); overload;
-    destructor Destroy; override;
-
-    procedure Read;
-
-    function CheckKey(const _KeyWord: TKeyWord): Boolean;
 
     property Source: String read FSource;
     property SrcLen: Int64 read FSrcLen;
     property Cursor: Int64 read FCursor;
     property Location: TLocation read FLocation write FLocation;
+    property ItemBody: Boolean read FItemBody write FItemBody;
+    property ItemStart: Int64 read FItemStart write FItemStart;
+    property Terminated: Boolean read FTerminated;
+    property KeyWords: TKeyWordList read FKeyWords;
+
+  public
+
+    constructor Create(const _Source: String);
+    constructor CreateNested(_Master: TCustomStringParser);
+
+    destructor Destroy; override;
+
+    { Главный рабочий метод }
+    procedure Read;
 
   end;
 
@@ -250,81 +258,83 @@ begin
 
 end;
 
-procedure TSpecialSegment.Open;
-begin
-  FActive := True;
-end;
-
-procedure TSpecialSegment.Close;
-begin
-  FActive := False;
-end;
-
-function TSpecialSegment.CanOpen(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
-begin
-  Result := OpeningKey.Equal(_KeyWord);
-end;
-
-function TSpecialSegment.CanClose(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
-begin
-  Result := ClosingKey.Equal(_KeyWord);
-end;
-
-function TSpecialSegment.KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
+function TSpecialSegment.Doubling(_Parser: TCustomStringParser): Boolean;
 begin
 
   Result :=
 
-      _KeyWord.Equal(OpeningKey) or
-      _KeyWord.Equal(ClosingKey);
+    (ClosingKey.KeyLength = 1) and
+    (_Parser.SrcLen - _Parser.Cursor > 2) and
+    (Copy(_Parser.Source, _Parser.Cursor, 2) = ClosingKey.StrValue + ClosingKey.StrValue);
 
+  if Result then
+    _Parser.Move(2);
+
+end;
+
+procedure TSpecialSegment.Open(_Parser: TCustomStringParser);
+begin
+  _Parser.Move(OpeningKey.KeyLength);
+end;
+
+procedure TSpecialSegment.Close(_Parser: TCustomStringParser);
+begin
+  _Parser.Move(ClosingKey.KeyLength);
+end;
+
+function TSpecialSegment.CanOpen(_Parser: TCustomStringParser): Boolean;
+begin
+  Result := _Parser.IsCursorKey(OpeningKey);
+end;
+
+function TSpecialSegment.CanClose(_Parser: TCustomStringParser): Boolean;
+begin
+  Result := _Parser.IsCursorKey(ClosingKey) and not Doubling(_Parser);
+end;
+
+function TSpecialSegment.KeyValid(_Parser: TCustomStringParser; _KeyWord: TKeyWord): Boolean;
+begin
+  Result := _KeyWord.Equal(OpeningKey) or _KeyWord.Equal(ClosingKey);
 end;
 
 { TSpecialSegmentList }
 
-function TSpecialSegmentList.GetActiveSegment(var _Value: TSpecialSegment): Boolean;
+procedure TSpecialSegmentList.Refresh(_Parser: TCustomStringParser; var _Handled: Boolean);
 var
   Segment: TSpecialSegment;
 begin
 
-  for Segment in Self do
+  _Handled:= False;
 
-    if Segment.Active then begin
+  if FActive then
 
-      _Value := Segment;
-      Exit(True);
+    if FActiveSegment.CanClose(_Parser) then begin
 
-    end;
+      FActiveSegment.Close(_Parser);
+      _Parser.SpecialSegmentClosed(FActiveSegment);
 
-  Result := False;
+      FActiveSegment := nil;
+      FActive := False;
+      _Handled:= True;
 
-end;
+    end else
 
-procedure TSpecialSegmentList.Refresh(_Parser: TCustomStringParser; const _KeyWord: TKeyWord; _ActiveSegment: TSpecialSegment);
-var
-  Segment: TSpecialSegment;
-begin
-
-  if Assigned(_ActiveSegment) then begin
-
-    with _ActiveSegment do
-      if CanClose(_Parser, _KeyWord) then
-        Close;
-
-  end else begin
+  else
 
     for Segment in Self do
 
-      with Segment do
+      if Segment.CanOpen(_Parser) then begin
 
-        if CanOpen(_Parser, _KeyWord) then begin
+        Segment.Open(_Parser);
+      _Parser.SpecialSegmentOpened(Segment);
 
-          Open;
-          Break;
+        FActiveSegment := Segment;
+        FActive := True;
+        _Handled:= True;
 
-        end;
+        Break;
 
-  end;
+      end;
 
 end;
 
@@ -358,16 +368,16 @@ end;
 
 { TCustomStringParser }
 
-constructor TCustomStringParser.Create(const _Source: String; _Cursor: Int64; _NestedLevel: Word; const _Location: TLocation);
+constructor TCustomStringParser.Create(const _Source: String);
 begin
 
   inherited Create;
 
-  FSource      := _Source;
-  FSrcLen      := Length(_Source);
-  FCursor      := _Cursor;
-  FNestedLevel := _NestedLevel;
-  FLocation    := _Location;
+  FSource := _Source;
+  FSrcLen := Length(_Source);
+
+  FCursor   := 1;
+  FLocation := LOC_INITIAL;
 
   FKeyWords        := TKeyWordList.       Create;
   FSpecialSegments := TSpecialSegmentList.Create;
@@ -380,9 +390,23 @@ begin
 
 end;
 
-constructor TCustomStringParser.Create(const _Source: String);
+constructor TCustomStringParser.CreateNested(_Master: TCustomStringParser);
 begin
-  Create(_Source, 1, 0, LOC_INITIAL);
+
+  inherited Create;
+
+  FSource := _Master.Source;
+  FSrcLen := Length(Source);
+
+  FCursor      := _Master.Cursor;
+  FLocation    := _Master.Location;
+  FNestedLevel := _Master.NestedLevel + 1;
+
+  FKeyWords        := TKeyWordList.       Create;
+  FSpecialSegments := TSpecialSegmentList.Create;
+
+  InitParser;
+
 end;
 
 destructor TCustomStringParser.Destroy;
@@ -395,14 +419,20 @@ begin
 
 end;
 
-function TCustomStringParser.CheckKeys(var _Value: TKeyWord): Boolean;
+function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
+begin
+  with _KeyWord do
+    Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
+end;
+
+function TCustomStringParser.GetCursorKey(var _Value: TKeyWord): Boolean;
 var
   KeyWord: TKeyWord;
 begin
 
   for KeyWord in FKeyWords do
 
-    if CheckKey(KeyWord) then begin
+    if IsCursorKey(KeyWord) then begin
 
       _Value := KeyWord;
       Exit(True);
@@ -413,7 +443,7 @@ begin
 
 end;
 
-procedure TCustomStringParser.IncLine;
+procedure TCustomStringParser.UpdateLocation;
 begin
 
   if
@@ -426,7 +456,6 @@ begin
     Inc(FLocation.Line);
     { TODO 4 -oVasilyevSM -cTCustomStringParser: Проверить, как будет считаться по CR или LF. }
     FLocation.LineStart := Cursor;
-    FLocation.LastItemBegin := Cursor;
 
   end;
 
@@ -454,13 +483,20 @@ begin
 
   if not ItemBody then begin
 
-    ItemBegin := Cursor;
+    ItemStart := Cursor;
     FLocation.LastItemBegin := Cursor;
     ItemBody := True;
-//    FSpecialSegments.Refresh(Self, KWR_EMPTY, nil);
 
   end;
 
+end;
+
+procedure TCustomStringParser.SpecialSegmentClosed(_Segment: TSpecialSegment);
+begin
+end;
+
+procedure TCustomStringParser.SpecialSegmentOpened(_Segment: TSpecialSegment);
+begin
 end;
 
 procedure TCustomStringParser.AddSpecialSegment;
@@ -468,30 +504,9 @@ begin
   FSpecialSegments.Add(_SegmentClass.Create(_OpeningKey, _ClosingKey));
 end;
 
-function TCustomStringParser.CheckKey(const _KeyWord: TKeyWord): Boolean;
-begin
-  with _KeyWord do
-    Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
-end;
-
 function TCustomStringParser.Nested: Boolean;
 begin
   Result := NestedLevel > 0;
-end;
-
-function TCustomStringParser.CheckDoubling(_ActiveSegment: TSpecialSegment; _KeyWord: TKeyWord; var Doubling: Boolean): Boolean;
-begin
-
-  with _KeyWord do
-
-    Result :=
-
-      (KeyLength = 1) and
-      (SrcLen - Cursor > 2) and
-      (Copy(Source, Cursor, 2) = StrValue + StrValue);
-
-  if Result then Doubling := True;
-
 end;
 
 procedure TCustomStringParser.Move(_Incrementer: Int64);
@@ -500,92 +515,31 @@ begin
 end;
 
 procedure TCustomStringParser.Read;
-
-//  function _IsKeyEvent(var _ActiveSegment: TSpecialSegment; var _CursorKey: TKeyWord): Boolean;
-//  var
-//    Active, KeyFound, Doubling, Valid: Boolean;
-//  begin
-//
-//    _ActiveSegment := nil;
-//    _CursorKey     := KWR_EMPTY;
-//    Doubling       := False;
-//    Valid          := False;
-//
-//    Active := FSpecialSegments.GetActiveSegment(_ActiveSegment);
-//    if Active then begin
-//
-//      KeyFound := CheckKey(_ActiveSegment.ClosingKey) and not CheckDoubling(_ActiveSegment, _ActiveSegment.ClosingKey, Doubling);
-//      if KeyFound then begin
-//
-//        { Активная зона закончилась, перед нами ее закрывающий ключ - KeyEvent }
-//        Active := False;
-//        _CursorKey := _ActiveSegment.ClosingKey;
-//
-//      end else begin
-//
-//        { Кастомные приблуды. Пробуем взять ключ из контекста }
-//        KeyFound := CheckKeys(_CursorKey) and not CheckDoubling(_ActiveSegment, _CursorKey, Doubling);
-//        if KeyFound then begin
-//
-//          { Если взялся, проверяем, не закрывается ли этим ключом активный сегмент }
-//          Active := not _ActiveSegment.CanClose(Self, _CursorKey);
-//
-//          { Если не закрывается, спрашиваем у него, пропускает он такой ключ или блокирует }
-//          if Active then
-//            Valid := _ActiveSegment.KeyValid(Self, _CursorKey) and not CheckDoubling(_ActiveSegment, _CursorKey, Doubling);
-//
-//          { Активный сегмент пропускает такой ключ }
-//          if Active and not Valid then begin
-//
-//            KeyFound := False;
-//            _CursorKey := KWR_EMPTY;
-//
-//          end;
-//
-//        end;
-//
-//      end
-//
-//    end else begin
-//
-//      _ActiveSegment := nil;
-//      { Активной зоны не было - проверяем, что перед нами, не ключ ли }
-//      KeyFound := CheckKeys(_CursorKey);
-//
-//    end;
-//
-//    if Doubling then Move;
-//
-//    Result := KeyFound and (not Active or Valid);
-//
-//  end;
-
 var
-//  ActiveSegment: TSpecialSegment;
   CursorKey: TKeyWord;
+  Handled: Boolean;
 begin
 
   try
 
     while (Cursor <= SrcLen) and not FTerminated do begin
 
-      { TODO 1 -oVasilyevSM -cTSpecialSegment: Сначала проверяем сегменты, если произошло переключение, вызываем
-        отдельное событие. TSpecialSegmentList.Active - это его свойство и оно посто выставляется по переключению.
-        Соответственно переключаем им же, а не напрямую. Тогда здесь все прозрачное будет. Так и быстрее будет. }
-      if CheckKeys(CursorKey) then begin
+      FSpecialSegments.Refresh(Self, Handled);
+      if not Handled then
 
-        KeyEvent(CursorKey);
-        Move(CursorKey.KeyLength);
+        if not FSpecialSegments.Active and GetCursorKey(CursorKey) then begin
 
-      end else begin
+          KeyEvent(CursorKey);
+          Move(CursorKey.KeyLength);
 
-        { Иначе - простой шаг вперед }
-        MoveEvent;
-        Move;
+        end else begin
 
-      end;
+          MoveEvent;
+          Move;
 
-      IncLine;
+        end;
+
+      UpdateLocation;
 
     end;
 
@@ -611,13 +565,15 @@ end;
 
 function TCustomStringParser.ReadItem: String;
 begin
+  if ItemStart > 0 then
+    Result := Trim(Copy(Source, ItemStart, Cursor - ItemStart));
+  CompleteItem;
+end;
 
-  if ItemBegin > 0 then
-    Result := Trim(Copy(Source, ItemBegin, Cursor - ItemBegin));
-
-  ItemBody := False;
-  ItemBegin := 0;
-
+procedure TCustomStringParser.CompleteItem;
+begin
+  ItemBody  := False;
+  ItemStart := 0;
 end;
 
 end.

@@ -49,8 +49,6 @@ type
     function DataSize: Cardinal;
     procedure PresetData(_DataType: TParamDataType);
 
-    procedure CheckNameValue(const _Value: String);
-
   private
 
     { v Using FData methods v }
@@ -89,6 +87,7 @@ type
     procedure Clear;
     { Для передачи без разбора типов }
     procedure Assign(_Source: TParam);
+    class procedure ValidateName(const _Value: String);
 
     property DataType: TParamDataType read FDataType;
     property IsNull: Boolean read FIsNull write SetIsNull;
@@ -251,7 +250,9 @@ implementation
 
 uses
   { vSoft }
-  { TODO 3 -oVasilyevSM -cuParams: Прям никак без циркулярной ссылки? }
+  { TODO 2 -oVasilyevSM -cuParams: Прям никак без циркулярной ссылки?  Можно, конечно! Отправлять ридеру отсюда только
+    внешние процедуры вместо использования объектов. Он будет их вызывать, а рвботать будет местный код. Тогда и
+    SetAsParams отправится на место, в прайват. }
   uParamsReader;
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
@@ -298,7 +299,7 @@ begin
   inherited Create;
 
   FIsNull := True;
-  CheckNameValue(_Name);
+  ValidateName(_Name);
   FName := _Name;
 
 end;
@@ -493,14 +494,23 @@ begin
 
 end;
 
-procedure TParam.CheckNameValue(const _Value: String);
+class procedure TParam.ValidateName(const _Value: String);
+const
+  SC_PARAM_NAME_FORBIDDEN_CHARS = [' '];
 var
   i: Integer;
 begin
 
+  if Length(_Value) = 0 then
+    raise EParamsReadException.Create('Empty param name');
+
   for i := 1 to Length(_Value) do
-    if not CharInSet(_Value[i], SC_TYPED_CHARS_SET) then
-      raise EParamsException.CreateFmt('Character #%d in invalid in param name', [Ord(_Value[i])]);
+    if not CharInSet(_Value[i], SC_TYPED_CHARS) then
+      raise EParamsException.CreateFmt('Character #%d in invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
+
+  for i := 1 to Length(_Value) do
+    if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
+      raise EParamsException.CreateFmt('Character ''%s'' in invalid in param name ''%s''', [_Value[i], _Value]);
 
 end;
 
