@@ -154,13 +154,23 @@ type
     procedure SpecialRegionOpened(_Region: TSpecialRegion); virtual;
     procedure SpecialRegionClosed(_Region: TSpecialRegion); virtual;
 
-    { Методы и свойства для потомков }
+  public
+
+    constructor Create(const _Source: String);
+    constructor CreateNested(_Master: TCustomStringParser);
+
+    destructor Destroy; override;
+
+    { Методы и свойства для управления }
     function Nested: Boolean;
     procedure Move(_Incrementer: Int64 = 1);
     procedure Terminate;
     function ReadItem(_Trim: Boolean): String;
     procedure CompleteItem;
     procedure AddSpecialRegion(const _RegionClass: TSpecialRegionClass; const _OpeningKey, _ClosingKey: TKeyWord);
+
+    { Главный рабочий метод }
+    procedure Read;
 
     property Source: String read FSource;
     property SrcLen: Int64 read FSrcLen;
@@ -170,16 +180,6 @@ type
     property ItemStart: Int64 read FItemStart write FItemStart;
     property Terminated: Boolean read FTerminated;
     property KeyWords: TKeyWordList read FKeyWords;
-
-  public
-
-    constructor Create(const _Source: String);
-    constructor CreateNested(_Master: TCustomStringParser);
-
-    destructor Destroy; override;
-
-    { Главный рабочий метод }
-    procedure Read;
 
   end;
 

@@ -6,7 +6,7 @@ uses
   { VCL }
   Generics.Collections, SysUtils,
   { vSoft }
-  uConsts, uCustomStringParser, uParams, uStrUtils;
+  uConsts, uCustomStringParser, uStrUtils;
 
 type
 
@@ -103,6 +103,30 @@ type
 
   end;
 
+  TWriteValueProc  = procedure (const Value: String) of object;
+  TWriteParamsProc = procedure (const _KeyWord: TKeyWord) of object;
+  TBooleanFunc     = function: Boolean of object;
+
+  TReaderWrapper = record
+
+    WriteName: TWriteValueProc;
+    WriteType: TWriteValueProc;
+    WriteValue: TWriteValueProc;
+    WriteParams: TWriteParamsProc;
+    CurrentTypeIsParams: TBooleanFunc;
+
+    constructor Create(
+
+        _WriteName: TWriteValueProc;
+        _WriteType: TWriteValueProc;
+        _WriteValue: TWriteValueProc;
+        _WriteParams: TWriteParamsProc;
+        _CurrentTypeIsParams: TBooleanFunc
+
+    );
+
+  end;
+
   {
 
     Просто параметры и этот парсер НЕ ДОЛЖНЫ:
@@ -126,11 +150,9 @@ type
 
   strict private
 
-    FParams: TParams;
+    FReaderWrapper: TReaderWrapper;
 
     FElement: TElement;
-    FCurrentName: String;
-    FCurrentType: TParamDataType;
 
     FReading: TReadInfoList;
     FSyntax: TSyntaxInfoList;
@@ -151,17 +173,12 @@ type
     function ReadType(const _KeyWord: TKeyWord): Boolean;
     function ReadValue(const _KeyWord: TKeyWord): Boolean;
 
-    procedure CheckPresetType;
     procedure CheckParams(_KeyWord: TKeyWord);
-    procedure ReadParams(_KeyWord: TKeyWord);
-
-    function UndoubleSymbols(const _Value: String): String;
-    function TrimDigital(const _Value: String): String;
+    procedure ReadParams(const _KeyWord: TKeyWord);
 
   private
 
     property Element: TElement read FElement;
-    property CurrentType: TParamDataType read FCurrentType;
 
   protected
 
@@ -172,10 +189,23 @@ type
 
   public
 
-    constructor Create(const _Source: String; _Params: TParams);
-    constructor CreateNested(_Master: TCustomStringParser; _Params: TParams; _CursorShift: Int64);
+    constructor Create(
+
+        const _Source: String;
+        _ReaderWrapper: TReaderWrapper
+
+    );
+    constructor CreateNested(
+
+        _Master: TCustomStringParser;
+        _CursorShift: Int64;
+        _ReaderWrapper: TReaderWrapper
+
+    );
 
     destructor Destroy; override;
+
+    function UndoubleSymbols(const _Value: String): String;
 
   end;
 
@@ -194,16 +224,6 @@ const
   KWR_QUOTE_DOBLE:          TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '"';   KeyLength: Length('"') );
   KWR_OPENING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktOpeningBracket);   StrValue: '(';   KeyLength: Length('(') );
   KWR_CLOSING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktClosingBracket);   StrValue: ')';   KeyLength: Length(')') );
-
-type
-
-  TParamsHelper = class helper for TParams
-
-  private
-
-    procedure SetAsParams(const _Path: String; _Value: TParams);
-
-  end;
 
 function KeyWordTypeToStr(Value: TKeyWordType): String;
 const
@@ -301,7 +321,7 @@ end;
 
 { TParamsStringParser }
 
-constructor TParamsStringParser.Create(const _Source: String; _Params: TParams);
+constructor TParamsStringParser.Create;
 begin
 
   FReading := TReadInfoList.Create;
@@ -309,11 +329,11 @@ begin
 
   inherited Create(_Source);
 
-  FParams := _Params;
+  FReaderWrapper := _ReaderWrapper;
 
 end;
 
-constructor TParamsStringParser.CreateNested(_Master: TCustomStringParser; _Params: TParams; _CursorShift: Int64);
+constructor TParamsStringParser.CreateNested;
 begin
 
   FReading := TReadInfoList.Create;
@@ -321,7 +341,7 @@ begin
 
   inherited CreateNested(_Master);
 
-  FParams := _Params;
+  FReaderWrapper := _ReaderWrapper;
 
 end;
 
@@ -332,6 +352,18 @@ begin
   FreeAndNil(FSyntax );
 
   inherited Destroy;
+
+end;
+
+function TParamsStringParser.UndoubleSymbols(const _Value: String): String;
+begin
+
+  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
+    условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
+    потому что дублирование не нужно в комментариях. }
+
+  if FDoublingChar > #0 then Result := UndoubleStr(_Value, FDoublingChar)
+  else Result := _Value;
 
 end;
 
@@ -400,74 +432,26 @@ end;
 
 function TParamsStringParser.ReadName(const _KeyWord: TKeyWord): Boolean;
 begin
-
-  FCurrentName := ReadItem(True);
-  TParam.ValidateName(FCurrentName);
-
+  FReaderWrapper.WriteName(ReadItem(True));
   Result := True;
-
 end;
 
 function TParamsStringParser.ReadType(const _KeyWord: TKeyWord): Boolean;
 begin
-
-  FCurrentType := StrToParamDataType(ReadItem(True));
-  CheckPresetType;
-
+  FReaderWrapper.WriteType(ReadItem(True));
   Result := True;
-
 end;
 
 function TParamsStringParser.ReadValue(const _KeyWord: TKeyWord): Boolean;
 begin
-
-  { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
-  CheckPresetType;
-
-  case CurrentType of
-
-    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(           ReadItem(False) );
-    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(   TrimDigital(ReadItem(False)));
-    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(ReadItem(False)));
-    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(ReadItem(False)));
-    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(          ReadItem(False) );
-    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(              ReadItem(False) );
-    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(             ReadItem(False) );
-    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(        ReadItem(False) );
-    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(           ReadItem(False) );
-
-  end;
-
-  FCurrentName := '';
-  FCurrentType := dtUnknown;
-
+  FReaderWrapper.WriteValue(ReadItem(False));
   Result := True;
-
-end;
-
-procedure TParamsStringParser.CheckPresetType;
-var
-  P: TParam;
-begin
-
-  { Определенный заранее тип данных }
-  if
-
-      (CurrentType = dtUnknown) and
-      FParams.FindParam(FCurrentName, P) and
-      (P.DataType <> dtUnknown)
-
-  then FCurrentType := P.DataType;
-
-  if CurrentType = dtUnknown then
-    raise EParamsReadException.Create('Unknown data type');
-
 end;
 
 procedure TParamsStringParser.CheckParams(_KeyWord: TKeyWord);
 begin
 
-  if (Element = etValue) and (CurrentType = dtParams) then begin
+  if (Element = etValue) and FReaderWrapper.CurrentTypeIsParams then begin
 
     { Контейнер. Проверка синтаксиса. }
     if not _KeyWord.TypeInSet([ktSpace, ktLineEnd, ktOpeningBracket]) then
@@ -493,54 +477,11 @@ begin
 
 end;
 
-procedure TParamsStringParser.ReadParams(_KeyWord: TKeyWord);
-var
-  P: TParams;
+procedure TParamsStringParser.ReadParams(const _KeyWord: TKeyWord);
 begin
+  FReaderWrapper.WriteParams(_KeyWord);
+  FElement := etName;
 
-  P := TParams.Create;
-  try
-
-    with TParamsStringParser.CreateNested(Self, P, _KeyWord.KeyLength) do
-
-      try
-
-        Read;
-
-      finally
-
-        Self.Move(Cursor - _KeyWord.KeyLength - Self.Cursor);
-        Self.Location := Location;
-
-        Free;
-
-      end;
-
-  finally
-
-    FParams.SetAsParams(FCurrentName, P);
-
-    CompleteItem;
-    FCurrentName := '';
-    FCurrentType := dtUnknown;
-    FElement := etName;
-
-  end;
-
-end;
-
-function TParamsStringParser.UndoubleSymbols(const _Value: String): String;
-begin
-  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
-    условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
-    потому что дублирование не нужно в комментариях. }
-  if FDoublingChar > #0 then Result := UndoubleStr(_Value, FDoublingChar)
-  else Result := _Value;
-end;
-
-function TParamsStringParser.TrimDigital(const _Value: String): String;
-begin
-  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
 end;
 
 procedure TParamsStringParser.InitParser;
@@ -629,11 +570,17 @@ begin
 
 end;
 
-{ TParamsHelper }
+{ TReaderWrapper }
 
-procedure TParamsHelper.SetAsParams(const _Path: String; _Value: TParams);
+constructor TReaderWrapper.Create;
 begin
-  inherited SetAsParams(_Path, _Value);
+
+  WriteName           := _WriteName;
+  WriteType           := _WriteType;
+  WriteValue          := _WriteValue;
+  WriteParams         := _WriteParams;
+  CurrentTypeIsParams := _CurrentTypeIsParams;
+
 end;
 
 end.

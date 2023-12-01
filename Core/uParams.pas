@@ -7,7 +7,7 @@ unit uParams;
 (*********************************************************)
 
 { TODO -oVasilyevSM -cuParams: Нужна оболочка TIniParams, которая будет сохраняться в файл, указанный в конструкторе. }
-{ TODO -oVasilyevSM -cuParams: Кроме SaveToFile нужны SaveToStream and LoadFromStream }
+{ TODO -oVasilyevSM -cuParams: Кроме SaveToString/LoadFromString нужны SaveToStream/LoadFromStream }
 { TODO -oVasilyevSM -cuParams: Нужен режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
 { TODO -oVasilyevSM -cuParams: Нужен также компонент TRegParams }
 { TODO -oVasilyevSM -cuParams: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
@@ -19,7 +19,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { vSoft }
-  uConsts, uTypes, uCore, uDataUtils, uStrUtils;
+  uConsts, uTypes, uCore, uDataUtils, uStrUtils, uCustomStringParser, uParamsStringParser;
 
 type
 
@@ -72,7 +72,7 @@ type
     procedure SetAsAnsiString(const _Value: AnsiString);
     procedure SetAsString(const _Value: String);
     procedure SetAsBLOB(const _Value: RawByteString);
-    protected procedure SetAsParams(_Value: TParams); { TODO 5 -oVasilyevSM -cTParam: 241032CB-4684-4451-AD39-9D723F30657A protected is a croked public }
+    procedure SetAsParams(_Value: TParams);
     { ^ Using FData methods ^ }
 
   protected
@@ -158,6 +158,10 @@ type
 
   strict private
 
+    function GetParam(_Path: String): TParam;
+
+  private
+
     function GetAsBoolean(const _Path: String): Boolean;
     function GetAsInteger(const _Path: String): Integer;
     function GetAsBigInt(const _Path: String): Int64;
@@ -178,11 +182,7 @@ type
     procedure SetAsAnsiString(_Path: String; const _Value: AnsiString);
     procedure SetAsString(_Path: String; const _Value: String);
     procedure SetAsBLOB(_Path: String; const _Value: BLOB);
-    protected procedure SetAsParams(_Path: String; _Value: TParams); { TODO 5 -oVasilyevSM -cTParam: 241032CB-4684-4451-AD39-9D723F30657A protected is a croked public }
-
-  strict private
-
-    function GetParam(_Path: String): TParam;
+    procedure SetAsParams(_Path: String; _Value: TParams);
 
   protected
 
@@ -250,12 +250,46 @@ procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
 
-uses
-  { vSoft }
-  { TODO 5 -oVasilyevSM -cuParams: 241032CB-4684-4451-AD39-9D723F30657A Можно избавиться. Надо в uParams оболочку завести с процедурами, которые uParams
-    используют. И прокидивать их в парсер для вызова оттуда. Боюсь, код изгадится до ужаса и вложенный вызов придется
-    заново писать, считай. }
-  uParamsStringParser;
+type
+
+  TParamsReader = class
+
+  strict private
+
+    FParams: TParams;
+    FParser: TParamsStringParser;
+
+    FCurrentName: String;
+    FCurrentType: TParamDataType;
+
+    procedure WriteName(const _Value: String);
+    procedure WriteType(const _Value: String);
+    procedure WriteValue(const _Value: String);
+    procedure WriteParams(const _KeyWord: TKeyWord);
+    function CurrentTypeIsParams: Boolean;
+
+    procedure CheckPresetType;
+    function TrimDigital(const _Value: String): String;
+    function UndoubleSymbols(const _Value: String): String;
+
+  private
+
+    constructor Create(const _Source: String; _Params: TParams);
+    constructor CreateNested(
+
+        _MasterParser: TParamsStringParser;
+        _Params: TParams;
+        _CursorShift: Int64
+
+    );
+
+    destructor Destroy; override;
+
+    procedure Read;
+
+    property Parser: TParamsStringParser read FParser;
+
+  end;
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 const
@@ -383,7 +417,7 @@ end;
 procedure StrToParams(const Value: String; Params: TParams);
 begin
 
-  with TParamsStringParser.Create(Value, Params) do
+  with TParamsReader.Create(Value, Params) do
 
     try
 
@@ -806,6 +840,41 @@ end;
 
 { TParams }
 
+function TParams.GetParam(_Path: String): TParam;
+var
+  SingleName: String;
+  Params: TParams;
+  Param: TParam;
+begin
+
+  Params := Self;
+
+  while Pos('.', _Path) > 0 do begin
+
+    SingleName := ReadStrTo(_Path, '.', False);
+
+    if Params.FindParam(SingleName, dtParams, Param) then Params := Param.AsParams
+    else
+
+      with Params.Add(SingleName) do begin
+
+        SetAsParams(TParams.Create);
+        Params := AsParams;
+
+      end;
+
+  end;
+
+  {
+
+    Для возможности многострочных структур просто параметры не поддерживают чтение без типов. Сохранение с
+    зарегистрированными типами должно исполнятся в потомках. Поэтому, просто Add.
+
+  }
+  Result := Params.Add(_Path);
+
+end;
+
 function TParams.GetAsBoolean(const _Path: String): Boolean;
 begin
   Result := ParamByName(_Path).AsBoolean;
@@ -904,41 +973,6 @@ end;
 procedure TParams.SetAsParams(_Path: String; _Value: TParams);
 begin
   GetParam(_Path).SetAsParams(_Value);
-end;
-
-function TParams.GetParam(_Path: String): TParam;
-var
-  SingleName: String;
-  Params: TParams;
-  Param: TParam;
-begin
-
-  Params := Self;
-
-  while Pos('.', _Path) > 0 do begin
-
-    SingleName := ReadStrTo(_Path, '.', False);
-
-    if Params.FindParam(SingleName, dtParams, Param) then Params := Param.AsParams
-    else
-
-      with Params.Add(SingleName) do begin
-
-        SetAsParams(TParams.Create);
-        Params := AsParams;
-
-      end;
-
-  end;
-
-  {
-
-    Для возможности многострочных структур просто параметры не поддерживают чтение без типов. Сохранение с
-    зарегистрированными типами должно исполнятся в потомках. Поэтому, просто Add.
-
-  }
-  Result := Params.Add(_Path);
-
 end;
 
 procedure TParams.Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification);
@@ -1166,6 +1200,177 @@ function TParams.AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
 begin
   if not FindBLOB(_Path, Result) then AsBLOB[_Path] := _Default;
   Result := _Default;
+end;
+
+{ TParamsReader }
+
+procedure TParamsReader.CheckPresetType;
+var
+  P: TParam;
+begin
+
+  { Определенный заранее тип данных }
+  if
+
+      (FCurrentType = dtUnknown) and
+      FParams.FindParam(FCurrentName, P) and
+      (P.DataType <> dtUnknown)
+
+  then FCurrentType := P.DataType;
+
+  if FCurrentType = dtUnknown then
+    raise EParamsReadException.Create('Unknown param data type');
+
+end;
+
+constructor TParamsReader.Create(const _Source: String; _Params: TParams);
+begin
+
+  inherited Create;
+
+  FParams := _Params;
+  FParser := TParamsStringParser.Create(
+
+      _Source,
+      TReaderWrapper.Create(
+
+          WriteName,
+          WriteType,
+          WriteValue,
+          WriteParams,
+          CurrentTypeIsParams
+
+      )
+
+  );
+
+end;
+
+constructor TParamsReader.CreateNested;
+begin
+
+  inherited Create;
+
+  FParams       := _Params;
+  FParser       := TParamsStringParser.CreateNested(
+
+      _MasterParser,
+      _CursorShift,
+      TReaderWrapper.Create(
+
+          WriteName,
+          WriteType,
+          WriteValue,
+          WriteParams,
+          CurrentTypeIsParams
+
+      )
+
+  );
+
+end;
+
+function TParamsReader.CurrentTypeIsParams: Boolean;
+begin
+  Result := FCurrentType = dtParams;
+end;
+
+destructor TParamsReader.Destroy;
+begin
+  FreeAndNil(FParser);
+  inherited Destroy;
+end;
+
+procedure TParamsReader.Read;
+begin
+  FParser.Read;
+end;
+
+function TParamsReader.TrimDigital(const _Value: String): String;
+begin
+  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
+end;
+
+function TParamsReader.UndoubleSymbols(const _Value: String): String;
+begin
+  if Assigned(FParser) then
+    Result := FParser.UndoubleSymbols(_Value);
+end;
+
+procedure TParamsReader.WriteName(const _Value: String);
+begin
+  TParam.ValidateName(_Value);
+  FCurrentName := _Value;
+end;
+
+procedure TParamsReader.WriteType(const _Value: String);
+begin
+  FCurrentType := StrToParamDataType(_Value);
+  CheckPresetType;
+end;
+
+procedure TParamsReader.WriteValue(const _Value: String);
+begin
+
+  { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
+  CheckPresetType;
+
+  case FCurrentType of
+
+    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(           _Value );
+    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(   TrimDigital(_Value));
+    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(_Value));
+    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(_Value));
+    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(          _Value );
+    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(              _Value );
+    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(             _Value );
+    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(        _Value );
+    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(           _Value );
+
+  end;
+
+  FCurrentName := '';
+  FCurrentType := dtUnknown;
+
+end;
+
+procedure TParamsReader.WriteParams(const _KeyWord: TKeyWord);
+var
+  P: TParams;
+  Nested: TParamsReader;
+  NestedCursor: Int64;
+begin
+
+  P := TParams.Create;
+  try
+
+    Nested := TParamsReader.CreateNested(FParser, P, _KeyWord.KeyLength);
+
+    try
+
+      Nested.Read;
+
+    finally
+
+      NestedCursor := Nested.Parser.Cursor;
+
+      FParser.Move(NestedCursor - _KeyWord.KeyLength - FParser.Cursor);
+      FParser.Location := Nested.Parser.Location;
+
+      Nested.Free;
+
+    end;
+
+  finally
+
+    FParams.SetAsParams(FCurrentName, P);
+
+    FParser.CompleteItem;
+    FCurrentName := '';
+    FCurrentType := dtUnknown;
+
+  end;
+
 end;
 
 end.

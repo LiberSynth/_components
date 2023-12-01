@@ -25,6 +25,7 @@ package VCore;
 {$DESCRIPTION '#V Core'}
 {$DESIGNONLY}
 {$IMPLICITBUILD ON}
+{$WARN DUPLICATE_CTOR_DTOR OFF}
 
 requires
   rtl;
