@@ -6,9 +6,6 @@ unit uParams;
 (*                                                       *)
 (*********************************************************)
 
-{ TODO 2 -oVasilyevSM -cTParams: Тип разделителя может быть не только '.', но и '/' или '\'. И эти символы должны быть
-  недопустимы в оконечных именах. }
-{ TODO 2 -oVasilyevSM -cTParams: Режим "сохранять строки всегда в кавычках }
 { TODO -oVasilyevSM -cuParams: Кроме SaveToString/LoadFromString нужны SaveToStream/LoadFromStream }
 
 interface
@@ -37,6 +34,7 @@ type
     FName: String;
     FDataType: TParamDataType;
     FIsNull: Boolean;
+    FPathSeparator: Char;
     FStrictDataType: Boolean;
     FData: Pointer;
 
@@ -79,13 +77,13 @@ type
 
   public
 
-    constructor Create(const _Name: String);
+    constructor Create(const _Name: String; const _PathSeparator: Char = '.');
     destructor Destroy; override;
 
     procedure Clear;
     { Для передачи без разбора типов }
     procedure Assign(_Source: TParam);
-    class procedure ValidateName(const _Value: String);
+    class procedure ValidateName(const _Value, _PathSeparator: String);
 
     property DataType: TParamDataType read FDataType;
     property IsNull: Boolean read FIsNull write SetIsNull;
@@ -139,20 +137,22 @@ type
 
   end;
 
+  {
+
+    _Name - всегда чистое имя параметра без пути. Путь через "." это _Path, причем, вместе с именем на последнем.
+    месте.
+    Методы SetAs... создают путь и конечный параметр, используя GetParam, если их нет.
+    Метод FindParam ничего не создает, только ищет существующий.
+    Метод ParamByName вовсе генерирует исключение, если чего-то не хватает.
+    Краткая запись при сохранении с предопределенными типами здесь не поддерживается. Нужно исполнять ее в потомках.
+
+  }
+
   TParams = class(TObjectList<TParam>)
 
-    {
-
-      _Name - всегда чистое имя параметра без пути. Путь через "." это _Path, причем, вместе с именем на последнем.
-      месте.
-      Методы SetAs... создают путь и конечный параметр, используя GetParam, если их нет.
-      Метод FindParam ничего не создает, только ищет существующий.
-      Метод ParamByName вовсе генерирует исключение, если чего-то не хватает.
-      Краткая запись при сохранении с предопределенными типами здесь не поддерживается. Нужно исполнять ее в потомках.
-
-    }
-
   strict private
+
+    FPathSeparator: Char;
 
     function GetParam(_Path: String): TParam;
 
@@ -180,11 +180,15 @@ type
     procedure SetAsBLOB(_Path: String; const _Value: BLOB);
     procedure SetAsParams(_Path: String; _Value: TParams);
 
+    property PathSeparator: Char read FPathSeparator;
+
   protected
 
     procedure Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification); override;
 
   public
+
+    constructor Create(const _PathSeparator: Char = '.');
 
     function Add(const _Name: String): TParam;
     function Insert(_Index: Integer; const _Name: String): TParam;
@@ -241,7 +245,14 @@ function StrToParamDataType(Value: String): TParamDataType;
   RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams также можно просто на вход
   подавать пустой контейнер с готовой структурой. Тогда она просто заполняется данными, типы известны и не требуют
   хранения в строке. }
-function ParamsToStr(Params: TParams; SingleString: Boolean = False): String;
+function ParamsToStr(
+
+    Params: TParams;
+    SingleString: Boolean = False;
+    ForceQuoteStrings: Boolean = False
+
+
+): String;
 procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
@@ -327,7 +338,7 @@ begin
 
 end;
 
-function ParamsToStr(Params: TParams; SingleString: Boolean): String;
+function ParamsToStr(Params: TParams; SingleString: Boolean; ForceQuoteStrings: Boolean): String;
 const
 
   SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
@@ -357,7 +368,7 @@ const
 
   function _GetNested(_Param: TParam): String;
   begin
-    Result := ParamsToStr(_Param.AsParams, SingleString);
+    Result := ParamsToStr(_Param.AsParams, SingleString, ForceQuoteStrings);
     if not SingleString then ShiftText(1, Result);
   end;
 
@@ -366,22 +377,21 @@ const
 
     Result := _Param.AsString;
 
-    if
+    if _Param.DataType in [dtAnsiString, dtString] then
 
-        (_Param.DataType = dtString) and
-        { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
-        (
-            (Pos(CR,   Result) > 0) or
-            (Pos(LF,   Result) > 0) or
-            (Pos(';',  Result) > 0) or
-            (Pos('''', Result) > 0) or
-            (Pos('"',  Result) > 0) or
-            (Pos('(',  Result) > 0) or
-            (Pos(')',  Result) > 0)
+      if
 
-        )
+          ForceQuoteStrings or
+          { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
+          (Pos(CR,   Result) > 0) or
+          (Pos(LF,   Result) > 0) or
+          (Pos(';',  Result) > 0) or
+          (Pos('''', Result) > 0) or
+          (Pos('"',  Result) > 0) or
+          (Pos('(',  Result) > 0) or
+          (Pos(')',  Result) > 0)
 
-    then Result := QuoteStr(Result);
+      then Result := QuoteStr(Result);
 
   end;
 
@@ -438,8 +448,10 @@ begin
 
   inherited Create;
 
-  FIsNull := True;
-  ValidateName(_Name);
+  FIsNull        := True;
+  FPathSeparator := _PathSeparator;
+
+  ValidateName(_Name, FPathSeparator);
   FName := _Name;
 
 end;
@@ -634,7 +646,7 @@ begin
 
 end;
 
-class procedure TParam.ValidateName(const _Value: String);
+class procedure TParam.ValidateName(const _Value, _PathSeparator: String);
 const
   SC_PARAM_NAME_FORBIDDEN_CHARS = [' '];
 var
@@ -651,6 +663,9 @@ begin
   for i := 1 to Length(_Value) do
     if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
       raise EParamsException.CreateFmt('Character ''%s'' in invalid in param name ''%s''', [_Value[i], _Value]);
+
+  if Pos(_PathSeparator, _Value) > 0 then
+    raise EParamsException.CreateFmt('Character ''%s'' is used as a path separator. So it is invalid in param name ''%s''.', [_PathSeparator, _Value]);
 
 end;
 
@@ -842,6 +857,12 @@ end;
 
 { TParams }
 
+constructor TParams.Create(const _PathSeparator: Char);
+begin
+  inherited Create;
+  FPathSeparator := _PathSeparator;
+end;
+
 function TParams.GetParam(_Path: String): TParam;
 var
   SingleName: String;
@@ -851,9 +872,9 @@ begin
 
   Params := Self;
 
-  while Pos('.', _Path) > 0 do begin
+  while Pos(FPathSeparator, _Path) > 0 do begin
 
-    SingleName := ReadStrTo(_Path, '.', False);
+    SingleName := ReadStrTo(_Path, FPathSeparator, False);
 
     if Params.FindParam(SingleName, dtParams, Param) then Params := Param.AsParams
     else
@@ -1010,13 +1031,13 @@ end;
 
 function TParams.Add(const _Name: String): TParam;
 begin
-  Result := TParam.Create(_Name);
+  Result := TParam.Create(_Name, FPathSeparator);
   inherited Add(Result);
 end;
 
 function TParams.Insert(_Index: Integer; const _Name: String): TParam;
 begin
-  Result := TParam.Create(_Name);
+  Result := TParam.Create(_Name, FPathSeparator);
   inherited Insert(_Index, Result);
 end;
 
@@ -1029,9 +1050,9 @@ begin
 
   Params := Self;
 
-  while Pos('.', _Path) > 0 do begin
+  while Pos(FPathSeparator, _Path) > 0 do begin
 
-    SingleName := ReadStrTo(_Path, '.', False);
+    SingleName := ReadStrTo(_Path, FPathSeparator, False);
 
     if Params.FindParam(SingleName, dtParams, Param) then
 
@@ -1255,7 +1276,7 @@ end;
 
 procedure TParamsReader.ReadName(const _Value: String);
 begin
-  TParam.ValidateName(_Value);
+  TParam.ValidateName(_Value, FParams.PathSeparator);
   FCurrentName := _Value;
 end;
 

@@ -113,6 +113,7 @@ type
     LineStart: Int64;
     LastItemBegin: Int64;
 
+    function Column: Int64;
     function Position: Int64;
 
   end;
@@ -356,9 +357,14 @@ end;
 
 { TLocation }
 
-function TLocation.Position: Int64;
+function TLocation.Column: Int64;
 begin
   Result := LastItemBegin - LineStart + 1;
+end;
+
+function TLocation.Position: Int64;
+begin
+  Result := LastItemBegin;
 end;
 
 { TCustomStringParser }
@@ -449,7 +455,6 @@ begin
   then begin
 
     Inc(FLocation.Line);
-    { TODO 4 -oVasilyevSM -cTCustomStringParser: Проверить, как будет считаться по CR или LF. }
     FLocation.LineStart := Cursor;
 
   end;
@@ -545,9 +550,20 @@ begin
     on E: Exception do
 
       if Nested then
+
         raise
+
       else
-                                                                                                                                                                            raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Position: %d', [E.Message, Location.Line, Location.Position]);
+
+        raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Column: %d, Position: %d', [
+
+            E.Message,
+            { Совпадает с Блокнотом и Notepad++ }
+            Location.Line,
+            Location.Column,
+            Location.Position
+
+        ]);
 
   end;
 
