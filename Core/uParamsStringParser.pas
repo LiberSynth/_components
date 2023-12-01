@@ -1,4 +1,4 @@
-unit uParamsReader;
+unit uParamsStringParser;
 
 interface
 
@@ -8,7 +8,6 @@ uses
   { vSoft }
   uConsts, uCustomStringParser, uParams, uStrUtils;
 
-  { TODO 1 -oVasilyevSM -cTParamsReader: Кодировка сбивается для русских букв. }
 type
 
   TElement = (etName, etType, etValue);
@@ -106,17 +105,24 @@ type
 
   {
 
-    Просто параметры НЕ ДОЛЖНЫ:
+    Просто параметры и этот парсер НЕ ДОЛЖНЫ:
 
-      1. Поддерживать комментарии. Комментарии должны обрабатываться пронаследованным классом TIniParamsReader.
+      1. Поддерживать комментарии.
       2. Уметь назначать значения по умолчанию, когда после = ничего не указано. Исключение - тип строка.
+      3. Разбираться с кодировками. На входе должна быть хотя бы UTF-8 с BOM.
 
-    Указывать тип на следующе строке допустимо.
+    Все эти проблемы должен решать класс-потомок TUserParamsParser.
+
+    Элементы параметров: имя, тип, значение. Тип уже здесь необязательный, но тогда для считывания надо заранее создать
+    параметр с нужным типом. В него считается значение.
+    Указывать тип на следующей строке допустется. Значение - нет. Конец строки или ';' - это конец параметра.
+    Между элементами имя - тип и между параметрами допускается любое количество пробелов, табуляций и переходов на
+    следующую строку. Перед значением - только пробелы и табуляция.
 
   }
-  { TODO 2 -oVasilyevSM -cTParamsReader: Все что вызывает неадекватное чтение или неадекватную ошибку должно
+  { TODO 2 -oVasilyevSM -cTParamsStringParser: Все что вызывает неадекватное чтение или неадекватную ошибку должно
     контролироваться в проверке синтаксиса. }
-  TParamsReader = class(TCustomStringParser)
+  TParamsStringParser = class(TCustomStringParser)
 
   strict private
 
@@ -175,9 +181,6 @@ type
 
   EParamsReadException = class(EStringParserException);
 
-function ParamsToStr(Params: TParams; SingleString: Boolean = False): String;
-procedure StrToParams(const Value: String; Params: TParams);
-
 implementation
 
 const
@@ -234,108 +237,6 @@ begin
       Exit(Item);
 
   raise EConvertError.CreateFmt('%s is not a TKeyWordType value', [Value]);
-
-end;
-
-function ParamsToStr(Params: TParams; SingleString: Boolean): String;
-const
-
-  SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
-  SC_SingleParamSingleStringFormat = '%s: %s = %s;';
-
-  SC_NestedParamsMultiStringFormat =
-
-      '%s: %s = (' + CRLF +
-      '%s' +
-      ')' + CRLF;
-
-  SC_NestedParamsSingleStringFormat =
-
-      '%s: %s = (%s);';
-
-  function _NestedParamsFormat: String;
-  begin
-    if SingleString then Result := SC_NestedParamsSingleStringFormat
-    else Result := SC_NestedParamsMultiStringFormat;
-  end;
-
-  function _SingleParamFormat: String;
-  begin
-    if SingleString then Result := SC_SingleParamSingleStringFormat
-    else Result := SC_SingleParamMultiStringFormat;
-  end;
-
-  function _GetNested(_Param: TParam): String;
-  begin
-    Result := ParamsToStr(_Param.AsParams, SingleString);
-    if not SingleString then ShiftText(1, Result);
-  end;
-
-  function _QuoteString(_Param: TParam): String;
-  begin
-
-    Result := _Param.AsString;
-
-    if
-
-        (_Param.DataType = dtString) and
-        { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
-        (
-            (Pos(CR,   Result) > 0) or
-            (Pos(LF,   Result) > 0) or
-            (Pos(';',  Result) > 0) or
-            (Pos('''', Result) > 0) or
-            (Pos('"',  Result) > 0)
-
-        )
-
-    then Result := QuoteStr(Result);
-
-  end;
-
-var
-  Param: TParam;
-begin
-
-  Result := '';
-  for Param in Params do
-
-    if Param.DataType = dtParams then
-
-      Result := Result + Format(_NestedParamsFormat, [
-
-          Param.Name,
-          ParamDataTypeToStr(Param.DataType),
-          _GetNested(Param)
-
-      ])
-
-    else
-
-      Result := Result + Format(_SingleParamFormat, [
-
-          Param.Name,
-          ParamDataTypeToStr(Param.DataType),
-          _QuoteString(Param)
-
-      ]);
-
-  if SingleString then CutStr(Result, 1);
-
-end;
-
-procedure StrToParams(const Value: String; Params: TParams);
-begin
-
-  with TParamsReader.Create(Value, Params) do
-
-    try
-
-      Read;
-
-    finally
-      Free;
-    end;
 
 end;
 
@@ -398,9 +299,9 @@ begin
   inherited Add(TSyntaxInfo.Create(_Element, _Nested, _InvalidKeys));
 end;
 
-{ TParamsReader }
+{ TParamsStringParser }
 
-constructor TParamsReader.Create(const _Source: String; _Params: TParams);
+constructor TParamsStringParser.Create(const _Source: String; _Params: TParams);
 begin
 
   FReading := TReadInfoList.Create;
@@ -412,7 +313,7 @@ begin
 
 end;
 
-constructor TParamsReader.CreateNested(_Master: TCustomStringParser; _Params: TParams; _CursorShift: Int64);
+constructor TParamsStringParser.CreateNested(_Master: TCustomStringParser; _Params: TParams; _CursorShift: Int64);
 begin
 
   FReading := TReadInfoList.Create;
@@ -424,7 +325,7 @@ begin
 
 end;
 
-destructor TParamsReader.Destroy;
+destructor TParamsStringParser.Destroy;
 begin
 
   FreeAndNil(FReading);
@@ -434,7 +335,7 @@ begin
 
 end;
 
-function TParamsReader.ElementTerminating(const _KeyWord: TKeyWord; var _NextElement: TElement; var _ReadFunc: TReadFunc): Boolean;
+function TParamsStringParser.ElementTerminating(const _KeyWord: TKeyWord; var _NextElement: TElement; var _ReadFunc: TReadFunc): Boolean;
 var
   RI: TReadInfo;
 begin
@@ -464,7 +365,7 @@ begin
 
 end;
 
-procedure TParamsReader.CheckSyntax(const _KeyWord: TKeyWord);
+procedure TParamsStringParser.CheckSyntax(const _KeyWord: TKeyWord);
 var
   SI: TSyntaxInfo;
 begin
@@ -485,7 +386,7 @@ begin
 
 end;
 
-procedure TParamsReader.CompleteElement(const _KeyWord: TKeyWord);
+procedure TParamsStringParser.CompleteElement(const _KeyWord: TKeyWord);
 var
   ReadFunc: TReadFunc;
   Next: TElement;
@@ -497,27 +398,27 @@ begin
 
 end;
 
-function TParamsReader.ReadName(const _KeyWord: TKeyWord): Boolean;
+function TParamsStringParser.ReadName(const _KeyWord: TKeyWord): Boolean;
 begin
 
-  FCurrentName := ReadItem;
+  FCurrentName := ReadItem(True);
   TParam.ValidateName(FCurrentName);
 
   Result := True;
 
 end;
 
-function TParamsReader.ReadType(const _KeyWord: TKeyWord): Boolean;
+function TParamsStringParser.ReadType(const _KeyWord: TKeyWord): Boolean;
 begin
 
-  FCurrentType := StrToParamDataType(ReadItem);
+  FCurrentType := StrToParamDataType(ReadItem(True));
   CheckPresetType;
 
   Result := True;
 
 end;
 
-function TParamsReader.ReadValue(const _KeyWord: TKeyWord): Boolean;
+function TParamsStringParser.ReadValue(const _KeyWord: TKeyWord): Boolean;
 begin
 
   { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
@@ -525,15 +426,15 @@ begin
 
   case CurrentType of
 
-    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(ReadItem);
-    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(TrimDigital(ReadItem));
-    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(ReadItem));
-    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(ReadItem));
-    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(ReadItem);
-    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(ReadItem);
-    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(ReadItem);
-    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(ReadItem);
-    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(ReadItem);
+    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(           ReadItem(False) );
+    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(   TrimDigital(ReadItem(False)));
+    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(ReadItem(False)));
+    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(ReadItem(False)));
+    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(          ReadItem(False) );
+    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(              ReadItem(False) );
+    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(             ReadItem(False) );
+    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(        ReadItem(False) );
+    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(           ReadItem(False) );
 
   end;
 
@@ -544,7 +445,7 @@ begin
 
 end;
 
-procedure TParamsReader.CheckPresetType;
+procedure TParamsStringParser.CheckPresetType;
 var
   P: TParam;
 begin
@@ -563,7 +464,7 @@ begin
 
 end;
 
-procedure TParamsReader.CheckParams(_KeyWord: TKeyWord);
+procedure TParamsStringParser.CheckParams(_KeyWord: TKeyWord);
 begin
 
   if (Element = etValue) and (CurrentType = dtParams) then begin
@@ -592,7 +493,7 @@ begin
 
 end;
 
-procedure TParamsReader.ReadParams(_KeyWord: TKeyWord);
+procedure TParamsStringParser.ReadParams(_KeyWord: TKeyWord);
 var
   P: TParams;
 begin
@@ -600,7 +501,7 @@ begin
   P := TParams.Create;
   try
 
-    with TParamsReader.CreateNested(Self, P, _KeyWord.KeyLength) do
+    with TParamsStringParser.CreateNested(Self, P, _KeyWord.KeyLength) do
 
       try
 
@@ -628,7 +529,7 @@ begin
 
 end;
 
-function TParamsReader.UndoubleSymbols(const _Value: String): String;
+function TParamsStringParser.UndoubleSymbols(const _Value: String): String;
 begin
   { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
     условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
@@ -637,12 +538,12 @@ begin
   else Result := _Value;
 end;
 
-function TParamsReader.TrimDigital(const _Value: String): String;
+function TParamsStringParser.TrimDigital(const _Value: String): String;
 begin
   Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
 end;
 
-procedure TParamsReader.InitParser;
+procedure TParamsStringParser.InitParser;
 begin
 
   inherited InitParser;
@@ -694,7 +595,7 @@ begin
 
 end;
 
-procedure TParamsReader.KeyEvent(const _KeyWord: TKeyWord);
+procedure TParamsStringParser.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
   inherited KeyEvent(_KeyWord);
@@ -706,7 +607,7 @@ begin
 
 end;
 
-procedure TParamsReader.SpecialRegionClosed(_Region: TSpecialRegion);
+procedure TParamsStringParser.SpecialRegionClosed(_Region: TSpecialRegion);
 begin
 
   with _Region do begin

@@ -72,7 +72,7 @@ type
     procedure SetAsAnsiString(const _Value: AnsiString);
     procedure SetAsString(const _Value: String);
     procedure SetAsBLOB(const _Value: RawByteString);
-    protected procedure SetAsParams(_Value: TParams); { TODO 4 -oVasilyevSM -cTParam: protected is a croked public }
+    protected procedure SetAsParams(_Value: TParams); { TODO 5 -oVasilyevSM -cTParam: 241032CB-4684-4451-AD39-9D723F30657A protected is a croked public }
     { ^ Using FData methods ^ }
 
   protected
@@ -178,7 +178,7 @@ type
     procedure SetAsAnsiString(_Path: String; const _Value: AnsiString);
     procedure SetAsString(_Path: String; const _Value: String);
     procedure SetAsBLOB(_Path: String; const _Value: BLOB);
-    protected procedure SetAsParams(_Path: String; _Value: TParams); { TODO 4 -oVasilyevSM -cTParam: protected is a croked public }
+    protected procedure SetAsParams(_Path: String; _Value: TParams); { TODO 5 -oVasilyevSM -cTParam: 241032CB-4684-4451-AD39-9D723F30657A protected is a croked public }
 
   strict private
 
@@ -245,15 +245,17 @@ function StrToParamDataType(Value: String): TParamDataType;
   RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams также можно просто на вход
   подавать пустой контейнер с готовой структурой. Тогда она просто заполняется данными, типы известны и не требуют
   хранения в строке. }
+function ParamsToStr(Params: TParams; SingleString: Boolean = False): String;
+procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
 
 uses
   { vSoft }
-  { TODO 5 -oVasilyevSM -cuParams: Можно избавиться. Надо в uParams оболочку завести с процедурами, которые uParams
+  { TODO 5 -oVasilyevSM -cuParams: 241032CB-4684-4451-AD39-9D723F30657A Можно избавиться. Надо в uParams оболочку завести с процедурами, которые uParams
     используют. И прокидивать их в парсер для вызова оттуда. Боюсь, код изгадится до ужаса и вложенный вызов придется
     заново писать, считай. }
-  uParamsReader;
+  uParamsStringParser;
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 const
@@ -288,6 +290,108 @@ begin
       Exit(Item);
 
   raise EConvertError.CreateFmt('%s is not a TParamDataType value', [Value]);
+
+end;
+
+function ParamsToStr(Params: TParams; SingleString: Boolean): String;
+const
+
+  SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
+  SC_SingleParamSingleStringFormat = '%s: %s = %s;';
+
+  SC_NestedParamsMultiStringFormat =
+
+      '%s: %s = (' + CRLF +
+      '%s' +
+      ')' + CRLF;
+
+  SC_NestedParamsSingleStringFormat =
+
+      '%s: %s = (%s);';
+
+  function _NestedParamsFormat: String;
+  begin
+    if SingleString then Result := SC_NestedParamsSingleStringFormat
+    else Result := SC_NestedParamsMultiStringFormat;
+  end;
+
+  function _SingleParamFormat: String;
+  begin
+    if SingleString then Result := SC_SingleParamSingleStringFormat
+    else Result := SC_SingleParamMultiStringFormat;
+  end;
+
+  function _GetNested(_Param: TParam): String;
+  begin
+    Result := ParamsToStr(_Param.AsParams, SingleString);
+    if not SingleString then ShiftText(1, Result);
+  end;
+
+  function _QuoteString(_Param: TParam): String;
+  begin
+
+    Result := _Param.AsString;
+
+    if
+
+        (_Param.DataType = dtString) and
+        { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
+        (
+            (Pos(CR,   Result) > 0) or
+            (Pos(LF,   Result) > 0) or
+            (Pos(';',  Result) > 0) or
+            (Pos('''', Result) > 0) or
+            (Pos('"',  Result) > 0)
+
+        )
+
+    then Result := QuoteStr(Result);
+
+  end;
+
+var
+  Param: TParam;
+begin
+
+  Result := '';
+  for Param in Params do
+
+    if Param.DataType = dtParams then
+
+      Result := Result + Format(_NestedParamsFormat, [
+
+          Param.Name,
+          ParamDataTypeToStr(Param.DataType),
+          _GetNested(Param)
+
+      ])
+
+    else
+
+      Result := Result + Format(_SingleParamFormat, [
+
+          Param.Name,
+          ParamDataTypeToStr(Param.DataType),
+          _QuoteString(Param)
+
+      ]);
+
+  if SingleString then CutStr(Result, 1);
+
+end;
+
+procedure StrToParams(const Value: String; Params: TParams);
+begin
+
+  with TParamsStringParser.Create(Value, Params) do
+
+    try
+
+      Read;
+
+    finally
+      Free;
+    end;
 
 end;
 

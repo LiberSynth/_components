@@ -158,7 +158,7 @@ type
     function Nested: Boolean;
     procedure Move(_Incrementer: Int64 = 1);
     procedure Terminate;
-    function ReadItem: String;
+    function ReadItem(_Trim: Boolean): String;
     procedure CompleteItem;
     procedure AddSpecialRegion(const _RegionClass: TSpecialRegionClass; const _OpeningKey, _ClosingKey: TKeyWord);
 
@@ -558,11 +558,20 @@ begin
   FTerminated := True;
 end;
 
-function TCustomStringParser.ReadItem: String;
+function TCustomStringParser.ReadItem(_Trim: Boolean): String;
 begin
+
   if ItemStart > 0 then
-    Result := Trim(Copy(Source, ItemStart, Cursor - ItemStart));
+
+    if _Trim then
+      Result := Trim(Copy(Source, ItemStart, Cursor - ItemStart))
+    else
+      Result := Copy(Source, ItemStart, Cursor - ItemStart)
+
+  else Result := '';
+
   CompleteItem;
+
 end;
 
 procedure TCustomStringParser.CompleteItem;
