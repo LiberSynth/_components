@@ -16,8 +16,10 @@ uses
 
 { v Преобразование основных типов данных друг в друга v }
 { TODO -oVasilyevSM -cuDataUtils: Продолжение следует. Умножением: Boolean, Integer, BigInt, Float, Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
-function BooleanToInt(Value: Boolean): Int64;
+function BooleanToInt(Value: Boolean): Integer;
+function BooleanToBigInt(Value: Boolean): Int64;
 function BooleanToBLOB(Value: Boolean): BLOB;
+function BooleanToData(Value: Boolean): TData;
 function IntToBoolean(Value: Int64): Boolean;
 function BLOBToBoolean(const Value: BLOB): Boolean;
 function BLOBToInt(const Value: BLOB): Integer;
@@ -26,6 +28,9 @@ function DataToBoolean(const Value: TData): Boolean;
 function DataToInt(const Value: TData): Integer;
 function DataToBigInt(const Value: TData): Int64;
 // ...
+function IntToBLOB(Value: Integer): BLOB;
+function BigIntToBLOB(Value: Int64): BLOB;
+function BLOBToData(const Value: BLOB): TData;
 function DataToGUID(const Value: TData): TGUID;
 function DataToAnsiStr(const Value: TData): AnsiString;
 function DataToStr(const Value: TData): String;
@@ -60,7 +65,12 @@ function Power(const Base, Exponent: Single): Single; overload;
 
 implementation
 
-function BooleanToInt(Value: Boolean): Int64;
+function BooleanToInt(Value: Boolean): Integer;
+begin
+  Result := BooleanToBigInt(Value);
+end;
+
+function BooleanToBigInt(Value: Boolean): Int64;
 const
   IA_MAP: array[Boolean] of Byte = (0, 1);
 begin
@@ -73,8 +83,15 @@ begin
   else Result := BLOB(#0);
 end;
 
+function BooleanToData(Value: Boolean): TData;
+begin
+  SetLength(Result, 1);
+  Result[0] := BooleanToBigInt(Value);
+end;
+
 function IntToBoolean(Value: Int64): Boolean;
 begin
+
   case Value of
 
     0: Result := False;
@@ -99,14 +116,11 @@ end;
 
 function BLOBToInt(const Value: BLOB): Integer;
 begin
-  { TODO 1 -oVasilyevSM -cConversions: New }
-//  Ожидаемое Move(Value[1], Result, SizeOf(Result)); не сработало. Наверное, в обратном порядке лежит
-  Result := DataToInt(TData(BytesOf(Value))); // 255
+  Move(Value[1], Result, SizeOf(Result));
 end;
 
 function BLOBToBigInt(const Value: BLOB): Int64;
 begin
-  { TODO 1 -oVasilyevSM -cConversions: New }
   Move(Value[1], Result, SizeOf(Result));
 end;
 
@@ -123,14 +137,30 @@ end;
 
 function DataToInt(const Value: TData): Integer;
 begin
-  { TODO 1 -oVasilyevSM -cConversions: New }
   Move(Value[0], Result, SizeOf(Result));
 end;
 
 function DataToBigInt(const Value: TData): Int64;
 begin
-  { TODO 1 -oVasilyevSM -cConversions: New }
   Move(Value[0], Result, SizeOf(Result));
+end;
+
+function IntToBLOB(Value: Integer): BLOB;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[1], SizeOf(Value));
+end;
+
+function BigIntToBLOB(Value: Int64): BLOB;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[1], SizeOf(Value));
+end;
+
+function BLOBToData(const Value: BLOB): TData;
+begin
+  SetLength(Result, Length(Value));
+  Move(Value[1], Result[0], Length(Value));
 end;
 
 function DataToGUID(const Value: TData): TGUID;

@@ -19,7 +19,6 @@ uses
 
 type
 
-  { TODO 1 -oVasilyevSM -cTParam: Продолжение следует. Остался только dtData. }
   { Похоже, что Double это действительно псевдоним Extended. Значения с большим количеством знаков урезаются одинаково.
     Странно только что в Win64 SizeOf(Extended) = 10, а не 16, как утверждает справка по RADStudio. }
   TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, dtExtended, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, dtData, dtParams);
@@ -509,7 +508,7 @@ begin
       dtAnsiString: Result := String(AnsiString  (FData     ));
       dtString:     Result := String             (FData      );
       dtBLOB:       Result := BLOBToHexStr       (AsBLOB     );
-      dtData:       Result := DataToHexStr       (AsData     );
+      dtData:       Result := DataToHexStr       (AsData     ); { TODO 1 -oVasilyevSM -cTParam.GetAsString: Формат. Это не хекс-строка. }
       dtParams:     Result := ParamsToStr(TParams(FData     ));
 
     else
@@ -774,10 +773,10 @@ begin
 
     case DataType of
 
-      dtInteger:    Result := IntToBoolean(AsInteger);
-      dtBigInt:     Result := IntToBoolean(AsBigInt);
-      dtAnsiString: Result := StrToBoolean(String(AsAnsiString));
-      dtString:     Result := StrToBoolean(AsString);
+      dtInteger:    Result := IntToBoolean (AsInteger);
+      dtBigInt:     Result := IntToBoolean (AsBigInt);
+      dtAnsiString: Result := StrToBoolean (String(AsAnsiString));
+      dtString:     Result := StrToBoolean (AsString);
       dtBLOB:       Result := BLOBToBoolean(AsBLOB);
       dtData:       Result := DataToBoolean(AsData);
 
@@ -831,7 +830,23 @@ end;
 
 procedure TParamHelper._SetAsBoolean(const _Value: Boolean);
 begin
-  SetAsBoolean(_Value);
+
+  if StrictDataType then SetAsBoolean(_Value)
+  else
+
+    case DataType of
+
+      dtInteger:    SetAsInteger(BooleanToInt(_Value));
+      dtBigInt:     SetAsBigInt(BooleanToBigInt(_Value));
+      dtAnsiString: SetAsAnsiString(AnsiString(BooleanToStr(_Value)));
+      dtString:     SetAsString(BooleanToStr(_Value));
+      dtBLOB:       SetAsBLOB(BooleanToBLOB(_Value));
+      dtData:       SetAsData(BooleanToData(_Value));
+
+    else
+      SetAsBoolean(_Value);
+    end;
+
 end;
 
 procedure TParamHelper._SetAsInteger(const _Value: Integer);
@@ -1000,6 +1015,7 @@ begin
 
   Params := Self;
 
+  { TODO 1 -oVasilyevSM -cTParams.GetParam: Параметрметр не переназначить. Херачит все в новый списком. }
   while Pos(FPathSeparator, _Path) > 0 do begin
 
     SingleName := ReadStrTo(_Path, FPathSeparator, False);
