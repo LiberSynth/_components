@@ -37,8 +37,8 @@ function GUIDToStr(const Value: TGUID) : String;
 function StrToGUID(const Value: String): TGUID;
 function BLOBToHexStr(const Value: BLOB): String;
 function HexStrToBLOB(const Value: String): BLOB;
-function DataToStr(const Value: TData): String;
-function DataToGUID(const Value: TData): TGUID;
+function DataToHexStr(const Value: TData): String;
+function HexStrToData(const Value: String): TData;
 { ^ Преобразование основных типов данных в строку и обратно ^ }
 
 { v Для парсинга и автоскриптов v }
@@ -92,7 +92,7 @@ function WordToBOM(Value: Word): TBOM;
 function BOMToStr(Value: TBOM): String;
 function UTF16DataToStr(const Data: TData; BOM: TBOM): String;
 
-function DecodeUTF8(Value: RawByteString): String;
+function DecodeUTF8(Value: BLOB): String;
 
 function IsHexChar(const Value: String): Boolean;
 function IsHexCharStr(const Value: String): Boolean;
@@ -476,18 +476,41 @@ begin
 
 end;
 
-function DataToStr(const Value: TData): String;
+function DataToHexStr(const Value: TData): String;
 var
-  L: Integer;
+  i: Integer;
+  B: Byte;
 begin
-  L := Length(Value);
-  SetLength(Result, L div 2);
-  Move(Value[0], Result[1], L);
+
+  SetLength(Result, Length(Value) * 2 + 2);
+  Result[1] := '0';
+  Result[2] := 'x';
+
+  for i := Low(Value) to High(Value) do begin
+
+    B := Value[i];
+    Result[(i + 1) * 2 + 1] := AC_HEX_CHARS[B div 16];
+    Result[(i + 1) * 2 + 2] := AC_HEX_CHARS[B mod 16];
+
+  end;
+
 end;
 
-function DataToGUID(const Value: TData): TGUID;
+function HexStrToData(const Value: String): TData;
+var
+  i: Integer;
+  B: Byte;
 begin
-  Move(Value[0], Result, 16);
+
+  SetLength(Result, (Length(Value) - 2) div 2);
+
+  for i := 1 to Length(Result) do begin
+
+    B := StrToInt('$' + Value[i * 2 + 1] + Value[i * 2 + 2]);
+    Result[i - 1] := B;
+
+  end;
+
 end;
 
 function PosOf(Patterns: String; const Value: String; Start: Integer): Integer;
@@ -1058,7 +1081,7 @@ begin
   Result := DataToStr(Data);
 end;
 
-function DecodeUTF8(Value: RawByteString): String;
+function DecodeUTF8(Value: BLOB): String;
 begin
   if Copy(Value, 1, Length(BOM_UTF8)) = BOM_UTF8 then Value := Copy(Value, Length(BOM_UTF8) + 1, MaxInt);
   Result := UTF8ToString(Value);

@@ -6,8 +6,6 @@ unit uDataUtils;
 (*                                                        *)
 (**********************************************************)
 
-{ TODO -oVasilyevSM -cuDataUtils: Проискать на лишние функции }
-
 interface
 
 uses
@@ -16,14 +14,22 @@ uses
   { vSoft }
   uConsts, uTypes;
 
-{ v Преобразование основных типов данных v }
+{ v Преобразование основных типов данных друг в друга v }
 { TODO -oVasilyevSM -cuDataUtils: Продолжение следует. Умножением: Boolean, Integer, BigInt, Float, Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
 function BooleanToInt(Value: Boolean): Int64;
 function BooleanToBLOB(Value: Boolean): BLOB;
 function IntToBoolean(Value: Int64): Boolean;
 function BLOBToBoolean(const Value: BLOB): Boolean;
+function BLOBToInt(const Value: BLOB): Integer;
+function BLOBToBigInt(const Value: BLOB): Int64;
+function DataToBoolean(const Value: TData): Boolean;
+function DataToInt(const Value: TData): Integer;
+function DataToBigInt(const Value: TData): Int64;
+// ...
+function DataToGUID(const Value: TData): TGUID;
 function DataToAnsiStr(const Value: TData): AnsiString;
-{ ^ Преобразование основных типов данных ^ }
+function DataToStr(const Value: TData): String;
+{ ^ Преобразование основных типов данных друг в друга ^ }
 
 { v Cравнение действительных чисел с отбросом "мусорной" части v }
 function SameDouble(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
@@ -91,12 +97,62 @@ begin
 
 end;
 
+function BLOBToInt(const Value: BLOB): Integer;
+begin
+  { TODO 1 -oVasilyevSM -cConversions: New }
+//  Ожидаемое Move(Value[1], Result, SizeOf(Result)); не сработало. Наверное, в обратном порядке лежит
+  Result := DataToInt(TData(BytesOf(Value))); // 255
+end;
+
+function BLOBToBigInt(const Value: BLOB): Int64;
+begin
+  { TODO 1 -oVasilyevSM -cConversions: New }
+  Move(Value[1], Result, SizeOf(Result));
+end;
+
+function DataToBoolean(const Value: TData): Boolean;
+begin
+
+  if (Length(Value) = 1) and (Value[0] in [0, 1]) then
+
+    Result := Value[0] = 1
+
+  else raise EConvertError.Create('It is not a Boolean value');
+
+end;
+
+function DataToInt(const Value: TData): Integer;
+begin
+  { TODO 1 -oVasilyevSM -cConversions: New }
+  Move(Value[0], Result, SizeOf(Result));
+end;
+
+function DataToBigInt(const Value: TData): Int64;
+begin
+  { TODO 1 -oVasilyevSM -cConversions: New }
+  Move(Value[0], Result, SizeOf(Result));
+end;
+
+function DataToGUID(const Value: TData): TGUID;
+begin
+  Move(Value[0], Result, SizeOf(Result));
+end;
+
 function DataToAnsiStr(const Value: TData): AnsiString;
 var
   L: Integer;
 begin
   L := Length(Value);
   SetLength(Result, L);
+  Move(Value[0], Result[1], L);
+end;
+
+function DataToStr(const Value: TData): String;
+var
+  L: Integer;
+begin
+  L := Length(Value);
+  SetLength(Result, L div 2);
   Move(Value[0], Result[1], L);
 end;
 

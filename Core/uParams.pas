@@ -22,7 +22,7 @@ type
   { TODO 1 -oVasilyevSM -cTParam: Продолжение следует. Остался только dtData. }
   { Похоже, что Double это действительно псевдоним Extended. Значения с большим количеством знаков урезаются одинаково.
     Странно только что в Win64 SizeOf(Extended) = 10, а не 16, как утверждает справка по RADStudio. }
-  TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, dtExtended, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
+  TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, dtExtended, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, dtData, dtParams);
 
   TParams = class;
 
@@ -30,7 +30,7 @@ type
 
   const
 
-    SC_SELF_ALLOCATED_TYPES = [dtAnsiString, dtString, dtBLOB, {dtData,}dtParams];
+    SC_SELF_ALLOCATED_TYPES = [dtAnsiString, dtString, dtBLOB, dtData, dtParams];
 
   strict private
 
@@ -62,7 +62,8 @@ type
     function GetAsGUID: TGUID;
     function GetAsAnsiString: AnsiString;
     function GetAsString: String;
-    function GetAsBLOB: RawByteString;
+    function GetAsBLOB: BLOB;
+    function GetAsData: TData;
     function GetAsParams: TParams;
 
     procedure SetAsBoolean(_Value: Boolean);
@@ -74,7 +75,8 @@ type
     procedure SetAsGUID(const _Value: TGUID);
     procedure SetAsAnsiString(const _Value: AnsiString);
     procedure SetAsString(const _Value: String);
-    procedure SetAsBLOB(const _Value: RawByteString);
+    procedure SetAsBLOB(const _Value: BLOB);
+    procedure SetAsData(const _Value: TData);
     procedure SetAsParams(_Value: TParams);
     { ^ Using FData methods ^ }
 
@@ -106,7 +108,8 @@ type
     property AsGUID: TGUID read GetAsGUID write SetAsGUID;
     property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
     property AsString: String read GetAsString write SetAsString;
-    property AsBLOB: RawByteString read GetAsBLOB write SetAsBLOB;
+    property AsBLOB: BLOB read GetAsBLOB write SetAsBLOB;
+    property AsData: TData read GetAsData write SetAsData;
     {
 
       Это свойство должно записываться только из класса TParams по вызову As... с указанием пути. В смысле, в конце
@@ -143,7 +146,8 @@ type
 //    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
 //    property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
 //    property AsString: String read GetAsString write SetAsString;
-//    property AsBLOB: RawByteString read GetAsBLOB write SetAsBLOB;
+//    property AsBLOB: BLOB read GetAsBLOB write SetAsBLOB;
+//    property AsData: TData read GetAsData write SetAsData;
 
   end;
 
@@ -182,6 +186,7 @@ type
     function GetAsAnsiString(_Path: String): AnsiString;
     function GetAsString(_Path: String): String;
     function GetAsBLOB(_Path: String): BLOB;
+    function GetAsData(_Path: String): TData;
     function GetAsParams(_Path: String): TParams;
 
     procedure SetIsNull(const _Path: String; const _Value: Boolean);
@@ -195,6 +200,7 @@ type
     procedure SetAsAnsiString(_Path: String; const _Value: AnsiString);
     procedure SetAsString(_Path: String; const _Value: String);
     procedure SetAsBLOB(_Path: String; const _Value: BLOB);
+    procedure SetAsData(_Path: String; const _Value: TData);
     procedure SetAsParams(_Path: String; _Value: TParams);
 
     function GetParam(_Path: String): TParam;
@@ -229,6 +235,7 @@ type
     function FindAnsiString(const _Path: String; var _Value: AnsiString): Boolean;
     function FindString(const _Path: String; var _Value: String): Boolean;
     function FindBLOB(const _Path: String; var _Value: BLOB): Boolean;
+    function FindData(const _Path: String; var _Value: TData): Boolean;
     function FindParams(const _Path: String; var _Value: TParams): Boolean;
 
     function AsBooleanDef(const _Path: String; _Default: Boolean): Boolean;
@@ -241,6 +248,8 @@ type
     function AsAnsiStringDef(const _Path: String; _Default: AnsiString): AnsiString;
     function AsStringDef(const _Path: String; _Default: String): String;
     function AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
+    function AsDataDef(const _Path: String; _Default: TData): TData;
+    // Параметры снаружи не берем
 
     function SaveToString: String;
     procedure LoadFromString(const _Value: String);
@@ -257,6 +266,7 @@ type
     property AsAnsiString[_Path: String]: AnsiString read GetAsAnsiString write SetAsAnsiString;
     property AsString[_Path: String]: String read GetAsString write SetAsString;
     property AsBLOB[_Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
+    property AsData[_Path: String]: TData read GetAsData write SetAsData;
     property AsParams[_Path: String]: TParams read GetAsParams;
 
     property PathSeparator: Char read FPathSeparator;
@@ -329,6 +339,7 @@ const
       { dtAnsiString } 'AnsiString',
       { dtString     } 'String',
       { dtBLOB       } 'BLOB',
+      { dtData       } 'Data',
       { dtParams     } 'Params'
 
   );
@@ -498,6 +509,7 @@ begin
       dtAnsiString: Result := String(AnsiString  (FData     ));
       dtString:     Result := String             (FData      );
       dtBLOB:       Result := BLOBToHexStr       (AsBLOB     );
+      dtData:       Result := DataToHexStr       (AsData     );
       dtParams:     Result := ParamsToStr(TParams(FData     ));
 
     else
@@ -506,10 +518,16 @@ begin
 
 end;
 
-function TParam.GetAsBLOB: RawByteString;
+function TParam.GetAsBLOB: BLOB;
 begin
   CheckDataType(dtBLOB);
-  Result := RawByteString(FData);
+  Result := BLOB(FData);
+end;
+
+function TParam.GetAsData: TData;
+begin
+  CheckDataType(dtData);
+  Result := TData(FData);
 end;
 
 function TParam.GetAsParams: TParams;
@@ -572,10 +590,16 @@ begin
   String(FData) := _Value;
 end;
 
-procedure TParam.SetAsBLOB(const _Value: RawByteString);
+procedure TParam.SetAsBLOB(const _Value: BLOB);
 begin
   PresetData(dtBLOB);
-  RawByteString(FData) := _Value;
+  BLOB(FData) := _Value;
+end;
+
+procedure TParam.SetAsData(const _Value: TData);
+begin
+  PresetData(dtData);
+  TData(FData) := _Value;
 end;
 
 procedure TParam.SetAsParams(_Value: TParams);
@@ -638,9 +662,10 @@ begin
   { Память строк освобождается так. }
   case FDataType of
 
-    dtAnsiString: AnsiString(FData)    := '';
-    dtString:     String(FData)        := '';
-    dtBLOB:       RawByteString(FData) := '';
+    dtAnsiString: AnsiString(FData) := '';
+    dtString:     String(FData)     := '';
+    dtBLOB:       BLOB(FData)       := '';
+    dtData:       SetLength(TData(FData), 0);
 
   end;
 
@@ -664,6 +689,7 @@ begin
     dtString:     Result := 0;
     dtGUID:       Result := SizeOf(TGUID);
     dtBLOB:       Result := 0;
+    dtData:       Result := 0;
     dtParams:     Result := SizeOf(TObject);
 
   else
@@ -720,6 +746,7 @@ begin
       dtAnsiString: AsAnsiString := _Source.AsAnsiString;
       dtString:     AsString     := _Source.AsString;
       dtBLOB:       AsBLOB       := _Source.AsBLOB;
+      dtData:       AsData       := _Source.AsData;
       dtParams:     AsParams.Assign(_Source.AsParams);
 
     else
@@ -752,6 +779,7 @@ begin
       dtAnsiString: Result := StrToBoolean(String(AsAnsiString));
       dtString:     Result := StrToBoolean(AsString);
       dtBLOB:       Result := BLOBToBoolean(AsBLOB);
+      dtData:       Result := DataToBoolean(AsData);
 
     else
       Result := GetAsBoolean;
@@ -771,7 +799,8 @@ begin
       dtBigInt:     Result := AsBigInt;
       dtAnsiString: Result := StrToInt(String(AsAnsiString));
       dtString:     Result := StrToInt(AsString);
-      dtBLOB:       raise EUncomplitedMethod.Create;
+      dtBLOB:       Result := BLOBToInt(AsBLOB);
+      dtData:       Result := DataToInt(AsData);
 
     else
       Result := GetAsInteger;
@@ -791,7 +820,8 @@ begin
       dtInteger:    Result := AsInteger;
       dtAnsiString: Result := StrToBigInt(String(AsAnsiString));
       dtString:     Result := StrToBigInt(AsString);
-      dtBLOB:       raise EUncomplitedMethod.Create;
+      dtBLOB:       Result := BLOBToBigInt(AsBLOB);
+      dtData:       Result := DataToBigInt(AsData);
 
     else
       Result := GetAsBigInt;
@@ -886,6 +916,11 @@ begin
   Result := ParamByName(_Path).AsBLOB;
 end;
 
+function TParams.GetAsData(_Path: String): TData;
+begin
+  Result := ParamByName(_Path).AsData;
+end;
+
 function TParams.GetAsParams(_Path: String): TParams;
 begin
   Result := ParamByName(_Path).AsParams;
@@ -944,6 +979,11 @@ end;
 procedure TParams.SetAsBLOB(_Path: String; const _Value: BLOB);
 begin
   GetParam(_Path).AsBLOB := _Value;
+end;
+
+procedure TParams.SetAsData(_Path: String; const _Value: TData);
+begin
+  GetParam(_Path).AsData := _Value;
 end;
 
 procedure TParams.SetAsParams(_Path: String; _Value: TParams);
@@ -1151,6 +1191,14 @@ begin
   if Result then _Value := P.AsBLOB;
 end;
 
+function TParams.FindData(const _Path: String; var _Value: TData): Boolean;
+var
+  P: TParam;
+begin
+  Result := FindParam(_Path, dtData, P);
+  if Result then _Value := P.AsData;
+end;
+
 function TParams.FindParams(const _Path: String; var _Value: TParams): Boolean;
 var
   P: TParam;
@@ -1216,6 +1264,12 @@ end;
 function TParams.AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
 begin
   if not FindBLOB(_Path, Result) then AsBLOB[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsDataDef(const _Path: String; _Default: TData): TData;
+begin
+  if not FindData(_Path, Result) then AsData[_Path] := _Default;
   Result := _Default;
 end;
 
@@ -1430,6 +1484,7 @@ begin
       dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(               Value );
       dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(          Value );
       dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(             Value );
+      dtData:       FParams.AsData      [FCurrentName] := HexStrToData(             Value );
 
     end
 
