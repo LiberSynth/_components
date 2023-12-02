@@ -493,10 +493,6 @@ end;
 procedure TCustomStringParser.UpdateLocation;
 begin
 
-  { TODO 3 -oVasilyevSM -cSyntax: Отрицательный столбец:
-    E: String = '''
-    I: Integer = 123}
-
   if
 
       (Copy(Source, Cursor - 1, 2) <> CRLF) and (

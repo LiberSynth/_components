@@ -6,7 +6,8 @@ unit uParams;
 (*                                                        *)
 (**********************************************************)
 
-{ TODO -oVasilyevSM -cuParams: Кроме SaveToString/LoadFromString нужны SaveToStream/LoadFromStream }
+{ TODO 10 -oVasilyevSM -cuParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
+{ TODO 10 -oVasilyevSM -cuParams: Кроме SaveToString/LoadFromString нужны SaveToStream/LoadFromStream }
 
 interface
 
@@ -148,11 +149,33 @@ type
 
   }
 
+  TSaveToStringOptions = record
+
+  strict private
+
+    FSingleString: Boolean;
+    FForceQuoteStrings: Boolean;
+
+    procedure SetSingleString(const _Value: Boolean);
+    procedure SetForceQuoteStrings(const _Value: Boolean);
+
+  public
+
+    constructor Create(_SingleString: Boolean; _ForceQuoteStrings: Boolean);
+
+    property SingleString: Boolean read FSingleString;
+    property ForceQuoteStrings: Boolean read FForceQuoteStrings;
+
+  end;
+
+  { Некоторые корневые свойства намеренно задаются один раз при создании объекта. Не нужно их менять на ходу. }
   TParams = class(TObjectList<TParam>)
+{ TODO 1 -oVasilyevSM -cTParams: +Режим сохранения, с типами/без типов }
 
   strict private
 
     FPathSeparator: Char;
+    FSaveToStringOptions: TSaveToStringOptions;
 
     function GetParam(_Path: String): TParam;
 
@@ -180,15 +203,15 @@ type
     procedure SetAsBLOB(_Path: String; const _Value: BLOB);
     procedure SetAsParams(_Path: String; _Value: TParams);
 
-    property PathSeparator: Char read FPathSeparator;
-
   protected
 
     procedure Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification); override;
 
   public
 
-    constructor Create(const _PathSeparator: Char = '.');
+    constructor Create(const _PathSeparator: Char; const _SaveToStringOptions: TSaveToStringOptions); overload;
+    constructor Create(const _PathSeparator: Char = '.'); overload;
+    constructor Create(const _SaveToStringOptions: TSaveToStringOptions); overload;
 
     function Add(const _Name: String): TParam;
     function Insert(_Index: Integer; const _Name: String): TParam;
@@ -222,6 +245,8 @@ type
     function AsStringDef(const _Path: String; _Default: String): String;
     function AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
 
+    function SaveToString: String;
+
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
     property AsBigInt[const _Path: String]: Int64 read GetAsBigInt write SetAsBigInt;
@@ -232,6 +257,10 @@ type
     property AsString[_Path: String]: String read GetAsString write SetAsString;
     property AsBLOB[_Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
     property AsParams[_Path: String]: TParams read GetAsParams;
+
+    property PathSeparator: Char read FPathSeparator;
+    property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions;
+
     { v Функции и свойства для основной работы v }
 
   end;
@@ -240,19 +269,8 @@ type
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
-{ TODO -oVasilyevSM -cParamsToStr: В функции ParamsToStr нужен еще один режим, явное указание типа параметра в ини-файле
-  или без него. И тогда при считывании тип должен предварительно определяться в приложении через вызов функций
-  RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В StrToParams также можно просто на вход
-  подавать пустой контейнер с готовой структурой. Тогда она просто заполняется данными, типы известны и не требуют
-  хранения в строке. }
-function ParamsToStr(
-
-    Params: TParams;
-    SingleString: Boolean = False;
-    ForceQuoteStrings: Boolean = False
-
-
-): String;
+function ParamsToStr(Params: TParams): String;
+{ TODO 1 -oVasilyevSM -cStrToParams: -> TParams.LoadFromString. Этуфункцию можно оставить, но в ней вызывать LoadFromString }
 procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
@@ -331,92 +349,9 @@ begin
 
 end;
 
-function ParamsToStr(Params: TParams; SingleString: Boolean; ForceQuoteStrings: Boolean): String;
-const
-
-  SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
-  SC_SingleParamSingleStringFormat = '%s: %s = %s;';
-
-  SC_NestedParamsMultiStringFormat =
-
-      '%s: %s = (' + CRLF +
-      '%s' +
-      ')' + CRLF;
-
-  SC_NestedParamsSingleStringFormat =
-
-      '%s: %s = (%s);';
-
-  function _NestedParamsFormat: String;
-  begin
-    if SingleString then Result := SC_NestedParamsSingleStringFormat
-    else Result := SC_NestedParamsMultiStringFormat;
-  end;
-
-  function _SingleParamFormat: String;
-  begin
-    if SingleString then Result := SC_SingleParamSingleStringFormat
-    else Result := SC_SingleParamMultiStringFormat;
-  end;
-
-  function _GetNested(_Param: TParam): String;
-  begin
-    Result := ParamsToStr(_Param.AsParams, SingleString, ForceQuoteStrings);
-    if not SingleString then ShiftText(1, Result);
-  end;
-
-  function _QuoteString(_Param: TParam): String;
-  begin
-
-    Result := _Param.AsString;
-
-    if _Param.DataType in [dtAnsiString, dtString] then
-
-      if
-
-          ForceQuoteStrings or
-          { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
-          (Pos(CR,   Result) > 0) or
-          (Pos(LF,   Result) > 0) or
-          (Pos(';',  Result) > 0) or
-          (Pos('''', Result) > 0) or
-          (Pos('"',  Result) > 0) or
-          (Pos('(',  Result) > 0) or
-          (Pos(')',  Result) > 0)
-
-      then Result := QuoteStr(Result);
-
-  end;
-
-var
-  Param: TParam;
+function ParamsToStr(Params: TParams): String;
 begin
-
-  Result := '';
-  for Param in Params do
-
-    if Param.DataType = dtParams then
-
-      Result := Result + Format(_NestedParamsFormat, [
-
-          Param.Name,
-          ParamDataTypeToStr(Param.DataType),
-          _GetNested(Param)
-
-      ])
-
-    else
-
-      Result := Result + Format(_SingleParamFormat, [
-
-          Param.Name,
-          ParamDataTypeToStr(Param.DataType),
-          _QuoteString(Param)
-
-      ]);
-
-  if SingleString then CutStr(Result, 1);
-
+  Result := Params.SaveToString;
 end;
 
 procedure StrToParams(const Value: String; Params: TParams);
@@ -848,12 +783,46 @@ begin
   SetAsBigInt(_Value);
 end;
 
+{ TSaveToStringOptions }
+
+constructor TSaveToStringOptions.Create(_SingleString, _ForceQuoteStrings: Boolean);
+begin
+  FSingleString      := _SingleString;
+  FForceQuoteStrings := _ForceQuoteStrings;
+end;
+
+procedure TSaveToStringOptions.SetSingleString(const _Value: Boolean);
+begin
+  FSingleString := _Value;
+end;
+
+procedure TSaveToStringOptions.SetForceQuoteStrings(const _Value: Boolean);
+begin
+  FForceQuoteStrings := _Value;
+end;
+
 { TParams }
 
-constructor TParams.Create(const _PathSeparator: Char);
+constructor TParams.Create(const _PathSeparator: Char; const _SaveToStringOptions: TSaveToStringOptions);
 begin
+
   inherited Create;
+
   FPathSeparator := _PathSeparator;
+  FSaveToStringOptions := _SaveToStringOptions;
+
+end;
+
+constructor TParams.Create(const _PathSeparator: Char);
+const
+  STSO_EMPTY: TSaveToStringOptions = (FSingleString: False; FForceQuoteStrings: False);
+begin
+  Create(_PathSeparator, STSO_EMPTY);
+end;
+
+constructor TParams.Create(const _SaveToStringOptions: TSaveToStringOptions);
+begin
+  Create('.', _SaveToStringOptions);
 end;
 
 function TParams.GetParam(_Path: String): TParam;
@@ -874,7 +843,7 @@ begin
 
       with Params.Add(SingleName) do begin
 
-        SetAsParams(TParams.Create);
+        SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
         Params := AsParams;
 
       end;
@@ -1006,13 +975,15 @@ var
   Src, Dst: TParam;
 begin
 
+  { TODO 2 -oVasilyevSM -cTParams.Assign: Многострочные параметры записываются в одну строку. Остается только последний. }
+
   for Src in _Source do begin
 
     if not FindParam(Src.Name, Src.DataType, Dst) then begin
 
       Dst := Add(Src.Name);
       if Src.DataType = dtParams then
-        Dst.SetAsParams(TParams.Create);
+        Dst.SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
 
     end;
 
@@ -1218,6 +1189,91 @@ begin
   Result := _Default;
 end;
 
+function TParams.SaveToString: String;
+const
+
+  SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
+  { TODO 1 -oVasilyevSM -cTParams.SaveToString: В однострочном режиме сохранять в краткой форме: '%s:%s=%s;'. }
+  SC_SingleParamSingleStringFormat = '%s: %s = %s;';
+
+  SC_NestedParamsMultiStringFormat =
+
+      '%s: %s = (' + CRLF +
+      '%s' +
+      ')' + CRLF;
+
+  SC_NestedParamsSingleStringFormat = '%s: %s = (%s);';
+
+  function _GetNested(_Param: TParam): String;
+  begin
+    Result := _Param.AsParams.SaveToString;
+    if not SaveToStringOptions.SingleString then
+      ShiftText(1, Result);
+  end;
+
+  function _QuoteString(_Param: TParam): String;
+  begin
+
+    Result := _Param.AsString;
+
+    if _Param.DataType in [dtAnsiString, dtString] then
+
+      if
+
+          SaveToStringOptions.ForceQuoteStrings or
+          { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
+          (Pos(CR,   Result) > 0) or
+          (Pos(LF,   Result) > 0) or
+          (Pos(';',  Result) > 0) or
+          (Pos('''', Result) > 0) or
+          (Pos('"',  Result) > 0) or
+          (Pos('(',  Result) > 0) or
+          (Pos(')',  Result) > 0)
+
+      then Result := QuoteStr(Result);
+
+  end;
+
+var
+  NestedParamsFormat: String;
+  SingleParamFormat: String;
+  Param: TParam;
+begin
+
+  if SaveToStringOptions.SingleString then NestedParamsFormat := SC_NestedParamsSingleStringFormat
+  else NestedParamsFormat := SC_NestedParamsMultiStringFormat;
+
+  if SaveToStringOptions.SingleString then SingleParamFormat := SC_SingleParamSingleStringFormat
+  else SingleParamFormat := SC_SingleParamMultiStringFormat;
+
+  Result := '';
+  for Param in Self do
+
+    if Param.DataType = dtParams then
+
+      Result := Result + Format(NestedParamsFormat, [
+
+          Param.Name,
+          ParamDataTypeToStr(Param.DataType),
+          _GetNested(Param)
+
+      ])
+
+    else
+
+      Result := Result + Format(SingleParamFormat, [
+
+          Param.Name,
+          ParamDataTypeToStr(Param.DataType),
+          _QuoteString(Param)
+
+      ]);
+
+  if SaveToStringOptions.SingleString then
+    CutStr(Result, 1);
+
+end;
+
 { TParamsReader }
 
 constructor TParamsReader.Create(const _Source: String; _Params: TParams);
@@ -1326,7 +1382,7 @@ var
   P: TParams;
 begin
 
-  P := TParams.Create;
+  P := TParams.Create(FParams.PathSeparator, FParams.SaveToStringOptions);
   try
 
     with TParamsReader.CreateNested(Self, P, _KeyWord.KeyLength) do
