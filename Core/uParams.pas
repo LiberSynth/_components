@@ -19,8 +19,10 @@ uses
 
 type
 
-  { TODO -oVasilyevSM -cTParam: Продолжение следует. Насчет Extended, в Вордстоке он. }
-  TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, {dtExtended, }dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
+  { TODO 1 -oVasilyevSM -cTParam: Продолжение следует. Остался только dtData. }
+  { Похоже, что Double это действительно псевдоним Extended. Значения с большим количеством знаков урезаются одинаково.
+    Странно только что в Win64 SizeOf(Extended) = 10, а не 16, как утверждает справка по RADStudio. }
+  TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, dtExtended, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, {dtData (TData),}dtParams);
 
   TParams = class;
 
@@ -55,6 +57,7 @@ type
     function GetAsInteger: Integer;
     function GetAsBigInt: Int64;
     function GetAsFloat: Double;
+    function GetAsExtended: Extended;
     function GetAsDateTime: TDateTime;
     function GetAsGUID: TGUID;
     function GetAsAnsiString: AnsiString;
@@ -66,6 +69,7 @@ type
     procedure SetAsInteger(_Value: Integer);
     procedure SetAsBigInt(_Value: Int64);
     procedure SetAsFloat(_Value: Double);
+    procedure SetAsExtended(_Value: Extended);
     procedure SetAsDateTime(_Value: TDateTime);
     procedure SetAsGUID(const _Value: TGUID);
     procedure SetAsAnsiString(const _Value: AnsiString);
@@ -97,6 +101,7 @@ type
     property AsInteger: Integer read GetAsInteger write SetAsInteger;
     property AsBigInt: Int64 read GetAsBigInt write SetAsBigInt;
     property AsFloat: Double read GetAsFloat write SetAsFloat;
+    property AsExtended: Extended read GetAsExtended write SetAsExtended;
     property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
     property AsGUID: TGUID read GetAsGUID write SetAsGUID;
     property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
@@ -133,6 +138,7 @@ type
     property AsBigInt: Int64 read _GetAsBigInt write _SetAsBigInt;
     { TODO -oVasilyevSM -cTParamHelper: Продолжение следует }
 //    property AsFloat: Double read GetAsFloat write SetAsFloat;
+//    property AsExtended: Extended read GetAsExtended write SetAsExtended;
 //    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
 //    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
 //    property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
@@ -170,6 +176,7 @@ type
     function GetAsInteger(const _Path: String): Integer;
     function GetAsBigInt(const _Path: String): Int64;
     function GetAsFloat(_Path: String): Double;
+    function GetAsExtended(_Path: String): Extended;
     function GetAsDateTime(_Path: String): TDateTime;
     function GetAsGUID(_Path: String): TGUID;
     function GetAsAnsiString(_Path: String): AnsiString;
@@ -182,6 +189,7 @@ type
     procedure SetAsInteger(const _Path: String; _Value: Integer);
     procedure SetAsBigInt(const _Path: String; _Value: Int64);
     procedure SetAsFloat(_Path: String; _Value: Double);
+    procedure SetAsExtended(_Path: String; _Value: Extended);
     procedure SetAsDateTime(_Path: String; _Value: TDateTime);
     procedure SetAsGUID(_Path: String; const _Value: TGUID);
     procedure SetAsAnsiString(_Path: String; const _Value: AnsiString);
@@ -215,6 +223,7 @@ type
     function FindInteger(const _Path: String; var _Value: Integer): Boolean;
     function FindBigInt(const _Path: String; var _Value: Int64): Boolean;
     function FindFloat(const _Path: String; var _Value: Double): Boolean;
+    function FindExtended(const _Path: String; var _Value: Extended): Boolean;
     function FindDateTime(const _Path: String; var _Value: TDateTime): Boolean;
     function FindGUID(const _Path: String; var _Value: TGUID): Boolean;
     function FindAnsiString(const _Path: String; var _Value: AnsiString): Boolean;
@@ -226,6 +235,7 @@ type
     function AsIntegerDef(const _Path: String; _Default: Integer): Integer;
     function AsBigIntDef(const _Path: String; _Default: Int64): Int64;
     function AsFloatDef(const _Path: String; _Default: Double): Double;
+    function AsExtendedDef(const _Path: String; _Default: Extended): Extended;
     function AsDateTimeDef(const _Path: String; _Default: TDateTime): TDateTime;
     function AsGUIDDef(const _Path: String; _Default: TGUID): TGUID;
     function AsAnsiStringDef(const _Path: String; _Default: AnsiString): AnsiString;
@@ -241,6 +251,7 @@ type
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
     property AsBigInt[const _Path: String]: Int64 read GetAsBigInt write SetAsBigInt;
     property AsFloat[_Path: String]: Double read GetAsFloat write SetAsFloat;
+    property AsExtended[_Path: String]: Extended read GetAsExtended write SetAsExtended;
     property AsDateTime[_Path: String]: TDateTime read GetAsDateTime write SetAsDateTime;
     property AsGUID[_Path: String]: TGUID read GetAsGUID write SetAsGUID;
     property AsAnsiString[_Path: String]: AnsiString read GetAsAnsiString write SetAsAnsiString;
@@ -312,6 +323,7 @@ const
       { dtInteger    } 'Integer',
       { dtBigInt     } 'BigInt',
       { dtFloat      } 'Float',
+      { dtExtended   } 'Extended',
       { dtDateTime   } 'DateTime',
       { dtGUID       } 'GUID',
       { dtAnsiString } 'AnsiString',
@@ -422,6 +434,17 @@ begin
 
 end;
 
+function TParam.GetAsExtended: Extended;
+begin
+
+
+  CheckDataType(dtExtended);
+
+  if IsNull then Result := 0
+  else Move(FData^, Result, DataSize);
+
+end;
+
 function TParam.GetAsDateTime: TDateTime;
 begin
 
@@ -469,6 +492,7 @@ begin
       dtInteger:    Result := IntToStr           (AsInteger  );
       dtBigInt:     Result := BigIntToStr        (AsBigInt   );
       dtFloat:      Result := DoubleToStr        (AsFloat    );
+      dtExtended:   Result := ExtendedToStr      (AsExtended );
       dtDateTime:   Result := DateTimeToStr      (AsDateTime );
       dtGUID:       Result := GUIDToStr          (AsGUID     );
       dtAnsiString: Result := String(AnsiString  (FData     ));
@@ -515,6 +539,12 @@ end;
 procedure TParam.SetAsFloat(_Value: Double);
 begin
   PresetData(dtFloat);
+  Move(_Value, FData^, DataSize);
+end;
+
+procedure TParam.SetAsExtended(_Value: Extended);
+begin
+  PresetData(dtExtended);
   Move(_Value, FData^, DataSize);
 end;
 
@@ -628,6 +658,7 @@ begin
     dtInteger:    Result := SizeOf(Integer);
     dtBigInt:     Result := SizeOf(Int64);
     dtFloat:      Result := SizeOf(Double);
+    dtExtended:   Result := SizeOf(Extended);
     dtDateTime:   Result := SizeOf(TDateTime);
     dtAnsiString: Result := 0;
     dtString:     Result := 0;
@@ -683,6 +714,7 @@ begin
       dtInteger:    AsInteger    := _Source.AsInteger;
       dtBigInt:     AsBigInt     := _Source.AsBigInt;
       dtFloat:      AsFloat      := _Source.AsFloat;
+      dtExtended:   AsExtended   := _Source.AsExtended;
       dtDateTime:   AsDateTime   := _Source.AsDateTime;
       dtGUID:       AsGUID       := _Source.AsGUID;
       dtAnsiString: AsAnsiString := _Source.AsAnsiString;
@@ -824,6 +856,11 @@ begin
   Result := ParamByName(_Path).AsFloat;
 end;
 
+function TParams.GetAsExtended(_Path: String): Extended;
+begin
+  Result := ParamByName(_Path).AsExtended;
+end;
+
 function TParams.GetAsDateTime(_Path: String): TDateTime;
 begin
   Result := ParamByName(_Path).AsDateTime;
@@ -877,6 +914,11 @@ end;
 procedure TParams.SetAsFloat(_Path: String; _Value: Double);
 begin
   GetParam(_Path).AsFloat := _Value;
+end;
+
+procedure TParams.SetAsExtended(_Path: String; _Value: Extended);
+begin
+  GetParam(_Path).AsExtended := _Value;
 end;
 
 procedure TParams.SetAsDateTime(_Path: String; _Value: TDateTime);
@@ -1061,6 +1103,14 @@ begin
   if Result then _Value := P.AsFloat;
 end;
 
+function TParams.FindExtended(const _Path: String; var _Value: Extended): Boolean;
+var
+  P: TParam;
+begin
+  Result := FindParam(_Path, dtExtended, P);
+  if Result then _Value := P.AsExtended;
+end;
+
 function TParams.FindDateTime(const _Path: String; var _Value: TDateTime): Boolean;
 var
   P: TParam;
@@ -1130,6 +1180,12 @@ end;
 function TParams.AsFloatDef(const _Path: String; _Default: Double): Double;
 begin
   if not FindFloat(_Path, Result) then AsFloat[_Path] := _Default;
+  Result := _Default;
+end;
+
+function TParams.AsExtendedDef(const _Path: String; _Default: Extended): Extended;
+begin
+  if not FindExtended(_Path, Result) then AsExtended[_Path] := _Default;
   Result := _Default;
 end;
 
@@ -1364,15 +1420,16 @@ begin
 
     case FCurrentType of
 
-      dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(           Value );
-      dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(   TrimDigital(Value));
-      dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(Value));
-      dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(Value));
-      dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(          Value );
-      dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(              Value );
-      dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(             Value );
-      dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(        Value );
-      dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(           Value );
+      dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(             Value );
+      dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(     TrimDigital(Value));
+      dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(  TrimDigital(Value));
+      dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(  TrimDigital(Value));
+      dtExtended:   FParams.AsExtended  [FCurrentName] := StrToExtended(TrimDigital(Value));
+      dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(            Value );
+      dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(                Value );
+      dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(               Value );
+      dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(          Value );
+      dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(             Value );
 
     end
 

@@ -29,6 +29,8 @@ function BigIntToStr(Value: Int64): String;
 function StrToBigInt(const Value: String): Int64;
 function DoubleToStr(Value: Double): String;
 function StrToDouble(const Value: String): Double;
+function ExtendedToStr(Value: Extended): String;
+function StrToExtended(const Value: String): Extended;
 function DateTimeToStr(Value: TDateTime): String;
 function StrToDateTime(const Value: String): TDateTime;
 function GUIDToStr(const Value: TGUID) : String;
@@ -191,7 +193,16 @@ end;
 
 function StrToDouble(const Value: String): Double;
 begin
-  { TODO -oVasilyevSM -cStrToDouble: Дельфина округляет до 6 знаков после запятой. }
+  Result := SysUtils.StrToFloat(GetFloatStr(Value));
+end;
+
+function ExtendedToStr(Value: Extended): String;
+begin
+  Result := SysUtils.FloatToStr(Value);
+end;
+
+function StrToExtended(const Value: String): Extended;
+begin
   Result := SysUtils.StrToFloat(GetFloatStr(Value));
 end;
 
