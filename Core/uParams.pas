@@ -85,7 +85,7 @@ type
 
     procedure Clear;
     { Для передачи без разбора типов }
-    procedure Assign(_Source: TParam);
+    procedure AssignValue(_Source: TParam);
     class procedure ValidateName(const _Value, _PathSeparator: String);
 
     property DataType: TParamDataType read FDataType;
@@ -667,25 +667,32 @@ begin
 
 end;
 
-procedure TParam.Assign(_Source: TParam);
+procedure TParam.AssignValue(_Source: TParam);
 begin
 
-  case _Source.DataType of
+  if _Source.IsNull then begin
 
-    dtBoolean:    AsBoolean    := _Source.AsBoolean;
-    dtInteger:    AsInteger    := _Source.AsInteger;
-    dtBigInt:     AsBigInt     := _Source.AsBigInt;
-    dtFloat:      AsFloat      := _Source.AsFloat;
-    dtDateTime:   AsDateTime   := _Source.AsDateTime;
-    dtGUID:       AsGUID       := _Source.AsGUID;
-    dtAnsiString: AsAnsiString := _Source.AsAnsiString;
-    dtString:     AsString     := _Source.AsString;
-    dtBLOB:       AsBLOB       := _Source.AsBLOB;
-    dtParams:     AsParams.Assign(_Source.AsParams);
+    IsNull := True;
+    SetDataType(_Source.DataType);
 
-  else
-    raise EUncomplitedMethod.Create;
-  end;
+  end else
+
+    case _Source.DataType of
+
+      dtBoolean:    AsBoolean    := _Source.AsBoolean;
+      dtInteger:    AsInteger    := _Source.AsInteger;
+      dtBigInt:     AsBigInt     := _Source.AsBigInt;
+      dtFloat:      AsFloat      := _Source.AsFloat;
+      dtDateTime:   AsDateTime   := _Source.AsDateTime;
+      dtGUID:       AsGUID       := _Source.AsGUID;
+      dtAnsiString: AsAnsiString := _Source.AsAnsiString;
+      dtString:     AsString     := _Source.AsString;
+      dtBLOB:       AsBLOB       := _Source.AsBLOB;
+      dtParams:     AsParams.Assign(_Source.AsParams);
+
+    else
+      raise EUncomplitedMethod.Create;
+    end;
 
 end;
 
@@ -948,19 +955,13 @@ var
   Src, Dst: TParam;
 begin
 
-  { TODO 3 -oVasilyevSM -cTParams.Assign: Многострочные параметры записываются в одну строку. Остается только последний. }
-
   for Src in _Source do begin
 
-    if not FindParam(Src.Name, Src.DataType, Dst) then begin
+    Dst := Add(Src.Name);
+    if Src.DataType = dtParams then
+      Dst.SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
 
-      Dst := Add(Src.Name);
-      if Src.DataType = dtParams then
-        Dst.SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
-
-    end;
-
-    Dst.Assign(Src);
+    Dst.AssignValue(Src);
 
   end;
 

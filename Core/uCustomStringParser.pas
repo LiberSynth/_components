@@ -261,7 +261,7 @@ end;
 
 function TKeyWordHelper.GetKeyType: TKeyWordType;
 begin
-  Result := TKeyWordType(KeyTypeInternal)
+  Result := TKeyWordType(KeyTypeInternal);
 end;
 
 procedure TKeyWordHelper.SetKeyType(const _Value: TKeyWordType);
