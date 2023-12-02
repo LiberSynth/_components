@@ -6,7 +6,8 @@ unit uParams;
 (*                                                        *)
 (**********************************************************)
 
-{ TODO 10 -oVasilyevSM -cuParams: ƒл€ работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или как табличные записи. —ейчас ParamByName вернет первый из списка и все.  }
+{ TODO 10 -oVasilyevSM -cuParams: ƒл€ работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или
+  как табличные записи. —ейчас ParamByName вернет первый из списка и все.  }
 
 interface
 
@@ -46,6 +47,8 @@ type
     procedure PresetData(_DataType: TParamDataType);
 
   private
+
+    procedure SetDataType(_Value: TParamDataType);
 
     { v Using FData methods v }
     function GetAsBoolean: Boolean;
@@ -101,9 +104,10 @@ type
     property AsBLOB: RawByteString read GetAsBLOB write SetAsBLOB;
     {
 
-      Ёто свойство должно записыватьс€ только из класса TParams по вызову As... с указанием пути. ѕотому что AsParams,
-      заданный снаружи должен оставатьс€ в пам€ти, пока он нужен создавшему его объекту и должен освободитьс€ этим
-      объектом. Ёто ненадежно, потому что утечки случаютс€ при таком подходе. ƒа и вообще, каша получитс€.
+      Ёто свойство должно записыватьс€ только из класса TParams по вызову As... с указанием пути. ¬ смысле, в конце
+      параметр, но с путем, который создаетс€ в виде вложенных параметров. » только так, потому что AsParams, заданный
+      снаружи должен оставатьс€ в пам€ти, пока он нужен создавшему его объекту и должен освобождатсь€ этим объектом.
+      Ёто ненадежно, потому что допускает веро€тность ошибок, влекущих утечки. ƒа и вообще, каша получитс€.
 
     }
     property AsParams: TParams read GetAsParams;
@@ -159,10 +163,9 @@ type
     FPathSeparator: Char;
     FSaveToStringOptions: TSaveToStringOptions;
 
-    function GetParam(_Path: String): TParam;
-
   private
 
+    function GetIsNull(const _Path: String): Boolean;
     function GetAsBoolean(const _Path: String): Boolean;
     function GetAsInteger(const _Path: String): Integer;
     function GetAsBigInt(const _Path: String): Int64;
@@ -174,6 +177,7 @@ type
     function GetAsBLOB(_Path: String): BLOB;
     function GetAsParams(_Path: String): TParams;
 
+    procedure SetIsNull(const _Path: String; const _Value: Boolean);
     procedure SetAsBoolean(const _Path: String; _Value: Boolean);
     procedure SetAsInteger(const _Path: String; _Value: Integer);
     procedure SetAsBigInt(const _Path: String; _Value: Int64);
@@ -184,6 +188,8 @@ type
     procedure SetAsString(_Path: String; const _Value: String);
     procedure SetAsBLOB(_Path: String; const _Value: BLOB);
     procedure SetAsParams(_Path: String; _Value: TParams);
+
+    function GetParam(_Path: String): TParam;
 
   protected
 
@@ -230,6 +236,7 @@ type
     procedure LoadFromString(const _Value: String);
     { TODO 10 -oVasilyevSM -cuParams: SaveToStream/LoadFromStream }
 
+    property IsNull[const _Path: String]: Boolean read GetIsNull write SetIsNull;
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
     property AsBigInt[const _Path: String]: Int64 read GetAsBigInt write SetAsBigInt;
@@ -360,6 +367,19 @@ destructor TParam.Destroy;
 begin
   FreeData;
   inherited Destroy;
+end;
+
+procedure TParam.SetDataType(_Value: TParamDataType);
+begin
+
+  if _Value <> FDataType then begin
+
+    if not IsNull then
+      FreeData;
+    FDataType := _Value;
+
+  end;
+
 end;
 
 function TParam.GetAsBoolean: Boolean;
@@ -772,39 +792,9 @@ begin
   Create('.', _SaveToStringOptions);
 end;
 
-function TParams.GetParam(_Path: String): TParam;
-var
-  SingleName: String;
-  Params: TParams;
-  Param: TParam;
+function TParams.GetIsNull(const _Path: String): Boolean;
 begin
-
-  Params := Self;
-
-  while Pos(FPathSeparator, _Path) > 0 do begin
-
-    SingleName := ReadStrTo(_Path, FPathSeparator, False);
-
-    if Params.FindParam(SingleName, dtParams, Param) then Params := Param.AsParams
-    else
-
-      with Params.Add(SingleName) do begin
-
-        SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
-        Params := AsParams;
-
-      end;
-
-  end;
-
-  {
-
-    ƒл€ возможности многострочных структур просто параметры не поддерживают чтение без типов. —охранение с
-    зарегистрированными типами должно исполн€тс€ в потомках. ѕоэтому, просто Add.
-
-  }
-  Result := Params.Add(_Path);
-
+  Result := ParamByName(_Path).IsNull;
 end;
 
 function TParams.GetAsBoolean(const _Path: String): Boolean;
@@ -857,6 +847,11 @@ begin
   Result := ParamByName(_Path).AsParams;
 end;
 
+procedure TParams.SetIsNull(const _Path: String; const _Value: Boolean);
+begin
+  GetParam(_Path).IsNull := _Value;
+end;
+
 procedure TParams.SetAsBoolean(const _Path: String; _Value: Boolean);
 begin
   GetParam(_Path).AsBoolean := _Value;
@@ -905,6 +900,37 @@ end;
 procedure TParams.SetAsParams(_Path: String; _Value: TParams);
 begin
   GetParam(_Path).SetAsParams(_Value);
+end;
+
+function TParams.GetParam(_Path: String): TParam;
+var
+  SingleName: String;
+  Params: TParams;
+  Param: TParam;
+begin
+
+  Params := Self;
+
+  while Pos(FPathSeparator, _Path) > 0 do begin
+
+    SingleName := ReadStrTo(_Path, FPathSeparator, False);
+
+    if Params.FindParam(SingleName, dtParams, Param) then Params := Param.AsParams
+    else
+
+      with Params.Add(SingleName) do begin
+
+        SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
+        Params := AsParams;
+
+      end;
+
+  end;
+
+  { ƒл€ возможности многострочных структур просто параметры не поддерживают чтение без типов. —охранение с
+    зарегистрированными типами должно исполн€тс€ в потомках. ѕоэтому, просто Add. }
+  Result := Params.Add(_Path);
+
 end;
 
 procedure TParams.Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification);
@@ -1318,15 +1344,9 @@ begin
 end;
 
 procedure TParamsReader.ReadType(const _KeyWord: TKeyWord);
-var
-  Value: String;
 begin
-
-  Value := ReadItem(True);
-
-  FCurrentType := StrToParamDataType(Value);
+  FCurrentType := StrToParamDataType(ReadItem(True));
   CheckPresetType;
-
 end;
 
 procedure TParamsReader.ReadValue(const _KeyWord: TKeyWord);
@@ -1339,19 +1359,30 @@ begin
   { «десь нужно это вызывать. “ип может не хранитьс€ в строке и его чтени€ не будет. “огда вытаскиваем его здесь. }
   CheckPresetType;
 
-  case FCurrentType of
+  if Length(Value) > 0 then
 
-    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(           Value );
-    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(   TrimDigital(Value));
-    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(Value));
-    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(Value));
-    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(          Value );
-    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(              Value );
-    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(             Value );
-    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(        Value );
-    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(           Value );
+    case FCurrentType of
 
-  end;
+      dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(           Value );
+      dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(   TrimDigital(Value));
+      dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(Value));
+      dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(Value));
+      dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(          Value );
+      dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(              Value );
+      dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(             Value );
+      dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(        Value );
+      dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(           Value );
+
+    end
+
+  else
+
+    with FParams.GetParam(FCurrentName) do begin
+
+      IsNull := True;
+      SetDataType(FCurrentType);
+
+    end;
 
   FCurrentName := '';
   FCurrentType := dtUnknown;

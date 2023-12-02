@@ -51,7 +51,7 @@ type
     Terminator: TKeyWordType;
     Nested: Boolean;
     NextElement: TElement;
-    ReadFunc: TReadProc;
+    ReadProc: TReadProc;
 
     constructor Create(
 
@@ -59,7 +59,7 @@ type
         _Terminator: TKeyWordType;
         _Nested: Boolean;
         _NextElement: TElement;
-        _ReadFunc: TReadProc
+        _ReadProc: TReadProc
 
     );
 
@@ -75,7 +75,7 @@ type
         _Terminator: TKeyWordType;
         _Nested: Boolean;
         _NextElement: TElement;
-        _ReadFunc: TReadProc
+        _ReadProc: TReadProc
 
     );
 
@@ -118,30 +118,29 @@ type
 
     Просто параметры и этот парсер НЕ ДОЛЖНЫ:
 
-      1. Поддерживать комментарии.
-      2. Уметь назначать значения по умолчанию, когда после = ничего не указано. Исключение - тип строка.
-      3. Разбираться с кодировками. На входе должна быть хотя бы UTF-8 с BOM.
+      1.  Поддерживать комментарии.
+      2.  Считывать зарегистрированные параметры из нетипизованного источника. Одно из двух, либо записываться в
+          существующий параметр с таким же именем, либо поддерживать многострочные структуры. Это должен уметь потомок с
+          свойством параметра Registered (предопределенный). Это свойство будет указывать, что он зарегистрирован для
+          такого чтения. И тогда раширенный TParams.GetParam должен не жестко добавлять новый, а только если он не
+          Registered.
+      3.  Уметь назначать значения по умолчанию, когда после = ничего не указано.
+      4.  Разбираться с кодировками. На входе должна быть хотя бы UTF-8 с BOM.
 
     Все эти проблемы должен решать класс-потомок TUserParamsParser.
 
-    1.  Элементы параметров: имя, тип, значение. Тип уже здесь необязательный, но тогда для считывания надо заранее
-        создать параметр с нужным типом. В него считается значение.
-    2.  Указывать тип на следующей строке допустется. Значение, указанное после '=' на следующей строке нельзя. Конец
-        строки или ';' - это конец параметра.
-    3.  Между /* элементами "имя" и "тип" */ (дб просто между элементами) и между параметрами допускается любое
-        количество пробелов, табуляций и переходов на следующую строку. Перед значением - только пробелы и табуляция.
-    4.  Все что вызывает неадекватное чтение или неадекватную ошибку должно контролироваться в проверке синтаксиса.
-        Настройка синтаксиса - InitParser - FSyntax.Add. Можно?пополнять по мере обнаружения.
+      1.  Элементы параметров: имя, тип, значение. Тип уже здесь необязательный, но тогда для считывания надо заранее
+          создать параметр с нужным типом. В него считается значение.
+      2.  Указывать тип на следующей строке допустется. Значение после '=' указывать на следующей строке нельзя. Конец
+          строки после "=" так же как  ';' - это конец параметра. И это значение Null для него. Иначе придется слишком
+          сильно потрудиться, чтобы понять, что там в следующей строке, имя следующего параметра или значение текущего.
+      3.  За этим исключением, между параметрами и их элементами допускается любое количество пробелов, табуляций,
+          переходов на следующую строку и комментрариев. Перед значением - только пробелы, табуляция и комментарии.
+      4.  Все что вызывает неадекватное чтение или неадекватную ошибку должно контролироваться в проверке синтаксиса.
+          Настройка синтаксиса - InitParser - FSyntax.Add. Можно?пополнять по мере обнаружения.
 
   }
-  { TODO 3 -oVasilyevSM -cTParamsStringParser: 3 - на подумать. Пустое значение может подразумевать IsNull в параметре
-    или дифолт. Но на данный момент парсер прост пеерходит в режим "чтение имени следующего параметра" и там
-    выламывается, если это не имя следующего, а значение текущего. Типа, для строк считается, что это пустая строка.
-    Такое себе, всегда голову ломаешь, что не так.
-    Пустые значения можно задавать как '=;' или '= ;', если что. А переход на строку не считать завершением текущего
-    значения.
-    Или как вариант - заставить указывать пустые значения строк в явных кавычках. Тогда можно не считать концом значения
-    переход на следующую строку ДО ВХОДА в тело значения и продолжать его чтение до следующего перехода или ;. }
+
   TParamsStringParser = class(TCustomStringParser)
 
   strict private
@@ -157,7 +156,7 @@ type
 
         const _KeyWord: TKeyWord;
         var _NextElement: TElement;
-        var _ReadFunc: TReadProc
+        var _ReadProc: TReadProc
 
     ): Boolean;
     procedure CheckSyntax(const _KeyWord: TKeyWord);
@@ -286,7 +285,7 @@ begin
   Terminator  := _Terminator;
   Nested      := _Nested;
   NextElement := _NextElement;
-  ReadFunc    := _ReadFunc;
+  ReadProc    := _ReadProc;
 
 end;
 
@@ -294,7 +293,7 @@ end;
 
 procedure TReadInfoList.Add;
 begin
-  inherited Add(TReadInfo.Create(_Element, _Terminator, _Nested, _NextElement,_ReadFunc));
+  inherited Add(TReadInfo.Create(_Element, _Terminator, _Nested, _NextElement,_ReadProc));
 end;
 
 { TSyntaxInfo }
@@ -348,7 +347,7 @@ begin
 
 end;
 
-function TParamsStringParser.ElementTerminating(const _KeyWord: TKeyWord; var _NextElement: TElement; var _ReadFunc: TReadProc): Boolean;
+function TParamsStringParser.ElementTerminating(const _KeyWord: TKeyWord; var _NextElement: TElement; var _ReadProc: TReadProc): Boolean;
 var
   RI: TReadInfo;
 begin
@@ -368,7 +367,7 @@ begin
       then begin
 
         _NextElement := RI.NextElement;
-        _ReadFunc    := RI.ReadFunc;
+        _ReadProc    := RI.ReadProc;
 
         Exit;
 
@@ -429,19 +428,18 @@ end;
 
 procedure TParamsStringParser.CompleteElement(const _KeyWord: TKeyWord);
 var
-  ReadFunc: TReadProc;
+  ReadProc: TReadProc;
   Next: TElement;
 begin
 
-  if ElementTerminating(_KeyWord, Next, ReadFunc) then begin
+  if ElementTerminating(_KeyWord, Next, ReadProc) then begin
 
-    ReadFunc(_KeyWord);
+    ReadProc(_KeyWord);
     FElement := Next;
 
   end;
 
 end;
-
 procedure TParamsStringParser.InitParser;
 begin
 
@@ -463,7 +461,7 @@ begin
 
   with FReading do begin
 
-    {   Element  Terminator        Nested NextElement ReadFunc }
+    {   Element  Terminator        Nested NextElement ReadProc }
     Add(etName,  ktTypeIdent,      False, etType,     ReadName );
     Add(etName,  ktTypeIdent,      True,  etType,     ReadName );
     Add(etName,  ktAssigning,      False, etValue,    ReadName );
