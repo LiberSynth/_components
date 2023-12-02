@@ -156,9 +156,6 @@ type
     FSingleString: Boolean;
     FForceQuoteStrings: Boolean;
 
-    procedure SetSingleString(const _Value: Boolean);
-    procedure SetForceQuoteStrings(const _Value: Boolean);
-
   public
 
     constructor Create(_SingleString: Boolean; _ForceQuoteStrings: Boolean);
@@ -791,16 +788,6 @@ begin
   FForceQuoteStrings := _ForceQuoteStrings;
 end;
 
-procedure TSaveToStringOptions.SetSingleString(const _Value: Boolean);
-begin
-  FSingleString := _Value;
-end;
-
-procedure TSaveToStringOptions.SetForceQuoteStrings(const _Value: Boolean);
-begin
-  FForceQuoteStrings := _Value;
-end;
-
 { TParams }
 
 constructor TParams.Create(const _PathSeparator: Char; const _SaveToStringOptions: TSaveToStringOptions);
@@ -1193,8 +1180,8 @@ function TParams.SaveToString: String;
 const
 
   SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
-  { TODO 1 -oVasilyevSM -cTParams.SaveToString: ¬ однострочном режиме сохран€ть в краткой форме: '%s:%s=%s;'. }
-  SC_SingleParamSingleStringFormat = '%s: %s = %s;';
+
+  SC_SingleParamSingleStringFormat = '%s:%s=%s;';
 
   SC_NestedParamsMultiStringFormat =
 
@@ -1202,7 +1189,7 @@ const
       '%s' +
       ')' + CRLF;
 
-  SC_NestedParamsSingleStringFormat = '%s: %s = (%s);';
+  SC_NestedParamsSingleStringFormat = '%s:%s=(%s);';
 
   function _GetNested(_Param: TParam): String;
   begin
