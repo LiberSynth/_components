@@ -75,6 +75,8 @@ type
     FClosingKey: TKeyWord;
     FUnterminatedMessage: String;
 
+    { TODO 1 -oVasilyevSM -cTSpecialRegion: Это лишняя конктретика. Для комментариев вообще не нужен даблинг.
+      Пронаследовать класс для строк и там исполнить даблинг. }
     function Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 
   private
@@ -489,7 +491,9 @@ begin
 
   then begin
 
-    { TODO 3 -oVasilyevSM -cSyntax: Extreme: String = ''' отрицательный столбец }
+    { TODO 3 -oVasilyevSM -cSyntax: Отрицательный столбец:
+      E: String = '''
+      I: Integer = 123}
     Inc(FLocation.Line);
     FLocation.LineStart := Cursor;
 

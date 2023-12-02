@@ -259,25 +259,14 @@ implementation
 
 type
 
-  TParamsReader = class
+  TParamsReader = class(TParamsStringParser)
 
   strict private
 
     FParams: TParams;
-    FParser: TParamsStringParser;
 
     FCurrentName: String;
     FCurrentType: TParamDataType;
-
-    function CreateNewReaderWrapper: TReaderWrapper;
-
-    { v Для ReaderWrapper v }
-    procedure ReadName(const _Value: String);
-    procedure ReadType(const _Value: String);
-    procedure ReadValue(const _Value: String);
-    procedure ReadParams(const _KeyWord: TKeyWord);
-    function CurrentTypeIsParams: Boolean;
-    { ^ Для ReaderWrapper ^ }
 
     procedure CheckPresetType;
     function TrimDigital(const _Value: String): String;
@@ -288,17 +277,19 @@ type
     constructor Create(const _Source: String; _Params: TParams);
     constructor CreateNested(
 
-        _MasterParser: TParamsStringParser;
+        _MasterParser: TParamsReader;
         _Params: TParams;
         _CursorShift: Int64
 
     );
 
-    destructor Destroy; override;
+  protected
 
-    procedure Read;
-
-    property Parser: TParamsStringParser read FParser;
+    procedure ReadName(const _KeyWord: TKeyWord); override;
+    procedure ReadType(const _KeyWord: TKeyWord); override;
+    procedure ReadValue(const _KeyWord: TKeyWord); override;
+    procedure ReadParams(const _KeyWord: TKeyWord); override;
+    function IsParamsType: Boolean; override;
 
   end;
 
@@ -1229,130 +1220,14 @@ end;
 
 constructor TParamsReader.Create(const _Source: String; _Params: TParams);
 begin
-
-  inherited Create;
-
+  inherited Create(_Source);
   FParams := _Params;
-  FParser := TParamsStringParser.Create(_Source, CreateNewReaderWrapper);
-
 end;
 
 constructor TParamsReader.CreateNested;
 begin
-
-  inherited Create;
-
+  inherited CreateNested(_MasterParser, _CursorShift);
   FParams := _Params;
-  FParser := TParamsStringParser.CreateNested(
-
-      _MasterParser,
-      _CursorShift,
-      CreateNewReaderWrapper
-
-  );
-
-end;
-
-destructor TParamsReader.Destroy;
-begin
-  FreeAndNil(FParser);
-  inherited Destroy;
-end;
-
-function TParamsReader.CreateNewReaderWrapper: TReaderWrapper;
-begin
-
-  Result := TReaderWrapper.Create(
-
-      ReadName,
-      ReadType,
-      ReadValue,
-      ReadParams,
-      CurrentTypeIsParams
-
-  );
-
-end;
-
-procedure TParamsReader.ReadName(const _Value: String);
-begin
-  TParam.ValidateName(_Value, FParams.PathSeparator);
-  FCurrentName := _Value;
-end;
-
-procedure TParamsReader.ReadType(const _Value: String);
-begin
-  FCurrentType := StrToParamDataType(_Value);
-  CheckPresetType;
-end;
-
-procedure TParamsReader.ReadValue(const _Value: String);
-begin
-
-  { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
-  CheckPresetType;
-
-  case FCurrentType of
-
-    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(           _Value );
-    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(   TrimDigital(_Value));
-    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(_Value));
-    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(_Value));
-    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(          _Value );
-    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(              _Value );
-    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(             _Value );
-    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(        _Value );
-    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(           _Value );
-
-  end;
-
-  FCurrentName := '';
-  FCurrentType := dtUnknown;
-
-end;
-
-procedure TParamsReader.ReadParams(const _KeyWord: TKeyWord);
-var
-  P: TParams;
-  NestedReader: TParamsReader;
-  NestedCursor: Int64;
-begin
-
-  P := TParams.Create;
-  try
-
-    NestedReader := TParamsReader.CreateNested(FParser, P, _KeyWord.KeyLength);
-
-    try
-
-      NestedReader.Read;
-
-    finally
-
-      NestedCursor := NestedReader.Parser.Cursor;
-
-      FParser.Move(NestedCursor - _KeyWord.KeyLength - FParser.Cursor);
-      FParser.Location := NestedReader.Parser.Location;
-
-      NestedReader.Free;
-
-    end;
-
-  finally
-
-    FParams.SetAsParams(FCurrentName, P);
-
-    FParser.CompleteItem;
-    FCurrentName := '';
-    FCurrentType := dtUnknown;
-
-  end;
-
-end;
-
-function TParamsReader.CurrentTypeIsParams: Boolean;
-begin
-  Result := FCurrentType = dtParams;
 end;
 
 procedure TParamsReader.CheckPresetType;
@@ -1381,13 +1256,109 @@ end;
 
 function TParamsReader.UndoubleSymbols(const _Value: String): String;
 begin
-  if Assigned(FParser) then
-    Result := FParser.UndoubleSymbols(_Value);
+
+  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
+    условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
+    потому что дублирование не нужно в комментариях. }
+
+  if DoublingChar > #0 then Result := UndoubleStr(_Value, DoublingChar)
+  else Result := _Value;
+
 end;
 
-procedure TParamsReader.Read;
+procedure TParamsReader.ReadName(const _KeyWord: TKeyWord);
+var
+  Value: String;
 begin
-  FParser.Read;
+
+  Value := ReadItem(True);
+
+  TParam.ValidateName(Value, FParams.PathSeparator);
+  FCurrentName := Value;
+
+end;
+
+procedure TParamsReader.ReadType(const _KeyWord: TKeyWord);
+var
+  Value: String;
+begin
+
+  Value := ReadItem(True);
+
+  FCurrentType := StrToParamDataType(Value);
+  CheckPresetType;
+
+end;
+
+procedure TParamsReader.ReadValue(const _KeyWord: TKeyWord);
+var
+  Value: String;
+begin
+
+  Value := ReadItem(False);
+
+  { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
+  CheckPresetType;
+
+  case FCurrentType of
+
+    dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(           Value );
+    dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(   TrimDigital(Value));
+    dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(TrimDigital(Value));
+    dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(TrimDigital(Value));
+    dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(          Value );
+    dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(              Value );
+    dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(             Value );
+    dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(        Value );
+    dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(           Value );
+
+  end;
+
+  FCurrentName := '';
+  FCurrentType := dtUnknown;
+
+end;
+
+procedure TParamsReader.ReadParams(const _KeyWord: TKeyWord);
+var
+  P: TParams;
+begin
+
+  P := TParams.Create;
+  try
+
+    with TParamsReader.CreateNested(Self, P, _KeyWord.KeyLength) do
+
+      try
+
+        Read;
+
+      finally
+
+        Self.Move(Cursor - _KeyWord.KeyLength - Self.Cursor);
+        Self.Location := Location;
+
+        Free;
+
+      end;
+
+  finally
+
+    FParams.SetAsParams(FCurrentName, P);
+
+    CompleteItem;
+    FCurrentName := '';
+    FCurrentType := dtUnknown;
+
+    inherited ReadParams(_KeyWord);
+
+  end;
+
+end;
+
+function TParamsReader.IsParamsType: Boolean;
+begin
+  Result := FCurrentType = dtParams;
 end;
 
 end.

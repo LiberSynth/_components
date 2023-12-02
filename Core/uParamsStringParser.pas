@@ -43,7 +43,7 @@ type
 
   end;
 
-  TReadFunc = function (const KeyWord: TKeyWord): Boolean of object;
+  TReadProc = procedure (const KeyWord: TKeyWord) of object;
 
   TReadInfo = record
 
@@ -51,7 +51,7 @@ type
     Terminator: TKeyWordType;
     Nested: Boolean;
     NextElement: TElement;
-    ReadFunc: TReadFunc;
+    ReadFunc: TReadProc;
 
     constructor Create(
 
@@ -59,7 +59,7 @@ type
         _Terminator: TKeyWordType;
         _Nested: Boolean;
         _NextElement: TElement;
-        _ReadFunc: TReadFunc
+        _ReadFunc: TReadProc
 
     );
 
@@ -75,7 +75,7 @@ type
         _Terminator: TKeyWordType;
         _Nested: Boolean;
         _NextElement: TElement;
-        _ReadFunc: TReadFunc
+        _ReadFunc: TReadProc
 
     );
 
@@ -114,30 +114,6 @@ type
 
   end;
 
-  TWriteValueProc  = procedure (const Value: String) of object;
-  TWriteParamsProc = procedure (const _KeyWord: TKeyWord) of object;
-  TBooleanFunc     = function: Boolean of object;
-
-  TReaderWrapper = record
-
-    ReadName: TWriteValueProc;
-    ReadType: TWriteValueProc;
-    ReadValue: TWriteValueProc;
-    ReadParams: TWriteParamsProc;
-    CurrentTypeIsParams: TBooleanFunc;
-
-    constructor Create(
-
-        _ReadName: TWriteValueProc;
-        _ReadType: TWriteValueProc;
-        _ReadValue: TWriteValueProc;
-        _ReadParams: TWriteParamsProc;
-        _CurrentTypeIsParams: TBooleanFunc
-
-    );
-
-  end;
-
   {
 
     Просто параметры и этот парсер НЕ ДОЛЖНЫ:
@@ -166,7 +142,6 @@ type
 
     FReading: TReadInfoList;
     FSyntax: TSyntaxInfoList;
-    FReaderWrapper: TReaderWrapper;
 
     FDoublingChar: Char;
 
@@ -174,22 +149,12 @@ type
 
         const _KeyWord: TKeyWord;
         var _NextElement: TElement;
-        var _ReadFunc: TReadFunc
+        var _ReadFunc: TReadProc
 
     ): Boolean;
     procedure CheckSyntax(const _KeyWord: TKeyWord);
-    procedure CompleteElement(const _KeyWord: TKeyWord);
-
-    function ReadName(const _KeyWord: TKeyWord): Boolean;
-    function ReadType(const _KeyWord: TKeyWord): Boolean;
-    function ReadValue(const _KeyWord: TKeyWord): Boolean;
-
     procedure CheckParams(_KeyWord: TKeyWord);
-    procedure ReadParams(const _KeyWord: TKeyWord);
-
-  private
-
-    property Element: TElement read FElement;
+    procedure CompleteElement(const _KeyWord: TKeyWord);
 
   protected
 
@@ -198,25 +163,20 @@ type
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
     procedure SpecialRegionClosed(_Region: TSpecialRegion); override;
 
+    procedure ReadName(const _KeyWord: TKeyWord); virtual; abstract;
+    procedure ReadType(const _KeyWord: TKeyWord); virtual; abstract;
+    procedure ReadValue(const _KeyWord: TKeyWord); virtual; abstract;
+    procedure ReadParams(const _KeyWord: TKeyWord); virtual;
+    function IsParamsType: Boolean; virtual; abstract;
+
+    property DoublingChar: Char read FDoublingChar;
+
   public
 
-    constructor Create(
-
-        const _Source: String;
-        _ReaderWrapper: TReaderWrapper
-
-    );
-    constructor CreateNested(
-
-        _Master: TCustomStringParser;
-        _CursorShift: Int64;
-        _ReaderWrapper: TReaderWrapper
-
-    );
+    constructor Create(const _Source: String);
+    constructor CreateNested(_Master: TCustomStringParser; _CursorShift: Int64);
 
     destructor Destroy; override;
-
-    function UndoubleSymbols(const _Value: String): String;
 
   end;
 
@@ -343,8 +303,6 @@ begin
 
   inherited Create(_Source);
 
-  FReaderWrapper := _ReaderWrapper;
-
 end;
 
 constructor TParamsStringParser.CreateNested;
@@ -354,8 +312,6 @@ begin
   FSyntax  := TSyntaxInfoList.Create;
 
   inherited CreateNested(_Master, _CursorShift);
-
-  FReaderWrapper := _ReaderWrapper;
 
 end;
 
@@ -369,24 +325,12 @@ begin
 
 end;
 
-function TParamsStringParser.UndoubleSymbols(const _Value: String): String;
-begin
-
-  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
-    условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
-    потому что дублирование не нужно в комментариях. }
-
-  if FDoublingChar > #0 then Result := UndoubleStr(_Value, FDoublingChar)
-  else Result := _Value;
-
-end;
-
-function TParamsStringParser.ElementTerminating(const _KeyWord: TKeyWord; var _NextElement: TElement; var _ReadFunc: TReadFunc): Boolean;
+function TParamsStringParser.ElementTerminating(const _KeyWord: TKeyWord; var _NextElement: TElement; var _ReadFunc: TReadProc): Boolean;
 var
   RI: TReadInfo;
 begin
 
-  Result := ItemBody or (Element = etValue);
+  Result := ItemBody or (FElement = etValue);
 
   if Result then
 
@@ -394,7 +338,7 @@ begin
 
       if
 
-          (RI.Element    = Element         ) and
+          (RI.Element    = FElement         ) and
           (RI.Terminator = _KeyWord.KeyType) and
           (RI.Nested     = Nested          )
 
@@ -420,7 +364,7 @@ begin
 
     if
 
-        (SI.Element = Element) and
+        (SI.Element = FElement) and
         (SI.ItemBody = ItemBody) and
         (SI.Nested = Nested) and
         _KeyWord.TypeInSet(SI.InvalidKeys)
@@ -431,40 +375,10 @@ begin
 
 end;
 
-procedure TParamsStringParser.CompleteElement(const _KeyWord: TKeyWord);
-var
-  ReadFunc: TReadFunc;
-  Next: TElement;
-begin
-
-  if ElementTerminating(_KeyWord, Next, ReadFunc) then
-    if ReadFunc(_KeyWord) then
-      FElement := Next;
-
-end;
-
-function TParamsStringParser.ReadName(const _KeyWord: TKeyWord): Boolean;
-begin
-  FReaderWrapper.ReadName(ReadItem(True));
-  Result := True;
-end;
-
-function TParamsStringParser.ReadType(const _KeyWord: TKeyWord): Boolean;
-begin
-  FReaderWrapper.ReadType(ReadItem(True));
-  Result := True;
-end;
-
-function TParamsStringParser.ReadValue(const _KeyWord: TKeyWord): Boolean;
-begin
-  FReaderWrapper.ReadValue(ReadItem(False));
-  Result := True;
-end;
-
 procedure TParamsStringParser.CheckParams(_KeyWord: TKeyWord);
 begin
 
-  if (Element = etValue) and FReaderWrapper.CurrentTypeIsParams then begin
+  if (FElement = etValue) and IsParamsType then begin
 
     { Контейнер. Проверка синтаксиса. }
     if not _KeyWord.TypeInSet([ktSpace, ktLineEnd, ktOpeningBracket]) then
@@ -490,10 +404,19 @@ begin
 
 end;
 
-procedure TParamsStringParser.ReadParams(const _KeyWord: TKeyWord);
+procedure TParamsStringParser.CompleteElement(const _KeyWord: TKeyWord);
+var
+  ReadFunc: TReadProc;
+  Next: TElement;
 begin
-  FReaderWrapper.ReadParams(_KeyWord);
-  FElement := etName;
+
+  if ElementTerminating(_KeyWord, Next, ReadFunc) then begin
+
+    ReadFunc(_KeyWord);
+    FElement := Next;
+
+  end;
+
 end;
 
 procedure TParamsStringParser.InitParser;
@@ -588,17 +511,9 @@ begin
 
 end;
 
-{ TReaderWrapper }
-
-constructor TReaderWrapper.Create;
+procedure TParamsStringParser.ReadParams(const _KeyWord: TKeyWord);
 begin
-
-  ReadName            := _ReadName;
-  ReadType            := _ReadType;
-  ReadValue           := _ReadValue;
-  ReadParams          := _ReadParams;
-  CurrentTypeIsParams := _CurrentTypeIsParams;
-
+  FElement := etName;
 end;
 
 end.
