@@ -59,13 +59,15 @@ type
     кроме закрывающего этото регион ключа.
     Особые регионы настраиваются в потомках парсера добавлением в виртуальном методе InitParser с помощью
     AddSpecialRegion.
-    Для настройки специфического региона нужно пронаследовать класс обработчика (от TSpecialRegion) и воспользовться
+    Для специфической настройки региона нужно пронаследовать класс обработчика (от TSpecialRegion) и воспользовться
     двумя виртуальными методами:
 
     CanOpen  - условие открытия особого региона
     CanClose - условие закрытия особого региона
 
-    Для строк в кавычках работает без наследования.
+    По завершению региона вызывается событие парсера SpecialRegionClosed, в котором можно выполнить чтение.
+
+    Пример - TQoutedStringRegion. Регион для строк в кавычках, исполняющий обработку сдублированного закрывающего ключа.
 
   }
   TSpecialRegion = class
@@ -74,10 +76,6 @@ type
     FOpeningKey: TKeyWord;
     FClosingKey: TKeyWord;
     FUnterminatedMessage: String;
-
-    { TODO 1 -oVasilyevSM -cTSpecialRegion: Это лишняя конктретика. Для комментариев вообще не нужен даблинг.
-      Пронаследовать класс для строк и там исполнить даблинг. }
-    function Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 
   private
 
@@ -126,10 +124,16 @@ type
 
   TLocation = record
 
-    Line: Int64;
-    LineStart: Int64;
+    CurrentLine: Int64;
+    CurrentLineStart: Int64;
+
+    LastItemLine: Int64;
+    LastLineStart: Int64;
     LastItemBegin: Int64;
 
+    procedure Remember(_Cursor: Int64);
+
+    function Line: Int64;
     function Column: Int64;
     function Position: Int64;
 
@@ -153,6 +157,8 @@ type
     FKeyWords: TKeyWordList;
     FSpecialRegions: TSpecialRegionList;
 
+    function GetRest: Int64;
+
     function GetCursorKey(var _Value: TKeyWord): Boolean;
     procedure UpdateLocation;
 
@@ -166,10 +172,6 @@ type
 
     { События для потомков }
     procedure InitParser; virtual;
-    procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
-    procedure MoveEvent; virtual;
-    procedure SpecialRegionOpened(_Region: TSpecialRegion); virtual;
-    procedure SpecialRegionClosed(_Region: TSpecialRegion); virtual;
 
   public
 
@@ -177,6 +179,12 @@ type
     constructor CreateNested(_Master: TCustomStringParser; _CursorShift: Int64);
 
     destructor Destroy; override;
+
+    { События для потомков }
+    procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
+    procedure MoveEvent; virtual;
+    procedure SpecialRegionOpened(_Region: TSpecialRegion); virtual;
+    procedure SpecialRegionClosed(_Region: TSpecialRegion); virtual;
 
     { Методы и свойства для управления }
     function Nested: Boolean;
@@ -199,6 +207,7 @@ type
     property Source: String read FSource;
     property SrcLen: Int64 read FSrcLen;
     property Cursor: Int64 read FCursor;
+    property Rest: Int64 read GetRest;
     property Location: TLocation read FLocation write FLocation;
     property ItemBody: Boolean read FItemBody write FItemBody;
     property ItemStart: Int64 read FItemStart write FItemStart;
@@ -217,7 +226,7 @@ const
   KWR_LINE_END_LF:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: LF;   KeyLength: Length(LF)  );
   KWR_LINE_END_CRLF: TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CRLF; KeyLength: Length(CRLF));
 
-  LOC_INITIAL: TLocation = (Line: 1; LineStart: 1; LastItemBegin: 1);
+  LOC_INITIAL: TLocation = (CurrentLine: 1; CurrentLineStart: 1; LastItemLine: 1; LastLineStart: 1; LastItemBegin: 1);
 
 implementation
 
@@ -279,25 +288,6 @@ begin
 
 end;
 
-function TSpecialRegion.Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
-begin
-
-  Result :=
-
-    (ClosingKey.KeyLength = 1) and
-    (_Parser.SrcLen - _Parser.Cursor + 1 >= 2) and
-    (Copy(_Parser.Source, _Parser.Cursor, 2) = ClosingKey.StrValue + ClosingKey.StrValue);
-
-  if Result then begin
-
-    _Parser.MoveEvent;
-    _Parser.Move(2);
-    _Handled := True;
-
-  end;
-
-end;
-
 procedure TSpecialRegion.Open(_Parser: TCustomStringParser);
 begin
   _Parser.Move(OpeningKey.KeyLength);
@@ -321,7 +311,7 @@ end;
 
 function TSpecialRegion.CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
-  Result := _Parser.IsCursorKey(ClosingKey) and not Doubling(_Parser, _Handled);
+  Result := _Parser.IsCursorKey(ClosingKey);
 end;
 
 { TSpecialRegionList }
@@ -394,9 +384,23 @@ end;
 
 { TLocation }
 
+procedure TLocation.Remember(_Cursor: Int64);
+begin
+
+  LastItemLine      := CurrentLine;
+  LastLineStart := CurrentLineStart;
+  LastItemBegin := _Cursor;
+
+end;
+
+function TLocation.Line: Int64;
+begin
+  Result := LastItemLine;
+end;
+
 function TLocation.Column: Int64;
 begin
-  Result := LastItemBegin - LineStart + 1;
+  Result := LastItemBegin - LastLineStart + 1;
 end;
 
 function TLocation.Position: Int64;
@@ -463,6 +467,11 @@ begin
     Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
 end;
 
+function TCustomStringParser.GetRest: Int64;
+begin
+  Result := SrcLen - Cursor + 1;
+end;
+
 function TCustomStringParser.GetCursorKey(var _Value: TKeyWord): Boolean;
 var
   KeyWord: TKeyWord;
@@ -484,18 +493,23 @@ end;
 procedure TCustomStringParser.UpdateLocation;
 begin
 
+  { TODO 3 -oVasilyevSM -cSyntax: Отрицательный столбец:
+    E: String = '''
+    I: Integer = 123}
+
   if
 
-      (Copy(Source, Cursor - 2, 2) = CRLF) or
-      CharInSet(Source[Cursor - 1], [CR, LF])
+      (Copy(Source, Cursor - 1, 2) <> CRLF) and (
+
+        (Copy(Source, Cursor - 2, 2) = CRLF) or
+        CharInSet(Source[Cursor - 1], [CR, LF])
+
+      )
 
   then begin
 
-    { TODO 3 -oVasilyevSM -cSyntax: Отрицательный столбец:
-      E: String = '''
-      I: Integer = 123}
-    Inc(FLocation.Line);
-    FLocation.LineStart := Cursor;
+    Inc(FLocation.CurrentLine);
+    FLocation.CurrentLineStart := Cursor;
 
   end;
 
@@ -527,7 +541,8 @@ begin
 
     ItemBody := True;
     ItemStart := Cursor;
-    FLocation.LastItemBegin := Cursor;
+
+    FLocation.Remember(Cursor);
 
   end;
 

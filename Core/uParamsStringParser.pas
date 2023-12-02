@@ -159,9 +159,6 @@ type
   protected
 
     procedure InitParser; override;
-    { Осоновная работа здесь }
-    procedure KeyEvent(const _KeyWord: TKeyWord); override;
-    procedure SpecialRegionClosed(_Region: TSpecialRegion); override;
 
     procedure ReadName(const _KeyWord: TKeyWord); virtual; abstract;
     procedure ReadType(const _KeyWord: TKeyWord); virtual; abstract;
@@ -177,6 +174,10 @@ type
     constructor CreateNested(_Master: TCustomStringParser; _CursorShift: Int64);
 
     destructor Destroy; override;
+
+    { Осоновная работа здесь }
+    procedure KeyEvent(const _KeyWord: TKeyWord); override;
+    procedure SpecialRegionClosed(_Region: TSpecialRegion); override;
 
   end;
 
@@ -195,6 +196,20 @@ const
   KWR_QUOTE_DOBLE:          TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '"';   KeyLength: Length('"') );
   KWR_OPENING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktOpeningBracket);   StrValue: '(';   KeyLength: Length('(') );
   KWR_CLOSING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktClosingBracket);   StrValue: ')';   KeyLength: Length(')') );
+
+type
+
+  TQoutedStringRegion = class(TSpecialRegion)
+
+  strict private
+
+    function Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
+
+  protected
+
+    function CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; override;
+
+  end;
 
 function KeyWordTypeToStr(Value: TKeyWordType): String;
 const
@@ -471,10 +486,15 @@ begin
 
   end;
 
-  {                RegionClass     OpeningKey        ClosingKey      }
-  AddSpecialRegion(TSpecialRegion, KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE, 'Unterminated string');
-  AddSpecialRegion(TSpecialRegion, KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE,  'Unterminated string');
+  {                RegionClass           OpeningKey        ClosingKey        UnterminatedMessage  }
+  AddSpecialRegion(TQoutedStringRegion, KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE, 'Unterminated string');
+  AddSpecialRegion(TQoutedStringRegion, KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE,  'Unterminated string');
 
+end;
+
+procedure TParamsStringParser.ReadParams(const _KeyWord: TKeyWord);
+begin
+  FElement := etName;
 end;
 
 procedure TParamsStringParser.KeyEvent(const _KeyWord: TKeyWord);
@@ -511,9 +531,29 @@ begin
 
 end;
 
-procedure TParamsStringParser.ReadParams(const _KeyWord: TKeyWord);
+{ TQoutedStringRegion }
+
+function TQoutedStringRegion.Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
-  FElement := etName;
+
+  Result :=
+
+    (ClosingKey.KeyLength = 1) and
+    (Copy(_Parser.Source, _Parser.Cursor, 2) = ClosingKey.StrValue + ClosingKey.StrValue);
+
+  if Result then begin
+
+    _Parser.MoveEvent;
+    _Parser.Move(2);
+    _Handled := True;
+
+  end;
+
+end;
+
+function TQoutedStringRegion.CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
+begin
+  Result := inherited and not Doubling(_Parser, _Handled);
 end;
 
 end.

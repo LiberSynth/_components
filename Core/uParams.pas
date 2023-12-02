@@ -259,6 +259,8 @@ implementation
 
 type
 
+  { Этот класс нужен только для обращения к здешним объектам без циркулярной ссылки. Также, благодаря этому свойство
+    TParams.AsParams остается только для чтения и метод TParams.SetAsParams private. }
   TParamsReader = class(TParamsStringParser)
 
   strict private
