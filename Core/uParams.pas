@@ -149,25 +149,11 @@ type
 
   }
 
-  TSaveToStringOptions = record
-
-  strict private
-
-    FSingleString: Boolean;
-    FForceQuoteStrings: Boolean;
-
-  public
-
-    constructor Create(_SingleString: Boolean; _ForceQuoteStrings: Boolean);
-
-    property SingleString: Boolean read FSingleString;
-    property ForceQuoteStrings: Boolean read FForceQuoteStrings;
-
-  end;
+  TSaveToStringOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
+  TSaveToStringOptions = set of TSaveToStringOption;
 
   { Некоторые корневые свойства намеренно задаются один раз при создании объекта. Не нужно их менять на ходу. }
   TParams = class(TObjectList<TParam>)
-{ TODO 1 -oVasilyevSM -cTParams: +Режим сохранения, с типами/без типов }
 
   strict private
 
@@ -206,8 +192,7 @@ type
 
   public
 
-    constructor Create(const _PathSeparator: Char; const _SaveToStringOptions: TSaveToStringOptions); overload;
-    constructor Create(const _PathSeparator: Char = '.'); overload;
+    constructor Create(const _PathSeparator: Char = '.'; const _SaveToStringOptions: TSaveToStringOptions = []); overload;
     constructor Create(const _SaveToStringOptions: TSaveToStringOptions); overload;
 
     function Add(const _Name: String): TParam;
@@ -780,14 +765,6 @@ begin
   SetAsBigInt(_Value);
 end;
 
-{ TSaveToStringOptions }
-
-constructor TSaveToStringOptions.Create(_SingleString, _ForceQuoteStrings: Boolean);
-begin
-  FSingleString      := _SingleString;
-  FForceQuoteStrings := _ForceQuoteStrings;
-end;
-
 { TParams }
 
 constructor TParams.Create(const _PathSeparator: Char; const _SaveToStringOptions: TSaveToStringOptions);
@@ -795,16 +772,9 @@ begin
 
   inherited Create;
 
-  FPathSeparator := _PathSeparator;
+  FPathSeparator       := _PathSeparator;
   FSaveToStringOptions := _SaveToStringOptions;
 
-end;
-
-constructor TParams.Create(const _PathSeparator: Char);
-const
-  STSO_EMPTY: TSaveToStringOptions = (FSingleString: False; FForceQuoteStrings: False);
-begin
-  Create(_PathSeparator, STSO_EMPTY);
 end;
 
 constructor TParams.Create(const _SaveToStringOptions: TSaveToStringOptions);
@@ -1179,22 +1149,19 @@ end;
 function TParams.SaveToString: String;
 const
 
-  SC_SingleParamMultiStringFormat = '%s: %s = %s' + CRLF;
-
-  SC_SingleParamSingleStringFormat = '%s:%s=%s;';
-
-  SC_NestedParamsMultiStringFormat =
-
-      '%s: %s = (' + CRLF +
-      '%s' +
-      ')' + CRLF;
-
-  SC_NestedParamsSingleStringFormat = '%s:%s=(%s);';
+  SC_SINGLE_PARAM_TYPED_MULTI_STRING     = '%0:s: %2:s = %1:s' + CRLF;
+  SC_SINGLE_PARAM_UNTYPED_MULTI_STRING   = '%0:s = %1:s' + CRLF;
+  SC_SINGLE_PARAM_TYPED_SINGLE_STRING    = '%0:s:%2:s=%1:s;';
+  SC_SINGLE_PARAM_UNTYPED_SINGLE_STRING  = '%0:s=%1:s;';
+  SC_NESTED_PARAMS_TYPED_MULTI_STRING    = '%0:s: %2:s = (' + CRLF + '%1:s' + ')' + CRLF;
+  SC_NESTED_PARAMS_UNTYPED_MULTI_STRING  = '%0:s = (' + CRLF + '%1:s' + ')' + CRLF;
+  SC_NESTED_PARAMS_TYPED_SINGLE_STRING   = '%0:s:%2:s=(%1:s);';
+  SC_NESTED_PARAMS_UNTYPED_SINGLE_STRING = '%0:s=(%1:s);';
 
   function _GetNested(_Param: TParam): String;
   begin
     Result := _Param.AsParams.SaveToString;
-    if not SaveToStringOptions.SingleString then
+    if not (soSingleString in SaveToStringOptions) then
       ShiftText(1, Result);
   end;
 
@@ -1207,7 +1174,7 @@ const
 
       if
 
-          SaveToStringOptions.ForceQuoteStrings or
+          (soForceQuoteStrings in SaveToStringOptions) or
           { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
           (Pos(CR,   Result) > 0) or
           (Pos(LF,   Result) > 0) or
@@ -1222,16 +1189,38 @@ const
   end;
 
 var
-  NestedParamsFormat: String;
   SingleParamFormat: String;
+  NestedParamsFormat: String;
   Param: TParam;
 begin
 
-  if SaveToStringOptions.SingleString then NestedParamsFormat := SC_NestedParamsSingleStringFormat
-  else NestedParamsFormat := SC_NestedParamsMultiStringFormat;
+  if soSingleString in SaveToStringOptions then
 
-  if SaveToStringOptions.SingleString then SingleParamFormat := SC_SingleParamSingleStringFormat
-  else SingleParamFormat := SC_SingleParamMultiStringFormat;
+    if soTypesFree in SaveToStringOptions then begin
+
+      SingleParamFormat  := SC_SINGLE_PARAM_UNTYPED_SINGLE_STRING;
+      NestedParamsFormat := SC_NESTED_PARAMS_UNTYPED_SINGLE_STRING;
+
+    end else begin
+
+      SingleParamFormat  := SC_SINGLE_PARAM_TYPED_SINGLE_STRING;
+      NestedParamsFormat := SC_NESTED_PARAMS_TYPED_SINGLE_STRING;
+
+    end
+
+  else
+
+    if soTypesFree in SaveToStringOptions then begin
+
+      SingleParamFormat  := SC_SINGLE_PARAM_UNTYPED_MULTI_STRING;
+      NestedParamsFormat := SC_NESTED_PARAMS_UNTYPED_MULTI_STRING;
+
+    end else begin
+
+      SingleParamFormat  := SC_SINGLE_PARAM_TYPED_MULTI_STRING;
+      NestedParamsFormat := SC_NESTED_PARAMS_TYPED_MULTI_STRING;
+
+    end;
 
   Result := '';
   for Param in Self do
@@ -1241,8 +1230,8 @@ begin
       Result := Result + Format(NestedParamsFormat, [
 
           Param.Name,
-          ParamDataTypeToStr(Param.DataType),
-          _GetNested(Param)
+          _GetNested(Param),
+          ParamDataTypeToStr(Param.DataType)
 
       ])
 
@@ -1251,12 +1240,12 @@ begin
       Result := Result + Format(SingleParamFormat, [
 
           Param.Name,
-          ParamDataTypeToStr(Param.DataType),
-          _QuoteString(Param)
+          _QuoteString(Param),
+          ParamDataTypeToStr(Param.DataType)
 
       ]);
 
-  if SaveToStringOptions.SingleString then
+  if soSingleString in SaveToStringOptions then
     CutStr(Result, 1);
 
 end;
