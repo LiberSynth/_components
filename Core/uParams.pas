@@ -2,12 +2,11 @@ unit uParams;
 
 (**********************************************************)
 (*                                                        *)
-(*                     Liber Sunth Co                     *)
+(*                     Liber Synth Co                     *)
 (*                                                        *)
 (**********************************************************)
 
 { TODO 10 -oVasilyevSM -cuParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
-{ TODO 10 -oVasilyevSM -cuParams: Кроме SaveToString/LoadFromString нужны SaveToStream/LoadFromStream }
 
 interface
 
@@ -229,6 +228,7 @@ type
 
     function SaveToString: String;
     procedure LoadFromString(const _Value: String);
+    { TODO 10 -oVasilyevSM -cuParams: SaveToStream/LoadFromStream }
 
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
@@ -922,7 +922,7 @@ var
   Src, Dst: TParam;
 begin
 
-  { TODO 2 -oVasilyevSM -cTParams.Assign: Многострочные параметры записываются в одну строку. Остается только последний. }
+  { TODO 3 -oVasilyevSM -cTParams.Assign: Многострочные параметры записываются в одну строку. Остается только последний. }
 
   for Src in _Source do begin
 
