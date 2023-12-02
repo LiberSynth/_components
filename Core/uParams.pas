@@ -228,6 +228,7 @@ type
     function AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
 
     function SaveToString: String;
+    procedure LoadFromString(const _Value: String);
 
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
@@ -252,7 +253,6 @@ type
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
 function ParamsToStr(Params: TParams): String;
-{ TODO 1 -oVasilyevSM -cStrToParams: -> TParams.LoadFromString. Этуфункцию можно оставить, но в ней вызывать LoadFromString }
 procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
@@ -338,17 +338,7 @@ end;
 
 procedure StrToParams(const Value: String; Params: TParams);
 begin
-
-  with TParamsReader.Create(Value, Params) do
-
-    try
-
-      Read;
-
-    finally
-      Free;
-    end;
-
+  Params.LoadFromString(Value);
 end;
 
 { TParam }
@@ -1247,6 +1237,21 @@ begin
 
   if soSingleString in SaveToStringOptions then
     CutStr(Result, 1);
+
+end;
+
+procedure TParams.LoadFromString(const _Value: String);
+begin
+
+  with TParamsReader.Create(_Value, Self) do
+
+    try
+
+      Read;
+
+    finally
+      Free;
+    end;
 
 end;
 

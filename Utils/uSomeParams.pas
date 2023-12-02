@@ -14,7 +14,8 @@ unit uSomeParams;
 { TODO -oVasilyevSM: В компонентах, использующих TParams свойства, задаваемые в констукторе давать менять только в дизайн-таме }
 { TODO -oVasilyevSM: Режим "сохранять строки всегда в кавычках" }
 { TODO -oVasilyevSM: Нужна оболочка TFileParams, которая будет сохраняться в файл. Вот она-то и должна поддерживать комментарии итд. }
-{ TODO -oVasilyevSM: Режим TFileParams.AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда to - выставлять еще одним свойством или комбайном None, ToFile, ToStream }
+{ TODO -oVasilyevSM: Режим TFileParams.AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда - зависит от типа оъекта,
+  ToFile, ToStream, ToString, To Registry. Файл держать открытым, чтобы не перезаписывать целиком каждый раз. Итд. }
 { TODO -oVasilyevSM: Компонент TRegParams }
 { TODO -oVasilyevSM: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
 
