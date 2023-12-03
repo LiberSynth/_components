@@ -1,40 +1,111 @@
 unit uDataUtils;
 
-(**********************************************************)
-(*                                                        *)
-(*                     Liber Synth Co                     *)
-(*                                                        *)
-(**********************************************************)
+(*******************************************************************************************)
+(*            _____          _____          _____          _____          _____            *)
+(*           /\    \        /\    \        /\    \        /\    \        /\    \           *)
+(*          /::\____\      /::\    \      /::\    \      /::\    \      /::\    \          *)
+(*         /:::/    /      \:::\    \    /::::\    \    /::::\    \    /::::\    \         *)
+(*        /:::/    /        \:::\    \  /::::::\    \  /::::::\    \  /::::::\    \        *)
+(*       /:::/    /          \:::\    \ :::/\:::\    \ :::/\:::\    \ :::/\:::\    \       *)
+(*      /:::/    /            \:::\    \ :/__\:::\    \ :/__\:::\    \ :/__\:::\    \      *)
+(*     /:::/    /             /::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \     *)
+(*    /:::/    /     _____   /::::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \    *)
+(*   /:::/    /     /\    \ /:::/\:::\    \ \   \:::\ ___\ \   \:::\    \ \   \:::\____\   *)
+(*  /:::/____/     /::\    /:::/  \:::\____\ \   \:::|    | \   \:::\____\ \   \:::|    |  *)
+(*  \:::\    \     \:::\  /:::/    \::/    / :\  /:::|____| :\   \::/    / :\  /:::|____|  *)
+(*   \:::\    \     \:::\/:::/    / \/____/ :::\/:::/    / :::\   \/____/_:::\/:::/    /   *)
+(*    \:::\    \     \::::::/    /  \:::\   \::::::/    /  \:::\    \  |:::::::::/    /    *)
+(*     \:::\    \     \::::/____/    \:::\   \::::/    /    \:::\____\ |::|\::::/    /     *)
+(*      \:::\    \     \:::\    \     \:::\  /:::/    / :\   \::/    / |::| \::/____/      *)
+(*       \:::\    \     \:::\    \     \:::\/:::/    / :::\   \/____/  |::|  ~|            *)
+(*        \:::\    \     \:::\    \     \::::::/    /  \:::\    \      |::|   |            *)
+(*         \:::\____\     \:::\____\     \::::/    /    \:::\____\     \::|   |            *)
+(*          \::/    /      \::/    /      \::/____/      \::/    /      \:|   |            *)
+(*           \/____/        \/____/        ~~             \/____/        \|___|            *)
+(*                                                                                         *)
+(*******************************************************************************************)
 
 interface
 
 uses
   { VCL }
   SysUtils,
-  { vSoft }
-  uConsts, uTypes;
+  { LiberSynth }
+  uConsts, uTypes, uCore;
 
-{ v ѕреобразование основных типов данных друг в друга v }
-{ TODO -oVasilyevSM -cuDataUtils: ѕродолжение следует. ”множением: Boolean, Integer, BigInt, Float, Extended, TDateTime, TGUID, AnsiString, String, BLOB, TData }
+{ v ѕреобразование основных типов данных друг в друга. ѕолный набор. v }
+{ TODO 1 -oVasilyevSM -cuDataUtils: где '//' - ƒобавл€ть исполнение и отлаживать. ќсталось п€ть пар: DateTime/Integer,
+  DateTime/BigInt, Data/Integer, Data/BigInt и Data/Extended. }
 function BooleanToInt(Value: Boolean): Integer;
 function BooleanToBigInt(Value: Boolean): Int64;
+function BooleanToFloat(Value: Boolean): Double;
+function BooleanToExtended(Value: Boolean): Extended;
 function BooleanToBLOB(Value: Boolean): BLOB;
 function BooleanToData(Value: Boolean): TData;
-function IntToBoolean(Value: Int64): Boolean;
+
+function IntToBoolean(Value: Integer): Boolean;
+function IntToBigInt(Value: Integer): Int64;
+function IntToFloat(Value: Integer): Double;
+function IntToExtended(Value: Integer): Extended;
+function IntToDateTime(Value: Integer): TDateTime; // ~
+function IntToBLOB(Value: Integer): BLOB;
+function IntToData(Value: Integer): TData; //
+
+function BigIntToBoolean(Value: Int64): Boolean;
+function BigIntToInt(Value: Int64): Integer;
+function BigIntToFloat(Value: Int64): Double; // ~
+function BigIntToExtended(Value: Int64): Extended; // ~
+function BigIntToDateTime(Value: Int64): TDateTime; // ~
+function BigIntToBLOB(Value: Int64): BLOB;
+function BigIntToData(Value: Int64): TData; //
+
+function FloatToBoolean(Value: Double): Boolean;
+function FloatToInt(Value: Double): Integer;
+function FloatToBigInt(Value: Double): Int64; // ~
+function FloatToExtended(Value: Double): Extended; // ~
+function FloatToDateTime(Value: Double): TDateTime; // ~
+function FloatToBLOB(Value: Double): BLOB;
+function FloatToData(Value: Double): TData;
+
+function ExtendedToBoolean(Value: Extended): Boolean;
+function ExtendedToInt(Value: Extended): Integer;
+function ExtendedToBigInt(Value: Extended): Int64; // ~
+function ExtendedToFloat(Value: Extended): Double; // ~
+function ExtendedToDateTime(Value: Extended): TDateTime; // ~
+function ExtendedToBLOB(Value: Extended): BLOB;
+function ExtendedToData(Value: Extended): TData; //
+
+function DateTimeToInt(const Value: TDateTime): Integer; //
+function DateTimeToBigInt(const Value: TDateTime): Int64; //
+function DateTimeToFloat(const Value: TDateTime): Double;
+function DateTimeToExtended(const Value: TDateTime): Extended;
+function DateTimeToBLOB(const Value: TDateTime): BLOB;
+function DateTimeToData(const Value: TDateTime): TData;
+
+function GUIDToBLOB(const Value: TGUID): BLOB;
+function GUIDToData(const Value: TGUID): TData;
+
 function BLOBToBoolean(const Value: BLOB): Boolean;
 function BLOBToInt(const Value: BLOB): Integer;
 function BLOBToBigInt(const Value: BLOB): Int64;
-function DataToBoolean(const Value: TData): Boolean;
-function DataToInt(const Value: TData): Integer;
-function DataToBigInt(const Value: TData): Int64;
-// ...
-function IntToBLOB(Value: Integer): BLOB;
-function BigIntToBLOB(Value: Int64): BLOB;
+function BLOBToFloat(const Value: BLOB): Double;
+function BLOBToExtended(const Value: BLOB): Extended;
+function BLOBToDateTime(const Value: BLOB): TDateTime;
+function BLOBToGUID(const Value: BLOB): TGUID;
 function BLOBToData(const Value: BLOB): TData;
+
+function DataToBoolean(const Value: TData): Boolean;
+function DataToInt(const Value: TData): Integer; //
+function DataToBigInt(const Value: TData): Int64; //
+function DataToFloat(const Value: TData): Double;
+function DataToExtended(const Value: TData): Extended; //
+function DataToDateTime(const Value: TData): TDateTime;
 function DataToGUID(const Value: TData): TGUID;
+function DataToBLOB(const Value: TData): BLOB;
+{ ^ ѕреобразование основных типов данных друг в друга. ѕолный набор. ^ }
+
 function DataToAnsiStr(const Value: TData): AnsiString;
 function DataToStr(const Value: TData): String;
-{ ^ ѕреобразование основных типов данных друг в друга ^ }
 
 { v Cравнение действительных чисел с отбросом "мусорной" части v }
 function SameDouble(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
@@ -45,6 +116,15 @@ function DoubleLessEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_
 function DoubleMoreEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
 function DoubleMax(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
 function DoubleMin(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
+
+function SameExtended(ValueA, ValueB: Extended; Scale: Integer = IC_MAX_EXTENDED_SCALE): Boolean;
+function ExtendedEqual(ValueA, ValueB: Extended; Scale: Integer = IC_MAX_EXTENDED_SCALE): Boolean;
+function ExtendedLess(ValueA, ValueB: Extended; Scale: Integer = IC_MAX_EXTENDED_SCALE): Boolean;
+function ExtendedMore(ValueA, ValueB: Extended; Scale: Integer = IC_MAX_EXTENDED_SCALE): Boolean;
+function ExtendedLessEqual(ValueA, ValueB: Extended; Scale: Integer = IC_MAX_EXTENDED_SCALE): Boolean;
+function ExtendedMoreEqual(ValueA, ValueB: Extended; Scale: Integer = IC_MAX_EXTENDED_SCALE): Boolean;
+function ExtendedMax(ValueA, ValueB: Extended; Scale: Integer = IC_MAX_EXTENDED_SCALE): Extended;
+function ExtendedMin(ValueA, ValueB: Extended; Scale: Integer = IC_MAX_EXTENDED_SCALE): Extended;
 { ^ Cравнение действительных чисел с отбросом "мусорной" части ^ }
 
 { v Ѕезопасное деление. ѕри попытке делени€ на 0 возвращает 0. v }
@@ -77,6 +157,20 @@ begin
   Result := IA_MAP[Value];
 end;
 
+function BooleanToFloat(Value: Boolean): Double;
+const
+  DA_MAP: array[Boolean] of Double = (0, 1);
+begin
+  Result := DA_MAP[Value];
+end;
+
+function BooleanToExtended(Value: Boolean): Extended;
+const
+  EA_MAP: array[Boolean] of Extended = (0, 1);
+begin
+  Result := EA_MAP[Value];
+end;
+
 function BooleanToBLOB(Value: Boolean): BLOB;
 begin
   if Value then Result := BLOB(#1)
@@ -89,7 +183,7 @@ begin
   Result[0] := BooleanToBigInt(Value);
 end;
 
-function IntToBoolean(Value: Int64): Boolean;
+function IntToBoolean(Value: Integer): Boolean;
 begin
 
   case Value of
@@ -98,9 +192,238 @@ begin
     1: Result := True;
 
   else
-    raise EConvertError.CreateFmt('%d is invalud Boolean value', [Value]);
+    raise EConvertError.CreateFmt('%d is invalid boolean value', [Value]);
   end;
 
+end;
+
+function IntToBigInt(Value: Integer): Int64;
+begin
+  Result := Value;
+end;
+
+function IntToFloat(Value: Integer): Double;
+begin
+  Result := Value;
+end;
+
+function IntToExtended(Value: Integer): Extended;
+begin
+  Result := Value;
+end;
+
+function IntToDateTime(Value: Integer): TDateTime;
+begin
+  // Ќе весь диапазон
+  Result := TDateTime(IntToFloat(Value));
+end;
+
+function IntToBLOB(Value: Integer): BLOB;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[1], SizeOf(Value));
+end;
+
+function IntToData(Value: Integer): TData;
+begin
+  raise EUncompletedMethod.Create;
+end;
+
+function BigIntToBoolean(Value: Int64): Boolean;
+begin
+
+  case Value of
+
+    0: Result := False;
+    1: Result := True;
+
+  else
+    raise EConvertError.CreateFmt('%d is invalid boolean value', [Value]);
+  end;
+
+end;
+
+function BigIntToInt(Value: Int64): Integer;
+begin
+  Result := Value;
+  if Result <> Value then
+    raise EConvertError.CreateFmt('%d is invalid 32-bit integer value', [Value]);
+end;
+
+function BigIntToFloat(Value: Int64): Double;
+begin
+  // «начение округл€етс€
+  Result := Value;
+end;
+
+function BigIntToExtended(Value: Int64): Extended;
+begin
+  // «начение округл€етс€
+  Result := Value;
+end;
+
+function BigIntToDateTime(Value: Int64): TDateTime;
+begin
+  // Ќе весь диапазон
+  Result := TDateTime(BigIntToFloat(Value));
+end;
+
+function BigIntToBLOB(Value: Int64): BLOB;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[1], SizeOf(Value));
+end;
+
+function BigIntToData(Value: Int64): TData;
+begin
+  raise EUncompletedMethod.Create;
+end;
+
+function FloatToBoolean(Value: Double): Boolean;
+begin
+
+  if      DoubleEqual(Value, 0) then Result := False
+  else if DoubleEqual(Value, 1) then Result := True
+  else raise EConvertError.CreateFmt('%n is invalid boolean value', [Value]);
+
+end;
+
+function FloatToInt(Value: Double): Integer;
+begin
+
+  Result := Trunc(Value);
+  if not DoubleEqual(Result, Value) then
+    raise EConvertError.CreateFmt('%n is invalid integer value', [Value]);
+
+end;
+
+function FloatToBigInt(Value: Double): Int64;
+begin
+
+  // большие значени€ тер€ют точность
+  Result := Trunc(Value);
+  if not DoubleEqual(Result, Value) then
+    raise EConvertError.CreateFmt('%n is invalid integer value', [Value]);
+
+end;
+
+function FloatToExtended(Value: Double): Extended;
+begin
+  // большие значени€ тер€ют точность
+  Result := Value;
+end;
+
+function FloatToBLOB(Value: Double): BLOB;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[1], SizeOf(Value));
+end;
+
+function FloatToDateTime(Value: Double): TDateTime;
+begin
+  // диапазон не контролируетс€
+  Result := Value;
+end;
+
+function FloatToData(Value: Double): TData;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[0], SizeOf(Value));
+end;
+
+function ExtendedToBoolean(Value: Extended): Boolean;
+begin
+
+  if      ExtendedEqual(Value, 0) then Result := False
+  else if ExtendedEqual(Value, 1) then Result := True
+  else raise EConvertError.CreateFmt('%e is invalid boolean value', [Value]);
+
+end;
+
+function ExtendedToInt(Value: Extended): Integer;
+begin
+
+  Result := Trunc(Value);
+  if not ExtendedEqual(Result, Value) then
+    raise EConvertError.CreateFmt('%e is invalid integer value', [Value]);
+
+end;
+
+function ExtendedToBigInt(Value: Extended): Int64;
+begin
+
+  // большие значени€ тер€ют точность
+  Result := Trunc(Value);
+  if not DoubleEqual(Result, Value) then
+    raise EConvertError.CreateFmt('%n is invalid integer value', [Value]);
+
+end;
+
+function ExtendedToFloat(Value: Extended): Double;
+begin
+  // большие значени€ тер€ют точность
+  Result := Value;
+end;
+
+function ExtendedToDateTime(Value: Extended): TDateTime;
+begin
+  // диапазон не контролируетс€
+  Result := Value;
+end;
+
+function ExtendedToBLOB(Value: Extended): BLOB;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[1], SizeOf(Value));
+end;
+
+function ExtendedToData(Value: Extended): TData;
+begin
+  raise EUncompletedMethod.Create;
+end;
+
+function DateTimeToInt(const Value: TDateTime): Integer;
+begin
+  raise EUncompletedMethod.Create;
+end;
+
+function DateTimeToBigInt(const Value: TDateTime): Int64;
+begin
+  raise EUncompletedMethod.Create;
+end;
+
+function DateTimeToFloat(const Value: TDateTime): Double;
+begin
+  Result := Value;
+end;
+
+function DateTimeToExtended(const Value: TDateTime): Extended;
+begin
+  Result := Value;
+end;
+
+function DateTimeToBLOB(const Value: TDateTime): BLOB;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[1], SizeOf(Value));
+end;
+
+function DateTimeToData(const Value: TDateTime): TData;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[0], SizeOf(Value));
+end;
+
+function GUIDToBLOB(const Value: TGUID): BLOB;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[1], SizeOf(Value));
+end;
+
+function GUIDToData(const Value: TGUID): TData;
+begin
+  SetLength(Result, SizeOf(Value));
+  Move(Value, Result[0], SizeOf(Value));
 end;
 
 function BLOBToBoolean(const Value: BLOB): Boolean;
@@ -110,7 +433,7 @@ begin
 
     Result := Value[1] = #1
 
-  else raise EConvertError.Create('It is not a Boolean value');
+  else raise EConvertError.CreateFmt('''0x%x...'' is not a boolean value', [BLOBToBigInt(Value)]);
 
 end;
 
@@ -124,37 +447,24 @@ begin
   Move(Value[1], Result, SizeOf(Result));
 end;
 
-function DataToBoolean(const Value: TData): Boolean;
+function BLOBToFloat(const Value: BLOB): Double;
 begin
-
-  if (Length(Value) = 1) and (Value[0] in [0, 1]) then
-
-    Result := Value[0] = 1
-
-  else raise EConvertError.Create('It is not a Boolean value');
-
+  Move(Value[1], Result, SizeOf(Result));
 end;
 
-function DataToInt(const Value: TData): Integer;
+function BLOBToExtended(const Value: BLOB): Extended;
 begin
-  Move(Value[0], Result, SizeOf(Result));
+  Move(Value[1], Result, SizeOf(Result));
 end;
 
-function DataToBigInt(const Value: TData): Int64;
+function BLOBToDateTime(const Value: BLOB): TDateTime;
 begin
-  Move(Value[0], Result, SizeOf(Result));
+  Move(Value[1], Result, SizeOf(Result));
 end;
 
-function IntToBLOB(Value: Integer): BLOB;
+function BLOBToGUID(const Value: BLOB): TGUID;
 begin
-  SetLength(Result, SizeOf(Value));
-  Move(Value, Result[1], SizeOf(Value));
-end;
-
-function BigIntToBLOB(Value: Int64): BLOB;
-begin
-  SetLength(Result, SizeOf(Value));
-  Move(Value, Result[1], SizeOf(Value));
+  Move(Value[1], Result, SizeOf(Result));
 end;
 
 function BLOBToData(const Value: BLOB): TData;
@@ -163,9 +473,52 @@ begin
   Move(Value[1], Result[0], Length(Value));
 end;
 
+
+function DataToBoolean(const Value: TData): Boolean;
+begin
+
+  if (Length(Value) = 1) and (Value[0] in [0, 1]) then
+
+    Result := Value[0] = 1
+
+  else raise EConvertError.CreateFmt('''0x%x...'' is not a boolean value', [DataToBigInt(Value)]);
+
+end;
+
+function DataToInt(const Value: TData): Integer;
+begin
+  raise EUncompletedMethod.Create;
+end;
+
+function DataToBigInt(const Value: TData): Int64;
+begin
+  raise EUncompletedMethod.Create;
+end;
+
+function DataToFloat(const Value: TData): Double;
+begin
+  Move(Value[0], Result, SizeOf(TDateTime));
+end;
+
+function DataToExtended(const Value: TData): Extended;
+begin
+  raise EUncompletedMethod.Create;
+end;
+
+function DataToDateTime(const Value: TData): TDateTime;
+begin
+  Move(Value[0], Result, SizeOf(TDateTime));
+end;
+
 function DataToGUID(const Value: TData): TGUID;
 begin
   Move(Value[0], Result, SizeOf(Result));
+end;
+
+function DataToBLOB(const Value: TData): BLOB;
+begin
+  SetLength(Result, Length(Value));
+  Move(Value[0], Result[1], Length(Value));
 end;
 
 function DataToAnsiStr(const Value: TData): AnsiString;
@@ -186,7 +539,7 @@ begin
   Move(Value[0], Result[1], L);
 end;
 
-function SameDouble(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function SameDouble(ValueA, ValueB: Double; Scale: Integer): Boolean;
 begin
   Result := DoubleEqual(ValueA, ValueB, Scale);
 end;
@@ -196,33 +549,75 @@ begin
   Result := Abs(ValueA - ValueB) < Power(10, - Scale);
 end;
 
-function DoubleLess(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleLess(ValueA, ValueB: Double; Scale: Integer): Boolean;
 begin
   Result := not DoubleEqual(ValueA, ValueB, Scale) and (ValueA < ValueB);
 end;
 
-function DoubleMore(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMore(ValueA, ValueB: Double; Scale: Integer): Boolean;
 begin
   Result := not DoubleEqual(ValueA, ValueB, Scale) and (ValueA > ValueB);
 end;
 
-function DoubleLessEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleLessEqual(ValueA, ValueB: Double; Scale: Integer): Boolean;
 begin
   Result := DoubleLess(ValueA, ValueB, Scale) or DoubleEqual(ValueA, ValueB, Scale);
 end;
 
-function DoubleMoreEqual(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Boolean;
+function DoubleMoreEqual(ValueA, ValueB: Double; Scale: Integer): Boolean;
 begin
   Result := DoubleMore(ValueA, ValueB, Scale) or DoubleEqual(ValueA, ValueB, Scale);
 end;
 
-function DoubleMax(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
+function DoubleMax(ValueA, ValueB: Double; Scale: Integer): Double;
 begin
   if DoubleMore(ValueA, ValueB) then Result := ValueA
   else Result := ValueB;
 end;
 
-function DoubleMin(ValueA, ValueB: Double; Scale: Integer = IC_MAX_DOUBLE_SCALE): Double;
+function DoubleMin(ValueA, ValueB: Double; Scale: Integer): Double;
+begin
+  if DoubleLess(ValueA, ValueB) then Result := ValueA
+  else Result := ValueB;
+end;
+
+function SameExtended(ValueA, ValueB: Extended; Scale: Integer): Boolean;
+begin
+  Result := ExtendedEqual(ValueA, ValueB, Scale);
+end;
+
+function ExtendedEqual(ValueA, ValueB: Extended; Scale: Integer): Boolean;
+begin
+  Result := Abs(ValueA - ValueB) < Power(10, - Scale);
+end;
+
+function ExtendedLess(ValueA, ValueB: Extended; Scale: Integer): Boolean;
+begin
+  Result := not ExtendedEqual(ValueA, ValueB, Scale) and (ValueA < ValueB);
+end;
+
+function ExtendedMore(ValueA, ValueB: Extended; Scale: Integer): Boolean;
+begin
+  Result := not ExtendedEqual(ValueA, ValueB, Scale) and (ValueA > ValueB);
+end;
+
+function ExtendedLessEqual(ValueA, ValueB: Extended; Scale: Integer): Boolean;
+begin
+  Result := ExtendedLess(ValueA, ValueB, Scale) or ExtendedEqual(ValueA, ValueB, Scale);
+end;
+
+function ExtendedMoreEqual(ValueA, ValueB: Extended; Scale: Integer): Boolean;
+begin
+  Result := ExtendedMore(ValueA, ValueB, Scale) or ExtendedEqual(ValueA, ValueB, Scale);
+end;
+
+function ExtendedMax(ValueA, ValueB: Extended; Scale: Integer): Extended;
+begin
+  if ExtendedMore(ValueA, ValueB) then Result := ValueA
+  else Result := ValueB;
+end;
+
+function ExtendedMin(ValueA, ValueB: Extended; Scale: Integer): Extended;
 begin
   if DoubleLess(ValueA, ValueB) then Result := ValueA
   else Result := ValueB;

@@ -7,7 +7,7 @@ uses
   vParams;
 
 const
-  SC_RootPath = 'Software\vSoft\%s\Version %d';
+  SC_RootPath = 'Software\LiberSynth\%s\Version %d';
 
 type
 

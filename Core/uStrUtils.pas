@@ -1,10 +1,29 @@
 ﻿unit uStrUtils;
 
-(**********************************************************)
-(*                                                        *)
-(*                     Liber Synth Co                     *)
-(*                                                        *)
-(**********************************************************)
+(*******************************************************************************************)
+(*            _____          _____          _____          _____          _____            *)
+(*           /\    \        /\    \        /\    \        /\    \        /\    \           *)
+(*          /::\____\      /::\    \      /::\    \      /::\    \      /::\    \          *)
+(*         /:::/    /      \:::\    \    /::::\    \    /::::\    \    /::::\    \         *)
+(*        /:::/    /        \:::\    \  /::::::\    \  /::::::\    \  /::::::\    \        *)
+(*       /:::/    /          \:::\    \ :::/\:::\    \ :::/\:::\    \ :::/\:::\    \       *)
+(*      /:::/    /            \:::\    \ :/__\:::\    \ :/__\:::\    \ :/__\:::\    \      *)
+(*     /:::/    /             /::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \     *)
+(*    /:::/    /     _____   /::::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \    *)
+(*   /:::/    /     /\    \ /:::/\:::\    \ \   \:::\ ___\ \   \:::\    \ \   \:::\____\   *)
+(*  /:::/____/     /::\    /:::/  \:::\____\ \   \:::|    | \   \:::\____\ \   \:::|    |  *)
+(*  \:::\    \     \:::\  /:::/    \::/    / :\  /:::|____| :\   \::/    / :\  /:::|____|  *)
+(*   \:::\    \     \:::\/:::/    / \/____/ :::\/:::/    / :::\   \/____/_:::\/:::/    /   *)
+(*    \:::\    \     \::::::/    /  \:::\   \::::::/    /  \:::\    \  |:::::::::/    /    *)
+(*     \:::\    \     \::::/____/    \:::\   \::::/    /    \:::\____\ |::|\::::/    /     *)
+(*      \:::\    \     \:::\    \     \:::\  /:::/    / :\   \::/    / |::| \::/____/      *)
+(*       \:::\    \     \:::\    \     \:::\/:::/    / :::\   \/____/  |::|  ~|            *)
+(*        \:::\    \     \:::\    \     \::::::/    /  \:::\    \      |::|   |            *)
+(*         \:::\____\     \:::\____\     \::::/    /    \:::\____\     \::|   |            *)
+(*          \::/    /      \::/    /      \::/____/      \::/    /      \:|   |            *)
+(*           \/____/        \/____/        ~~             \/____/        \|___|            *)
+(*                                                                                         *)
+(*******************************************************************************************)
 
 { TODO -oVasilyevSM -cuStrUtils: Проискать на лишние функции }
 
@@ -13,33 +32,56 @@ interface
 uses
   { VCL }
   SysUtils,
-  { vSoft }
+  { LiberSynth }
   uConsts, uTypes, uDataUtils;
 
-{ v Преобразование основных типов данных в строку и обратно v }
+{ v Проверка v }
+{ TODO -oVasilyevSM -cuStrUtils: Продолжение следует: Integer, BigInt, Float, Extended, DateTime, AnsiString, String, BLOB, Data }
 function StrIsBoolean(const S: String): Boolean;
 function StrIsGUID(const Value: String): Boolean;
+{ ^ Проверка ^ }
 
-{ TODO -oVasilyevSM -cuStrUtils: Продолжение следует: Extended, AnsiString, BLOB }
+{ v Преобразование основных типов данных в визуальную строку и обратно. Полный набор. v }
 function BooleanToStr(Value: Boolean): String;
-function StrToBoolean(const S: String): Boolean;
+function StrToBoolean(const Value: String): Boolean;
 function IntToStr(Value: Integer): String;
 function StrToInt(const Value: String): Integer;
 function BigIntToStr(Value: Int64): String;
 function StrToBigInt(const Value: String): Int64;
-function DoubleToStr(Value: Double): String;
-function StrToDouble(const Value: String): Double;
+function FloatToStr(Value: Double): String;
+function StrToFloat(const Value: String): Double;
 function ExtendedToStr(Value: Extended): String;
 function StrToExtended(const Value: String): Extended;
 function DateTimeToStr(Value: TDateTime): String;
 function StrToDateTime(const Value: String): TDateTime;
 function GUIDToStr(const Value: TGUID) : String;
 function StrToGUID(const Value: String): TGUID;
+function AnsiStrToStr(const Value: AnsiString): String;
+function StrToAnsiStr(const Value: String): AnsiString;
 function BLOBToHexStr(const Value: BLOB): String;
 function HexStrToBLOB(const Value: String): BLOB;
-function DataToHexStr(const Value: TData): String;
-function HexStrToData(const Value: String): TData;
-{ ^ Преобразование основных типов данных в строку и обратно ^ }
+function DataToByteStr(const Value: TData): String;
+function ByteStrToData(const Value: String): TData;
+
+function BooleanToAnsiStr(Value: Boolean): AnsiString;
+function AnsiStrToBoolean(const Value: AnsiString): Boolean;
+function IntToAnsiStr(Value: Integer): AnsiString; //
+function AnsiStrToInt(const Value: AnsiString): Integer;
+function BigIntToAnsiStr(Value: Integer): AnsiString; //
+function AnsiStrToBigInt(const Value: AnsiString): Integer; //
+function FloatToAnsiStr(Value: Double): AnsiString; //
+function AnsiStrToFloat(const Value: AnsiString): Double; //
+function ExtendedToAnsiStr(Value: Extended): AnsiString; //
+function AnsiStrToExtended(const Value: AnsiString): Extended; //
+function DateTimeToAnsiStr(Value: TDateTime): AnsiString; //
+function AnsiStrToDateTime(const Value: AnsiString): TDateTime; //
+function GUIDToAnsiStr(const Value: TGUID) : AnsiString; //
+function AnsiStrToGUID(const Value: AnsiString): TGUID; //
+function BLOBToHexAnsiStr(const Value: BLOB): AnsiString; //
+function HexAnsiStrToBLOB(const Value: AnsiString): BLOB; //
+function DataToByteAnsiStr(const Value: TData): AnsiString; //
+function ByteAnsiStrToData(const Value: AnsiString): TData; //
+{ ^ Преобразование основных типов данных в визуальную строку и обратно. Полный набор. ^ }
 
 { v Для парсинга и автоскриптов v }
 function PosOf(Patterns: String; const Value: String; Start: Integer = 1): Integer; overload;
@@ -156,13 +198,13 @@ begin
   else Result := 'False';
 end;
 
-function StrToBoolean(const S: String): Boolean;
+function StrToBoolean(const Value: String): Boolean;
 begin
 
-  if SameText(S, 'FALSE') or SameText(S, '0') then Exit(False);
-  if SameText(S, 'TRUE' ) or SameText(S, '1') then Exit(True );
+  if SameText(Value, 'FALSE') or SameText(Value, '0') then Exit(False);
+  if SameText(Value, 'TRUE' ) or SameText(Value, '1') then Exit(True );
 
-  raise EConvertError.CreateFmt('%s is not a Boolean value', [S]);
+  raise EConvertError.CreateFmt('%s is not a Boolean value', [Value]);
 
 end;
 
@@ -186,12 +228,12 @@ begin
   Result := SysUtils.StrToInt64(Value);
 end;
 
-function DoubleToStr(Value: Double): String;
+function FloatToStr(Value: Double): String;
 begin
   Result := SysUtils.FloatToStr(Value);
 end;
 
-function StrToDouble(const Value: String): Double;
+function StrToFloat(const Value: String): Double;
 begin
   Result := SysUtils.StrToFloat(GetFloatStr(Value));
 end;
@@ -437,6 +479,16 @@ begin
 
 end;
 
+function AnsiStrToStr(const Value: AnsiString): String;
+begin
+  Result := String(Value);
+end;
+
+function StrToAnsiStr(const Value: String): AnsiString;
+begin
+  Result := AnsiString(Value);
+end;
+
 function BLOBToHexStr(const Value: BLOB): String;
 var
   P: Pointer;
@@ -476,41 +528,130 @@ begin
 
 end;
 
-function DataToHexStr(const Value: TData): String;
+function DataToByteStr(const Value: TData): String;
 var
   i: Integer;
   B: Byte;
 begin
 
-  SetLength(Result, Length(Value) * 2 + 2);
-  Result[1] := '0';
-  Result[2] := 'x';
+  SetLength(Result, Length(Value) * 3);
 
   for i := Low(Value) to High(Value) do begin
 
     B := Value[i];
-    Result[(i + 1) * 2 + 1] := AC_HEX_CHARS[B div 16];
-    Result[(i + 1) * 2 + 2] := AC_HEX_CHARS[B mod 16];
+    Result[(i) * 3 + 1] := AC_HEX_CHARS[B div 16];
+    Result[(i) * 3 + 2] := AC_HEX_CHARS[B mod 16];
+    Result[(i) * 3 + 3] := ' ';
 
   end;
 
 end;
 
-function HexStrToData(const Value: String): TData;
+function ByteStrToData(const Value: String): TData;
 var
   i: Integer;
   B: Byte;
 begin
 
-  SetLength(Result, (Length(Value) - 2) div 2);
+  SetLength(Result, Round(Length(Value) / 3));
 
-  for i := 1 to Length(Result) do begin
+  for i := Low(Result) to High(Result) do begin
 
-    B := StrToInt('$' + Value[i * 2 + 1] + Value[i * 2 + 2]);
-    Result[i - 1] := B;
+    B := StrToInt('$' + Value[i * 3 + 1] + Value[i * 3 + 2]);
+    Result[i] := B;
 
   end;
 
+end;
+
+function BooleanToAnsiStr(Value: Boolean): AnsiString;
+begin
+  Result := AnsiString(BooleanToStr(Value));
+end;
+
+function AnsiStrToBoolean(const Value: AnsiString): Boolean;
+begin
+  Result := StrToBoolean(String(Value));
+end;
+
+function IntToAnsiStr(Value: Integer): AnsiString;
+begin
+  Result := AnsiString(IntToStr(Value));
+end;
+
+function AnsiStrToInt(const Value: AnsiString): Integer;
+begin
+  Result := StrToInt(String(Value));
+end;
+
+function BigIntToAnsiStr(Value: Integer): AnsiString;
+begin
+  Result := AnsiString(BigIntToStr(Value));
+end;
+
+function AnsiStrToBigInt(const Value: AnsiString): Integer;
+begin
+  Result := StrToBigInt(String(Value));
+end;
+
+function FloatToAnsiStr(Value: Double): AnsiString;
+begin
+  Result := AnsiString(FloatToStr(Value));
+end;
+
+function AnsiStrToFloat(const Value: AnsiString): Double;
+begin
+  Result := StrToFloat(String(Value));
+end;
+
+function ExtendedToAnsiStr(Value: Extended): AnsiString;
+begin
+  Result := AnsiString(ExtendedToStr(Value));
+end;
+
+function AnsiStrToExtended(const Value: AnsiString): Extended;
+begin
+  Result := StrToExtended(String(Value));
+end;
+
+function DateTimeToAnsiStr(Value: TDateTime): AnsiString;
+begin
+  Result := AnsiString(DateTimeToStr(Value));
+end;
+
+function AnsiStrToDateTime(const Value: AnsiString): TDateTime;
+begin
+  Result := StrToDateTime(String(Value));
+end;
+
+function GUIDToAnsiStr(const Value: TGUID) : AnsiString;
+begin
+  Result := AnsiString(GUIDToStr(Value));
+end;
+
+function AnsiStrToGUID(const Value: AnsiString): TGUID;
+begin
+  Result := StrToGUID(String(Value));
+end;
+
+function BLOBToHexAnsiStr(const Value: BLOB): AnsiString;
+begin
+  Result := AnsiString(BLOBToHexStr(Value));
+end;
+
+function HexAnsiStrToBLOB(const Value: AnsiString): BLOB;
+begin
+  Result := HexStrToBLOB(String(Value));
+end;
+
+function DataToByteAnsiStr(const Value: TData): AnsiString;
+begin
+  Result := AnsiString(DataToByteStr(Value));
+end;
+
+function ByteAnsiStrToData(const Value: AnsiString): TData;
+begin
+  Result := ByteStrToData(String(Value));
 end;
 
 function PosOf(Patterns: String; const Value: String; Start: Integer): Integer;

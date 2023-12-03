@@ -46,7 +46,7 @@ procedure RegisterApplication(Registry: TRegistry);
   end;
 
 const
-  SC_RegKeyFormat = 'Software\vSoft\%s\Version %s';
+  SC_RegKeyFormat = 'Software\LiberSynth\%s\Version %s';
 var
   FN: String;
 begin

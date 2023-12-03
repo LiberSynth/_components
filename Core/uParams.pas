@@ -1,10 +1,29 @@
 unit uParams;
 
-(**********************************************************)
-(*                                                        *)
-(*                     Liber Synth Co                     *)
-(*                                                        *)
-(**********************************************************)
+(*******************************************************************************************)
+(*            _____          _____          _____          _____          _____            *)
+(*           /\    \        /\    \        /\    \        /\    \        /\    \           *)
+(*          /::\____\      /::\    \      /::\    \      /::\    \      /::\    \          *)
+(*         /:::/    /      \:::\    \    /::::\    \    /::::\    \    /::::\    \         *)
+(*        /:::/    /        \:::\    \  /::::::\    \  /::::::\    \  /::::::\    \        *)
+(*       /:::/    /          \:::\    \ :::/\:::\    \ :::/\:::\    \ :::/\:::\    \       *)
+(*      /:::/    /            \:::\    \ :/__\:::\    \ :/__\:::\    \ :/__\:::\    \      *)
+(*     /:::/    /             /::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \     *)
+(*    /:::/    /     _____   /::::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \    *)
+(*   /:::/    /     /\    \ /:::/\:::\    \ \   \:::\ ___\ \   \:::\    \ \   \:::\____\   *)
+(*  /:::/____/     /::\    /:::/  \:::\____\ \   \:::|    | \   \:::\____\ \   \:::|    |  *)
+(*  \:::\    \     \:::\  /:::/    \::/    / :\  /:::|____| :\   \::/    / :\  /:::|____|  *)
+(*   \:::\    \     \:::\/:::/    / \/____/ :::\/:::/    / :::\   \/____/_:::\/:::/    /   *)
+(*    \:::\    \     \::::::/    /  \:::\   \::::::/    /  \:::\    \  |:::::::::/    /    *)
+(*     \:::\    \     \::::/____/    \:::\   \::::/    /    \:::\____\ |::|\::::/    /     *)
+(*      \:::\    \     \:::\    \     \:::\  /:::/    / :\   \::/    / |::| \::/____/      *)
+(*       \:::\    \     \:::\    \     \:::\/:::/    / :::\   \/____/  |::|  ~|            *)
+(*        \:::\    \     \:::\    \     \::::::/    /  \:::\    \      |::|   |            *)
+(*         \:::\____\     \:::\____\     \::::/    /    \:::\____\     \::|   |            *)
+(*          \::/    /      \::/    /      \::/____/      \::/    /      \:|   |            *)
+(*           \/____/        \/____/        ~~             \/____/        \|___|            *)
+(*                                                                                         *)
+(*******************************************************************************************)
 
 { TODO 10 -oVasilyevSM -cuParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или
   как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
@@ -14,7 +33,7 @@ interface
 uses
   { VCL }
   SysUtils, Generics.Collections,
-  { vSoft }
+  { LiberSynth }
   uConsts, uTypes, uCore, uDataUtils, uStrUtils, uCustomStringParser, uParamsStringParser;
 
 type
@@ -128,25 +147,40 @@ type
     function _GetAsBoolean: Boolean;
     function _GetAsInteger: Integer;
     function _GetAsBigInt: Int64;
+    function _GetAsFloat: Double;
+    function _GetAsExtended: Extended;
+    function _GetAsDateTime: TDateTime;
+    function _GetAsGUID: TGUID;
+    function _GetAsAnsiString: AnsiString;
+    function _GetAsString: String;
+    function _GetAsBLOB: BLOB;
+    function _GetAsData: TData;
 
     procedure _SetAsBoolean(const _Value: Boolean);
     procedure _SetAsInteger(const _Value: Integer);
     procedure _SetAsBigInt(const _Value: Int64);
+    procedure _SetAsFloat(const _Value: Double);
+    procedure _SetAsExtended(const _Value: Extended);
+    procedure _SetAsDateTime(const _Value: TDateTime);
+    procedure _SetAsGUID(const _Value: TGUID);
+    procedure _SetAsAnsiString(const _Value: AnsiString);
+    procedure _SetAsString(const _Value: String);
+    procedure _SetAsBLOB(const _Value: BLOB);
+    procedure _SetAsData(const _Value: TData);
 
   public
 
     property AsBoolean: Boolean read _GetAsBoolean write _SetAsBoolean;
     property AsInteger: Integer read _GetAsInteger write _SetAsInteger;
     property AsBigInt: Int64 read _GetAsBigInt write _SetAsBigInt;
-    { TODO -oVasilyevSM -cTParamHelper: Продолжение следует }
-//    property AsFloat: Double read GetAsFloat write SetAsFloat;
-//    property AsExtended: Extended read GetAsExtended write SetAsExtended;
-//    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
-//    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
-//    property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
-//    property AsString: String read GetAsString write SetAsString;
-//    property AsBLOB: BLOB read GetAsBLOB write SetAsBLOB;
-//    property AsData: TData read GetAsData write SetAsData;
+    property AsFloat: Double read _GetAsFloat write _SetAsFloat;
+    property AsExtended: Extended read _GetAsExtended write _SetAsExtended;
+    property AsDateTime: TDateTime read _GetAsDateTime write _SetAsDateTime;
+    property AsGUID: TGUID read _GetAsGUID write _SetAsGUID;
+    property AsAnsiString: AnsiString read _GetAsAnsiString write _SetAsAnsiString;
+    property AsString: String read _GetAsString write _SetAsString;
+    property AsBLOB: BLOB read _GetAsBLOB write _SetAsBLOB;
+    property AsData: TData read _GetAsData write _SetAsData;
 
   end;
 
@@ -498,21 +532,21 @@ begin
     case FDataType of
 
       dtUnknown:    Result := '';
-      dtBoolean:    Result := BooleanToStr       (AsBoolean  );
-      dtInteger:    Result := IntToStr           (AsInteger  );
-      dtBigInt:     Result := BigIntToStr        (AsBigInt   );
-      dtFloat:      Result := DoubleToStr        (AsFloat    );
-      dtExtended:   Result := ExtendedToStr      (AsExtended );
-      dtDateTime:   Result := DateTimeToStr      (AsDateTime );
-      dtGUID:       Result := GUIDToStr          (AsGUID     );
-      dtAnsiString: Result := String(AnsiString  (FData     ));
-      dtString:     Result := String             (FData      );
-      dtBLOB:       Result := BLOBToHexStr       (AsBLOB     );
-      dtData:       Result := DataToHexStr       (AsData     ); { TODO 1 -oVasilyevSM -cTParam.GetAsString: Формат. Это не хекс-строка. }
-      dtParams:     Result := ParamsToStr(TParams(FData     ));
+      dtBoolean:    Result := BooleanToStr (AsBoolean   );
+      dtInteger:    Result := IntToStr     (AsInteger   );
+      dtBigInt:     Result := BigIntToStr  (AsBigInt    );
+      dtFloat:      Result := FloatToStr   (AsFloat     );
+      dtExtended:   Result := ExtendedToStr(AsExtended  );
+      dtDateTime:   Result := DateTimeToStr(AsDateTime  );
+      dtGUID:       Result := GUIDToStr    (AsGUID      );
+      dtAnsiString: Result := AnsiStrToStr (AsAnsiString);
+      dtString:     Result := String       (FData       );
+      dtBLOB:       Result := BLOBToHexStr (AsBLOB      );
+      dtData:       Result := DataToByteStr(AsData      );
+      dtParams:     Result := TParams(FData).SaveToString;
 
     else
-      raise EUncomplitedMethod.Create;
+      raise EUncompletedMethod.Create;
     end;
 
 end;
@@ -692,7 +726,7 @@ begin
     dtParams:     Result := SizeOf(TObject);
 
   else
-    raise EUncomplitedMethod.Create;
+    raise EUncompletedMethod.Create;
   end;
 
 end;
@@ -749,7 +783,7 @@ begin
       dtParams:     AsParams.Assign(_Source.AsParams);
 
     else
-      raise EUncomplitedMethod.Create;
+      raise EUncompletedMethod.Create;
     end;
 
 end;
@@ -773,12 +807,14 @@ begin
 
     case DataType of
 
-      dtInteger:    Result := IntToBoolean (AsInteger);
-      dtBigInt:     Result := IntToBoolean (AsBigInt);
-      dtAnsiString: Result := StrToBoolean (String(AsAnsiString));
-      dtString:     Result := StrToBoolean (AsString);
-      dtBLOB:       Result := BLOBToBoolean(AsBLOB);
-      dtData:       Result := DataToBoolean(AsData);
+      dtInteger:    Result := IntToBoolean     (AsInteger   );
+      dtBigInt:     Result := BigIntToBoolean  (AsBigInt    );
+      dtFloat:      Result := FloatToBoolean   (AsFloat     );
+      dtExtended:   Result := ExtendedToBoolean(AsExtended  );
+      dtAnsiString: Result := AnsiStrToBoolean (AsAnsiString);
+      dtString:     Result := StrToBoolean     (AsString    );
+      dtBLOB:       Result := BLOBToBoolean    (AsBLOB      );
+      dtData:       Result := DataToBoolean    (AsData      );
 
     else
       Result := GetAsBoolean;
@@ -794,12 +830,14 @@ begin
 
     case DataType of
 
-      dtBoolean:    Result := BooleanToInt(AsBoolean);
-      dtBigInt:     Result := AsBigInt;
-      dtAnsiString: Result := StrToInt(String(AsAnsiString));
-      dtString:     Result := StrToInt(AsString);
-      dtBLOB:       Result := BLOBToInt(AsBLOB);
-      dtData:       Result := DataToInt(AsData);
+      dtBoolean:    Result := BooleanToInt (AsBoolean   );
+      dtBigInt:     Result := BigIntToInt  (AsBigInt    );
+      dtFloat:      Result := FloatToInt   (AsFloat     );
+      dtExtended:   Result := ExtendedToInt(AsFloat     );
+      dtAnsiString: Result := AnsiStrToInt (AsAnsiString);
+      dtString:     Result := StrToInt     (AsString    );
+      dtBLOB:       Result := BLOBToInt    (AsBLOB      );
+      dtData:       Result := DataToInt    (AsData      );
 
     else
       Result := GetAsInteger;
@@ -815,15 +853,187 @@ begin
 
     case DataType of
 
-      dtBoolean:    Result := BooleanToInt(AsBoolean);
-      dtInteger:    Result := AsInteger;
-      dtAnsiString: Result := StrToBigInt(String(AsAnsiString));
-      dtString:     Result := StrToBigInt(AsString);
-      dtBLOB:       Result := BLOBToBigInt(AsBLOB);
-      dtData:       Result := DataToBigInt(AsData);
+      dtBoolean:    Result := BooleanToBigInt (AsBoolean   );
+      dtInteger:    Result := IntToBigInt     (AsInteger   );
+      dtFloat:      Result := FloatToBigInt   (AsFloat     );
+      dtExtended:   Result := ExtendedToBigInt(AsExtended  );
+      dtAnsiString: Result := AnsiStrToBigInt (AsAnsiString);
+      dtString:     Result := StrToBigInt     (AsString    );
+      dtBLOB:       Result := BLOBToBigInt    (AsBLOB      );
+      dtData:       Result := DataToBigInt    (AsData      );
 
     else
       Result := GetAsBigInt;
+    end;
+
+end;
+
+function TParamHelper._GetAsFloat: Double;
+begin
+
+  if StrictDataType then Result := GetAsFloat
+  else
+
+    case DataType of
+
+      dtBoolean:    Result := BooleanToFloat (AsBoolean   );
+      dtInteger:    Result := IntToFloat     (AsInteger   );
+      dtBigInt:     Result := BigIntToFloat  (AsBigInt    );
+      dtExtended:   Result := ExtendedToFloat(AsExtended  );
+      dtDateTime:   Result := DateTimeToFloat(AsDateTime  );
+      dtAnsiString: Result := AnsiStrToFloat (AsAnsiString);
+      dtString:     Result := StrToFloat     (AsString    );
+      dtBLOB:       Result := BLOBToFloat    (AsBLOB      );
+      dtData:       Result := DataToFloat    (AsData      );
+
+    else
+      Result := GetAsFloat;
+    end;
+
+end;
+
+function TParamHelper._GetAsExtended: Extended;
+begin
+
+  if StrictDataType then Result := GetAsExtended
+  else
+
+    case DataType of
+
+      dtBoolean:    Result := BooleanToExtended (AsBoolean   );
+      dtInteger:    Result := IntToExtended     (AsInteger   );
+      dtBigInt:     Result := BigIntToExtended  (AsBigInt    );
+      dtFloat:      Result := ExtendedToFloat   (AsExtended  );
+      dtDateTime:   Result := DateTimeToExtended(AsDateTime  );
+      dtAnsiString: Result := AnsiStrToExtended (AsAnsiString);
+      dtString:     Result := StrToExtended     (AsString    );
+      dtBLOB:       Result := BLOBToExtended    (AsBLOB      );
+      dtData:       Result := DataToExtended    (AsData      );
+
+    else
+      Result := GetAsExtended;
+    end;
+
+end;
+
+function TParamHelper._GetAsDateTime: TDateTime;
+begin
+
+  if StrictDataType then Result := GetAsDateTime
+  else
+
+    case DataType of
+
+      dtInteger:    Result := IntToDateTime     (AsInteger   );
+      dtBigInt:     Result := BigIntToDateTime  (AsBigInt    );
+      dtFloat:      Result := FloatToDateTime   (AsFloat     );
+      dtExtended:   Result := ExtendedToDateTime(AsExtended  );
+      dtAnsiString: Result := AnsiStrToDateTime (AsAnsiString);
+      dtString:     Result := StrToDateTime     (AsString    );
+      dtBLOB:       Result := BLOBToDateTime    (AsBLOB      );
+      dtData:       Result := DataToDateTime    (AsData      );
+
+    else
+      Result := GetAsDateTime;
+    end;
+
+end;
+
+function TParamHelper._GetAsGUID: TGUID;
+begin
+
+  if StrictDataType then Result := GetAsGUID
+  else
+
+    case DataType of
+
+      dtAnsiString: Result := AnsiStrToGUID(AsAnsiString);
+      dtString:     Result := StrToGUID    (AsString    );
+      dtBLOB:       Result := BLOBToGUID   (AsBLOB      );
+      dtData:       Result := DataToGUID   (AsData      );
+
+    else
+      Result := GetAsGUID;
+    end;
+
+end;
+
+function TParamHelper._GetAsAnsiString: AnsiString;
+begin
+
+  if StrictDataType then Result := GetAsAnsiString
+  else
+
+    case DataType of
+
+      dtBoolean:  Result := BooleanToAnsiStr (AsBoolean   );
+      dtInteger:  Result := IntToAnsiStr     (AsInteger   );
+      dtBigInt:   Result := BigIntToAnsiStr  (AsBigInt    );
+      dtFloat:    Result := FloatToAnsiStr   (AsFloat     );
+      dtExtended: Result := ExtendedToAnsiStr(AsExtended  );
+      dtDateTime: Result := DateTimeToAnsiStr(AsDateTime  );
+      dtGUID:     Result := GUIDToAnsiStr    (AsGUID      );
+      dtString:   Result := StrToAnsiStr     (AsString    );
+      dtBLOB:     Result := BLOBToHexAnsiStr (AsBLOB      );
+      dtData:     Result := DataToByteAnsiStr(AsData      );
+
+    else
+      Result := GetAsAnsiString;
+    end;
+
+end;
+
+function TParamHelper._GetAsString: String;
+begin
+  Result := GetAsString;
+end;
+
+function TParamHelper._GetAsBLOB: BLOB;
+begin
+
+  if StrictDataType then Result := GetAsBLOB
+  else
+
+    case DataType of
+
+      dtBoolean:    Result := BooleanToBLOB   (AsBoolean   );
+      dtInteger:    Result := IntToBLOB       (AsInteger   );
+      dtBigInt:     Result := BigIntToBLOB    (AsBigInt    );
+      dtFloat:      Result := FloatToBLOB     (AsFloat     );
+      dtExtended:   Result := ExtendedToBLOB  (AsExtended  );
+      dtDateTime:   Result := DateTimeToBLOB  (AsDateTime  );
+      dtGUID:       Result := GUIDToBLOB      (AsGUID      );
+      dtAnsiString: Result := HexAnsiStrToBLOB(AsAnsiString);
+      dtString:     Result := HexStrToBLOB    (AsString    );
+      dtData:       Result := DataToBLOB      (AsData      );
+
+    else
+      Result := GetAsBLOB;
+    end;
+
+end;
+
+function TParamHelper._GetAsData: TData;
+begin
+
+  if StrictDataType then Result := GetAsData
+  else
+
+    case DataType of
+
+      dtBoolean:    Result := BooleanToData    (AsBoolean   );
+      dtInteger:    Result := IntToData        (AsInteger   );
+      dtBigInt:     Result := BigIntToData     (AsBigInt    );
+      dtFloat:      Result := FloatToData      (AsFloat     );
+      dtExtended:   Result := ExtendedToData   (AsExtended  );
+      dtDateTime:   Result := DateTimeToData   (AsDateTime  );
+      dtGUID:       Result := GUIDToData       (AsGUID      );
+      dtAnsiString: Result := ByteAnsiStrToData(AsAnsiString);
+      dtString:     Result := ByteStrToData    (AsString    );
+      dtBLOB:       Result := BLOBToData       (AsBLOB      );
+
+    else
+      Result := GetAsData;
     end;
 
 end;
@@ -836,12 +1046,14 @@ begin
 
     case DataType of
 
-      dtInteger:    SetAsInteger(BooleanToInt(_Value));
-      dtBigInt:     SetAsBigInt(BooleanToBigInt(_Value));
-      dtAnsiString: SetAsAnsiString(AnsiString(BooleanToStr(_Value)));
-      dtString:     SetAsString(BooleanToStr(_Value));
-      dtBLOB:       SetAsBLOB(BooleanToBLOB(_Value));
-      dtData:       SetAsData(BooleanToData(_Value));
+      dtInteger:    SetAsInteger   (BooleanToInt     (_Value));
+      dtBigInt:     SetAsBigInt    (BooleanToBigInt  (_Value));
+      dtFloat:      SetAsFloat     (BooleanToFloat   (_Value));
+      dtExtended:   SetAsExtended  (BooleanToExtended(_Value));
+      dtAnsiString: SetAsAnsiString(BooleanToAnsiStr (_Value));
+      dtString:     SetAsString    (BooleanToStr     (_Value));
+      dtBLOB:       SetAsBLOB      (BooleanToBLOB    (_Value));
+      dtData:       SetAsData      (BooleanToData    (_Value));
 
     else
       SetAsBoolean(_Value);
@@ -851,12 +1063,237 @@ end;
 
 procedure TParamHelper._SetAsInteger(const _Value: Integer);
 begin
-  SetAsInteger(_Value);
+
+  if StrictDataType then SetAsInteger(_Value)
+  else
+
+    case DataType of
+
+      dtBoolean:    SetAsBoolean   (IntToBoolean (_Value));
+      dtBigInt:     SetAsBigInt    (IntToBigInt  (_Value));
+      dtFloat:      SetAsFloat     (IntToFloat   (_Value));
+      dtExtended:   SetAsExtended  (IntToExtended(_Value));
+      dtAnsiString: SetAsAnsiString(IntToAnsiStr (_Value));
+      dtString:     SetAsString    (IntToStr     (_Value));
+      dtBLOB:       SetAsBLOB      (IntToBLOB    (_Value));
+      dtData:       SetAsData      (IntToData    (_Value));
+
+    else
+      SetAsInteger(_Value);
+    end;
+
 end;
 
 procedure TParamHelper._SetAsBigInt(const _Value: Int64);
 begin
-  SetAsBigInt(_Value);
+
+  if StrictDataType then SetAsBigInt(_Value)
+  else
+
+    case DataType of
+
+      dtBoolean:    SetAsBoolean   (BigIntToBoolean (_Value));
+      dtInteger:    SetAsInteger   (BigIntToInt     (_Value));
+      dtFloat:      SetAsFloat     (BigIntToFloat   (_Value));
+      dtExtended:   SetAsExtended  (BigIntToExtended(_Value));
+      dtAnsiString: SetAsAnsiString(BigIntToAnsiStr (_Value));
+      dtString:     SetAsString    (BigIntToStr     (_Value));
+      dtBLOB:       SetAsBLOB      (BigIntToBLOB    (_Value));
+      dtData:       SetAsData      (BigIntToData    (_Value));
+
+    else
+      SetAsBigInt(_Value);
+    end;
+
+end;
+
+procedure TParamHelper._SetAsFloat(const _Value: Double);
+begin
+
+  if StrictDataType then SetAsFloat(_Value)
+  else
+
+    case DataType of
+
+      dtBoolean:    SetAsBoolean   (FloatToBoolean (_Value));
+      dtInteger:    SetAsInteger   (FloatToInt     (_Value));
+      dtBigInt:     SetAsFloat     (FloatToBigInt  (_Value));
+      dtExtended:   SetAsExtended  (FloatToExtended(_Value));
+      dtAnsiString: SetAsAnsiString(FloatToAnsiStr (_Value));
+      dtString:     SetAsString    (FloatToStr     (_Value));
+      dtBLOB:       SetAsBLOB      (FloatToBLOB    (_Value));
+      dtData:       SetAsData      (FloatToData    (_Value));
+
+    else
+      SetAsFloat(_Value);
+    end;
+
+end;
+
+procedure TParamHelper._SetAsExtended(const _Value: Extended);
+begin
+
+  if StrictDataType then SetAsExtended(_Value)
+  else
+
+    case DataType of
+
+      dtBoolean:    SetAsBoolean    (ExtendedToBoolean (_Value));
+      dtInteger:    SetAsInteger    (ExtendedToInt     (_Value));
+      dtBigInt:     SetAsBigInt     (ExtendedToBigInt  (_Value));
+      dtFloat:      SetAsFloat      (ExtendedToFloat   (_Value));
+      dtDateTime:   SetAsDateTime   (ExtendedToDateTime(_Value));
+      dtAnsiString: SetAsAnsiString (ExtendedToAnsiStr (_Value));
+      dtString:     SetAsString     (ExtendedToStr     (_Value));
+      dtBLOB:       SetAsBLOB       (ExtendedToBLOB    (_Value));
+      dtData:       SetAsData       (ExtendedToData    (_Value));
+
+    else
+      SetAsExtended(_Value);
+    end;
+
+end;
+
+procedure TParamHelper._SetAsDateTime(const _Value: TDateTime);
+begin
+
+  if StrictDataType then SetAsDateTime(_Value)
+  else
+
+    case DataType of
+
+      dtInteger:    SetAsInteger   (DateTimeToInt     (_Value));
+      dtBigInt:     SetAsBigInt    (DateTimeToBigInt  (_Value));
+      dtFloat:      SetAsFloat     (DateTimeToFloat   (_Value));
+      dtExtended:   SetAsExtended  (DateTimeToExtended(_Value));
+      dtAnsiString: SetAsAnsiString(DateTimeToAnsiStr (_Value));
+      dtString:     SetAsString    (DateTimeToStr     (_Value));
+      dtBLOB:       SetAsBLOB      (DateTimeToBLOB    (_Value));
+      dtData:       SetAsData      (DateTimeToData    (_Value));
+
+    else
+      SetAsDateTime(_Value);
+    end;
+
+end;
+
+procedure TParamHelper._SetAsGUID(const _Value: TGUID);
+begin
+
+  if StrictDataType then SetAsGUID(_Value)
+  else
+
+    case DataType of
+
+      dtAnsiString: SetAsAnsiString(GUIDToAnsiStr(_Value));
+      dtString:     SetAsString    (GUIDToStr    (_Value));
+      dtBLOB:       SetAsBLOB      (GUIDToBLOB   (_Value));
+      dtData:       SetAsData      (GUIDToData   (_Value));
+
+    else
+      SetAsGUID(_Value);
+    end;
+
+end;
+
+procedure TParamHelper._SetAsAnsiString(const _Value: AnsiString);
+begin
+
+  if StrictDataType then SetAsAnsiString(_Value)
+  else
+
+    case DataType of
+
+      dtBoolean:   SetAsBoolean(AnsiStrToBoolean (_Value));
+      dtInteger:  SetAsInteger (AnsiStrToInt     (_Value));
+      dtBigInt:   SetAsBigInt  (AnsiStrToBigInt  (_Value));
+      dtFloat:    SetAsFloat   (AnsiStrToFloat   (_Value));
+      dtExtended: SetAsExtended(AnsiStrToExtended(_Value));
+      dtDateTime: SetAsDateTime(AnsiStrToDateTime(_Value));
+      dtGUID:     SetAsGUID    (AnsiStrToGUID    (_Value));
+      dtString:   SetAsString  (AnsiStrToStr     (_Value));
+      dtBLOB:     SetAsBLOB    (HexAnsiStrToBLOB (_Value));
+      dtData:     SetAsData    (ByteAnsiStrToData(_Value));
+
+    else
+      SetAsAnsiString(_Value);
+    end;
+
+end;
+
+procedure TParamHelper._SetAsString(const _Value: String);
+begin
+
+  if StrictDataType then SetAsString(_Value)
+  else
+
+    case DataType of
+
+      dtBoolean:    SetAsBoolean   (StrToBoolean (_Value));
+      dtInteger:    SetAsInteger   (StrToInt     (_Value));
+      dtBigInt:     SetAsBigInt    (StrToBigInt  (_Value));
+      dtFloat:      SetAsFloat     (StrToFloat   (_Value));
+      dtExtended:   SetAsExtended  (StrToExtended(_Value));
+      dtDateTime:   SetAsDateTime  (StrToDateTime(_Value));
+      dtGUID:       SetAsGUID      (StrToGUID    (_Value));
+      dtAnsiString: SetAsAnsiString(StrToAnsiStr (_Value));
+      dtBLOB:       SetAsBLOB      (HexStrToBLOB (_Value));
+      dtData:       SetAsData      (ByteStrToData(_Value));
+
+    else
+      SetAsString(_Value);
+    end;
+
+end;
+
+procedure TParamHelper._SetAsBLOB(const _Value: BLOB);
+begin
+
+  if StrictDataType then SetAsBLOB(_Value)
+  else
+
+    case DataType of
+
+      dtBoolean:    SetAsBoolean   (BLOBToBoolean   (_Value));
+      dtInteger:    SetAsInteger   (BLOBToInt       (_Value));
+      dtBigInt:     SetAsBigInt    (BLOBToBigInt    (_Value));
+      dtFloat:      SetAsFloat     (BLOBToFloat     (_Value));
+      dtExtended:   SetAsExtended  (BLOBToExtended  (_Value));
+      dtDateTime:   SetAsDateTime  (BLOBToDateTime  (_Value));
+      dtGUID:       SetAsGUID      (BLOBToGUID      (_Value));
+      dtAnsiString: SetAsAnsiString(BLOBToHexAnsiStr(_Value));
+      dtString:     SetAsString    (BLOBToHexStr    (_Value));
+      dtData:       SetAsData      (BLOBToData      (_Value));
+
+    else
+      SetAsBLOB(_Value);
+    end;
+
+end;
+
+procedure TParamHelper._SetAsData(const _Value: TData);
+begin
+
+  if StrictDataType then SetAsData(_Value)
+  else
+
+    case DataType of
+
+      dtBoolean:    SetAsBoolean   (DataToBoolean    (_Value));
+      dtInteger:    SetAsInteger   (DataToInt        (_Value));
+      dtBigInt:     SetAsBigInt    (DataToBigInt     (_Value));
+      dtFloat:      SetAsFloat     (DataToFloat      (_Value));
+      dtExtended:   SetAsExtended  (DataToExtended   (_Value));
+      dtDateTime:   SetAsDateTime  (DataToDateTime   (_Value));
+      dtGUID:       SetAsGUID      (DataToGUID       (_Value));
+      dtAnsiString: SetAsAnsiString(DataToByteAnsiStr(_Value));
+      dtString:     SetAsString    (DataToByteStr    (_Value));
+      dtBLOB:       SetAsBLOB      (DataToBLOB       (_Value));
+
+    else
+      SetAsData(_Value);
+    end;
+
 end;
 
 { TParams }
@@ -1493,14 +1930,14 @@ begin
       dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(             Value );
       dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(     TrimDigital(Value));
       dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(  TrimDigital(Value));
-      dtFloat:      FParams.AsFloat     [FCurrentName] := StrToDouble(  TrimDigital(Value));
+      dtFloat:      FParams.AsFloat     [FCurrentName] := StrToFloat (  TrimDigital(Value));
       dtExtended:   FParams.AsExtended  [FCurrentName] := StrToExtended(TrimDigital(Value));
       dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(            Value );
       dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(                Value );
-      dtAnsiString: FParams.AsAnsiString[FCurrentName] := AnsiString(               Value );
+      dtAnsiString: FParams.AsAnsiString[FCurrentName] := StrToAnsiStr   (          Value );
       dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(          Value );
       dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(             Value );
-      dtData:       FParams.AsData      [FCurrentName] := HexStrToData(             Value );
+      dtData:       FParams.AsData      [FCurrentName] := ByteStrToData(            Value );
 
     end
 
