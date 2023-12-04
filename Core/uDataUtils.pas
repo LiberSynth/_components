@@ -37,11 +37,12 @@ uses
 { Представлен полный набор, чтобы голову не ломать, как это делать в каждом отдельном сочетании. Логика простая,
   <Тип A>To<Тип B>. Типы перечислены в uParams, что не до конца правильно, поскольку он зависимый от uDataUtils. Это
   на подумать. <Тип> это любой элемент TParamDataType без префикса. Исключения: Int[eger], Str[ing], AnsiStr[ing]. }
-{ TODO 5 -oVasilyevSM -cuDataUtils: Где '//' - добавлять исполнение и отлаживать. Осталось пять пар: DateTime/Integer,
-  DateTime/BigInt, Data/Integer, Data/BigInt и Data/Extended. }
-{ TODO 5 -oVasilyevSM -cuParams: Похоже, что Double это действительно псевдоним Extended. Значения с большим
+{ TODO 5 -oVasilyevSM -cuDataUtils: Где '//' - добавлять исполнение и отлаживать. Осталось: и Data/Extended. }
+{ TODO 5 -oVasilyevSM -cuDataUtils: Похоже, что Double это действительно псевдоним Extended. Значения с большим
   количеством знаков урезаются одинаково. Странно только что в Win64 SizeOf(Extended) = 10, а не 16, как утверждает
   справка по RADStudio. }
+{ TODO 5 -oVasilyevSM -cuDataUtils: Функции типа FloatToInt, которые могу округлять значение. Можно завести глобальный
+  режим - округлять/не округлять и если не округлять, то возвращать исключение }
 function BooleanToInt(Value: Boolean): Integer;
 function BooleanToBigInt(Value: Boolean): Int64;
 function BooleanToFloat(Value: Boolean): Double;
@@ -55,7 +56,7 @@ function IntToFloat(Value: Integer): Double;
 function IntToExtended(Value: Integer): Extended;
 function IntToDateTime(Value: Integer): TDateTime; // ~
 function IntToBLOB(Value: Integer): BLOB;
-function IntToData(Value: Integer): TData; //
+function IntToData(Value: Integer): TData;
 
 function BigIntToBoolean(Value: Int64): Boolean;
 function BigIntToInt(Value: Int64): Integer;
@@ -63,7 +64,7 @@ function BigIntToFloat(Value: Int64): Double; // ~
 function BigIntToExtended(Value: Int64): Extended; // ~
 function BigIntToDateTime(Value: Int64): TDateTime; // ~
 function BigIntToBLOB(Value: Int64): BLOB;
-function BigIntToData(Value: Int64): TData; //
+function BigIntToData(Value: Int64): TData;
 
 function FloatToBoolean(Value: Double): Boolean;
 function FloatToInt(Value: Double): Integer;
@@ -81,8 +82,8 @@ function ExtendedToDateTime(Value: Extended): TDateTime; // ~
 function ExtendedToBLOB(Value: Extended): BLOB;
 function ExtendedToData(Value: Extended): TData; //
 
-function DateTimeToInt(const Value: TDateTime): Integer; //
-function DateTimeToBigInt(const Value: TDateTime): Int64; //
+function DateTimeToInt(const Value: TDateTime): Integer; // ~
+function DateTimeToBigInt(const Value: TDateTime): Int64; // ~
 function DateTimeToFloat(const Value: TDateTime): Double;
 function DateTimeToExtended(const Value: TDateTime): Extended;
 function DateTimeToBLOB(const Value: TDateTime): BLOB;
@@ -101,8 +102,8 @@ function BLOBToGUID(const Value: BLOB): TGUID;
 function BLOBToData(const Value: BLOB): TData;
 
 function DataToBoolean(const Value: TData): Boolean;
-function DataToInt(const Value: TData): Integer; //
-function DataToBigInt(const Value: TData): Int64; //
+function DataToInt(const Value: TData): Integer;
+function DataToBigInt(const Value: TData): Int64;
 function DataToFloat(const Value: TData): Double;
 function DataToExtended(const Value: TData): Extended; //
 function DataToDateTime(const Value: TData): TDateTime;
@@ -231,8 +232,16 @@ begin
 end;
 
 function IntToData(Value: Integer): TData;
+var
+  i, L: Byte;
 begin
-  raise EUncompletedMethod.Create;
+
+  L := SizeOf(Value);
+  SetLength(Result, L);
+
+  for i := 0 to L - 1 do
+    Result[i] := PByte(@Value)[L - i - 1];
+
 end;
 
 function BigIntToBoolean(Value: Int64): Boolean;
@@ -281,8 +290,16 @@ begin
 end;
 
 function BigIntToData(Value: Int64): TData;
+var
+  i, L: Byte;
 begin
-  raise EUncompletedMethod.Create;
+
+  L := SizeOf(Value);
+  SetLength(Result, L);
+
+  for i := 0 to L - 1 do
+    Result[i] := PByte(@Value)[L - i - 1];
+
 end;
 
 function FloatToBoolean(Value: Double): Boolean;
@@ -390,12 +407,12 @@ end;
 
 function DateTimeToInt(const Value: TDateTime): Integer;
 begin
-  raise EUncompletedMethod.Create;
+  Result := Trunc(Value);
 end;
 
 function DateTimeToBigInt(const Value: TDateTime): Int64;
 begin
-  raise EUncompletedMethod.Create;
+  Result := Trunc(Value);
 end;
 
 function DateTimeToFloat(const Value: TDateTime): Double;
@@ -492,13 +509,29 @@ begin
 end;
 
 function DataToInt(const Value: TData): Integer;
+var
+  i, L: Byte;
 begin
-  raise EUncompletedMethod.Create;
+
+  L := Length(Value);
+
+  for i := 0 to 3 do
+    if i <= L - 1 then PByte(@Result)[i] := Value[L - i - 1]
+    else PByte(@Result)[i] := 0;
+
 end;
 
 function DataToBigInt(const Value: TData): Int64;
+var
+  i, L: Byte;
 begin
-  raise EUncompletedMethod.Create;
+
+  L := Length(Value);
+
+  for i := 0 to 7 do
+    if i <= L - 1 then PByte(@Result)[i] := Value[L - i - 1]
+    else PByte(@Result)[i] := 0;
+
 end;
 
 function DataToFloat(const Value: TData): Double;
