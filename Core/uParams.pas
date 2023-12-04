@@ -27,23 +27,21 @@ unit uParams;
 
 {
 
-
-  Параметр поддерживает сохранение всех типов данных во все типы данных, в которые может. Например, при попытке
-  записать в параметр с типом dtDateTime значения типа dtInteger (с помощью свойства AsInteger) оно будет
+  Параметр поддерживает конвертацию всех типов данных во все типы данных, в которые имеет смылсл это делать. Например,
+  при попытке записать в параметр с типом dtDateTime значения типа dtInteger (с помощью свойства AsInteger) оно будет
   сконвертировано в дату и сохранено. Этот режим можно выключить при помощи свойства StrictDataType = True. Тогда
   при попытке записи в параметр несоответствующего типа будет генерироваться исключение. Этот функционал исполнен
   хэлпером TParamHelper.
 
-  Для передачи значений без разбора типов служат методв Assign и AssignValue.
-
   Некоторые корневые свойства как TParams, так и TParam намеренно задаются один раз при создании объекта. Не нужно их
   менять на ходу.
 
-  Свойство TParam.AsParams записывается из контейнера TParams при присвоении значения любому свойству As... с указанием
-  пути через разделитель (AsBoolean['System.Debug.Enabled'] := True). Такая формализация позволяет безопасно управлять
-  любыми вложенными структурами из прикладного кода. Объект должен создаваться и уничтожаться одним и тем же условным
-  владельцем. Или по крайней мере контролировать уничтожение должен владелец. Поскольку TParamList уничтожает весь
-  список, желательно и создавать эти объекты здесь, а не снаружи.
+  Свойства TParam.As..., записываются только из контейнера TParams. При присвоении значения с указанием пути через
+  разделитель (AsBoolean['System.Debug.Enabled'] := True) создаются все промежуточные контейнеры TParams, вложенные друг
+  в друга. Такая формализация позволяет безопасно управлять любыми вложенными структурами из прикладного кода. Значение
+  свойства AsParams это объект, и он должен создаваться и уничтожаться одним и тем же условным владельцем. Или по
+  крайней мере контролировать уничтожение должен владелец. Поскольку TParamList уничтожает весь список, желательно и
+  создавать эти объекты здесь, а не снаружи.
 
   _Name - всегда имя параметра без пути. Путь через разделитель (по умолчанию '.') это всегда _Path, причем, вместе с
   именем на последнем месте ('System.Debug.Enabled')).
@@ -52,6 +50,10 @@ unit uParams;
   осуществляется методом TParams.GetPath, который тоже или находит или создает промжуточный параметры.
   Метод FindParam не создает ни параметра, ни пути, только ищет существующий без генерации исключения. Просто по
   указанному пути или с уточнением типа параметра.
+
+  Для передачи значений без разбора типов служат методы Assign и AssignValue. Параметр _ForceAdding управляет режимом,
+  перезапись значений существующих в приемнике параметров (_ForceAdding = False), либо принудительное добавление для
+  передачи многострочных структур.
 
   TMultiParamList это не список параметров, а особый объект - лист, позволяющий работать с многострочными структурами
   как с набором записей. Примерно так: Params.List['Country.City'].Count, Params.List['Country.City'].AsString[i].
@@ -168,7 +170,7 @@ type
 
     procedure Clear;
     { Для передачи без разбора типов }
-    procedure AssignValue(_Source: TParam);
+    procedure AssignValue(_Source: TParam; _ForceAdding: Boolean);
     class procedure ValidateName(const _Value, _PathSeparator: String);
 
     property DataType: TParamDataType read FDataType;
@@ -403,8 +405,8 @@ type
     destructor Destroy; override;
 
     { Для передачи без разбора типов }
-    procedure Assign(_Source: TParams);
-    { TODO 1 -oVasilyevSM -cTParams: AssignValue надо как-то сделать. }
+    procedure AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
+    procedure Assign(_Source: TParams; _ForceAdding: Boolean = True);
 
     { v Функции и свойства для основной работы v }
     function FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
@@ -890,7 +892,7 @@ begin
 
 end;
 
-procedure TParam.AssignValue(_Source: TParam);
+procedure TParam.AssignValue(_Source: TParam; _ForceAdding: Boolean);
 begin
 
   if _Source.IsNull then begin
@@ -913,7 +915,7 @@ begin
       dtString:     AsString     := _Source.AsString;
       dtBLOB:       AsBLOB       := _Source.AsBLOB;
       dtData:       AsData       := _Source.AsData;
-      dtParams:     AsParams.Assign(_Source.AsParams);
+      dtParams:     AsParams.Assign(_Source.AsParams, _ForceAdding);
 
     else
       raise EUncompletedMethod.Create;
@@ -1977,21 +1979,31 @@ begin
 
 end;
 
-procedure TParams.Assign(_Source: TParams);
+procedure TParams.AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
 var
-  Src, Dst: TParam;
+  Dst: TParam;
 begin
 
-  for Src in _Source.Items do begin
+  if _ForceAdding then Dst := Add(_Name)
+  else Dst := GetParam(_Name);
 
-    Dst := Add(Src.Name);
-    if Src.DataType = dtParams then
-      Dst.SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
+  with Dst do
 
-    Dst.AssignValue(Src);
+    if _Source.DataType = dtParams then begin
 
-  end;
+      SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
+      AsParams.Assign(_Source.AsParams, _ForceAdding);
 
+    end else AssignValue(_Source, _ForceAdding);
+
+end;
+
+procedure TParams.Assign(_Source: TParams; _ForceAdding: Boolean);
+var
+  Src: TParam;
+begin
+  for Src in _Source.Items do
+    AssignValue(Src.Name, Src, _ForceAdding);
 end;
 
 function TParams.FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
