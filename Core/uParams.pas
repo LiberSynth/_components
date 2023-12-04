@@ -125,6 +125,7 @@ type
     property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
     property Name: String read FName;
 
+    { Если хэлпер надоест, чтобы далеко не лазить за ними. }
 //    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
 //    property AsInteger: Integer read GetAsInteger write SetAsInteger;
 //    property AsBigInt: Int64 read GetAsBigInt write SetAsBigInt;
@@ -219,12 +220,11 @@ type
     Но это не набор записей, потому что условные поля здесь лежат в одну линию по вертикали.
 
   }
-  TParamList = class
+  TListParam = class
+  { _Index - это везде внешний индекс, в разрезе текущего имени. InternalIndex - индекс в FParams }
 
   strict private
 
-    { _Index - это всегда внешний индекс, в разрезе текущего имени. InternalIndex - индекс в FParams }
-    FPath: String;
     FName: String;
     FParams: TParams;
 
@@ -233,18 +233,45 @@ type
     function GetCount: Integer;
     function GetItems(_Index: Integer): TParam;
 
-    function GetAsString(_Index: Integer): String;
+    function GetDataType(_Index: Integer): TParamDataType;
+    function GetIsNull(_Index: Integer): Boolean;
 
+    function GetAsBoolean(_Index: Integer): Boolean;
+    function GetAsInteger(_Index: Integer): Integer;
+    function GetAsBigInt(_Index: Integer): Int64;
+    function GetAsFloat(_Index: Integer): Double;
+    function GetAsExtended(_Index: Integer): Extended;
+    function GetAsDateTime(_Index: Integer): TDateTime;
+    function GetAsAnsiString(_Index: Integer): AnsiString;
+    function GetAsGUID(_Index: Integer): TGUID;
+    function GetAsString(_Index: Integer): String;
+    function GetAsBLOB(_Index: Integer): BLOB;
+    function GetAsData(_Index: Integer): TData;
+
+    procedure SetIsNull(_Index: Integer; const _Value: Boolean);
+
+    procedure SetAsBoolean(_Index: Integer; const _Value: Boolean);
+    procedure SetAsInteger(_Index: Integer; const _Value: Integer);
+    procedure SetAsBigInt(_Index: Integer; const _Value: Int64);
+    procedure SetAsFloat(_Index: Integer; const _Value: Double);
+    procedure SetAsExtended(_Index: Integer; const _Value: Extended);
+    procedure SetAsDateTime(_Index: Integer; const _Value: TDateTime);
+    procedure SetAsGUID(_Index: Integer; const _Value: TGUID);
+    procedure SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
     procedure SetAsString(_Index: Integer; const _Value: String);
+    procedure SetAsBLOB(_Index: Integer; const _Value: BLOB);
+    procedure SetAsData(_Index: Integer; const _Value: TData);
 
     function InternalIndex(_Index: Integer): Integer;
     function ExternalIndex(_InternalIndex: Integer): Integer;
 
   private
 
-    constructor Create(const _Path, _Name: String; _Params: TParams);
+    constructor Create(const _Name: String; _Params: TParams);
 
-    property Path: String read FPath;
+    procedure SetDataType(_Index: Integer; const _Value: TParamDataType);
+
+    property Name: String read FName;
     property Items[_Index: Integer]: TParam read GetItems; default;
 
   public
@@ -255,35 +282,46 @@ type
 
     property Count: Integer read GetCount;
 
+    property DataType[_Index: Integer]: TParamDataType read GetDataType;
+    property IsNull[_Index: Integer]: Boolean read GetIsNull write SetIsNull;
+
+    property AsBoolean[_Index: Integer]: Boolean read GetAsBoolean write SetAsBoolean;
+    property AsInteger[_Index: Integer]: Integer read GetAsInteger write SetAsInteger;
+    property AsBigInt[_Index: Integer]: Int64 read GetAsBigInt write SetAsBigInt;
+    property AsFloat[_Index: Integer]: Double read GetAsFloat write SetAsFloat;
+    property AsExtended[_Index: Integer]: Extended read GetAsExtended write SetAsExtended;
+    property AsDateTime[_Index: Integer]: TDateTime read GetAsDateTime write SetAsDateTime;
+    property AsGUID[_Index: Integer]: TGUID read GetAsGUID write SetAsGUID;
+    property AsAnsiString[_Index: Integer]: AnsiString read GetAsAnsiString write SetAsAnsiString;
     property AsString[_Index: Integer]: String read GetAsString write SetAsString;
+    property AsBLOB[_Index: Integer]: BLOB read GetAsBLOB write SetAsBLOB;
+    property AsData[_Index: Integer]: TData read GetAsData write SetAsData;
+
 
   end;
 
   { сильно похож на лишний класс }
-  TParamListHolder = class(TObjectList<TParamList>)
+  TParamsListHolder = class(TObjectList<TListParam>)
 
   private
 
-    function GetList(
-
-        const _Path: String;
-        const _Name: String;
-        _Params: TParams
-
-    ): TParamList;
+    function Find(const _Name: String; var _ParamList: TListParam): Boolean;
+    function Add(const _Name: String; _Params: TParams): TListParam;
+    function Get(const _Name: String; _Params: TParams): TListParam;
 
   end;
 
   { Некоторые корневые свойства намеренно задаются один раз при создании объекта. Не нужно их менять на ходу. }
+  { TODO 1 -oVasilyevSM -cTParams: Не наследоваться т листа, чтобы не публиковать лишнего.  }
   TParams = class(TObjectList<TParam>)
 
   strict private
 
     FPathSeparator: Char;
     FSaveToStringOptions: TSaveToStringOptions;
-    FListHolder: TParamListHolder;
+    FListHolder: TParamsListHolder;
 
-    function GetList(const _Path: String): TParamList;
+    function GetList(const _Path: String): TListParam;
 
     function Add(const _Name: String): TParam;
 
@@ -324,6 +362,8 @@ type
     function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
     function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
     function GetParam(_Path: String): TParam;
+
+    property ListHolder: TParamsListHolder read FListHolder;
 
   protected
 
@@ -366,6 +406,8 @@ type
     function AsDataDef(const _Path: String; _Default: TData): TData;
     // Параметры снаружи не берем
 
+    function AddList(const _Path: String): TListParam;
+
     function SaveToString: String;
     procedure LoadFromString(const _Value: String);
     { TODO 5 -oVasilyevSM -cuParams: SaveToStream/LoadFromStream }
@@ -383,10 +425,10 @@ type
     property AsBLOB[const _Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
     property AsData[const _Path: String]: TData read GetAsData write SetAsData;
     property AsParams[const _Path: String]: TParams read GetAsParams;
+    property List[const _Path: String]: TListParam read GetList;
 
     property PathSeparator: Char read FPathSeparator;
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions;
-    property List[const _Path: String]: TParamList read GetList;
 
     { v Функции и свойства для основной работы v }
 
@@ -1379,25 +1421,24 @@ begin
 
 end;
 
-{ TParamList }
+{ TListParam }
 
-constructor TParamList.Create;
+constructor TListParam.Create;
 begin
 
   inherited Create;
 
-  FPath   := _Path;
   FName   := _Name;
   FParams := _Params;
 
 end;
 
-function TParamList.CreateNewParam: TParam;
+function TListParam.CreateNewParam: TParam;
 begin
   Result := TParam.Create(FName, FParams.PathSeparator);
 end;
 
-function TParamList.GetCount: Integer;
+function TListParam.GetCount: Integer;
 var
   Param: TParam;
 begin
@@ -1410,22 +1451,142 @@ begin
 
 end;
 
-function TParamList.GetItems(_Index: Integer): TParam;
+function TListParam.GetDataType(_Index: Integer): TParamDataType;
+begin
+  Result := Items[_Index].DataType;
+end;
+
+function TListParam.GetIsNull(_Index: Integer): Boolean;
+begin
+  Result := Items[_Index].IsNull;
+end;
+
+function TListParam.GetItems(_Index: Integer): TParam;
 begin
   Result := FParams[InternalIndex(_Index)];
 end;
 
-function TParamList.GetAsString(_Index: Integer): String;
+function TListParam.GetAsAnsiString(_Index: Integer): AnsiString;
+begin
+  Result := Items[_Index].AsAnsiString;
+end;
+
+function TListParam.GetAsBigInt(_Index: Integer): Int64;
+begin
+  Result := Items[_Index].AsBigInt;
+end;
+
+function TListParam.GetAsBLOB(_Index: Integer): BLOB;
+begin
+  Result := Items[_Index].AsBLOB;
+end;
+
+function TListParam.GetAsBoolean(_Index: Integer): Boolean;
+begin
+  Result := Items[_Index].AsBoolean;
+end;
+
+function TListParam.GetAsData(_Index: Integer): TData;
+begin
+  Result := Items[_Index].AsData;
+end;
+
+function TListParam.GetAsDateTime(_Index: Integer): TDateTime;
+begin
+  Result := Items[_Index].AsDateTime;
+end;
+
+function TListParam.GetAsExtended(_Index: Integer): Extended;
+begin
+  Result := Items[_Index].AsExtended;
+end;
+
+function TListParam.GetAsFloat(_Index: Integer): Double;
+begin
+  Result := Items[_Index].AsFloat;
+end;
+
+function TListParam.GetAsGUID(_Index: Integer): TGUID;
+begin
+  Result := Items[_Index].AsGUID;
+end;
+
+function TListParam.GetAsInteger(_Index: Integer): Integer;
+begin
+  Result := Items[_Index].AsInteger;
+end;
+
+function TListParam.GetAsString(_Index: Integer): String;
 begin
   Result := Items[_Index].AsString;
 end;
 
-procedure TParamList.SetAsString(_Index: Integer; const _Value: String);
+procedure TListParam.SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
+begin
+  Items[_Index].AsAnsiString := _Value;
+end;
+
+procedure TListParam.SetAsBigInt(_Index: Integer; const _Value: Int64);
+begin
+  Items[_Index].AsBigInt := _Value;
+end;
+
+procedure TListParam.SetAsBLOB(_Index: Integer; const _Value: BLOB);
+begin
+  Items[_Index].AsBLOB := _Value;
+end;
+
+procedure TListParam.SetAsBoolean(_Index: Integer; const _Value: Boolean);
+begin
+  Items[_Index].AsBoolean := _Value;
+end;
+
+procedure TListParam.SetAsData(_Index: Integer; const _Value: TData);
+begin
+  Items[_Index].AsData := _Value;
+end;
+
+procedure TListParam.SetAsDateTime(_Index: Integer; const _Value: TDateTime);
+begin
+  Items[_Index].AsDateTime := _Value;
+end;
+
+procedure TListParam.SetAsExtended(_Index: Integer; const _Value: Extended);
+begin
+  Items[_Index].AsExtended := _Value;
+end;
+
+procedure TListParam.SetAsFloat(_Index: Integer; const _Value: Double);
+begin
+  Items[_Index].AsFloat := _Value;
+end;
+
+procedure TListParam.SetAsGUID(_Index: Integer; const _Value: TGUID);
+begin
+  Items[_Index].AsGUID := _Value;
+end;
+
+procedure TListParam.SetAsInteger(_Index: Integer; const _Value: Integer);
+begin
+  Items[_Index].AsInteger := _Value;
+end;
+
+procedure TListParam.SetAsString(_Index: Integer; const _Value: String);
 begin
   Items[_Index].AsString := _Value;
 end;
 
-function TParamList.InternalIndex(_Index: Integer): Integer;
+procedure TListParam.SetDataType(_Index: Integer; const _Value: TParamDataType);
+begin
+  Items[_Index].SetDataType(_Value);
+end;
+
+procedure TListParam.SetIsNull(_Index: Integer; const _Value: Boolean);
+begin
+  Items[_Index].IsNull := _Value;
+end;
+
+function TListParam.InternalIndex(_Index: Integer): Integer;
 var
   i: Integer;
 begin
@@ -1445,7 +1606,7 @@ begin
 
 end;
 
-function TParamList.ExternalIndex(_InternalIndex: Integer): Integer;
+function TListParam.ExternalIndex(_InternalIndex: Integer): Integer;
 var
   i: Integer;
 begin
@@ -1458,38 +1619,54 @@ begin
 
 end;
 
-function TParamList.Insert(_Index: Integer): Integer;
+function TListParam.Insert(_Index: Integer): Integer;
 begin
   with FParams do
     Insert(InternalIndex(_Index), CreateNewParam);
   Result := _Index;
 end;
 
-function TParamList.Append: Integer;
+function TListParam.Append: Integer;
 begin
   with FParams do
     Result := ExternalIndex(Add(CreateNewParam));
 end;
 
-procedure TParamList.Delete(_Index: Integer);
+procedure TListParam.Delete(_Index: Integer);
 begin
   FParams.Delete(InternalIndex(_Index));
 end;
 
-{ TParamListHolder }
+{ TParamsListHolder }
 
-function TParamListHolder.GetList(const _Path, _Name: String; _Params: TParams): TParamList;
+function TParamsListHolder.Find(const _Name: String; var _ParamList: TListParam): Boolean;
 var
-  Item: TParamList;
+  Item: TListParam;
 begin
 
   for Item in Self do
-    if SameText(Item.Path, _Path) then
-      Exit(Item);
 
-  Result := TParamList.Create(_Path, _Name, _Params);
-  Add(Result);
+    if SameText(Item.Name, _Name) then begin
 
+      _ParamList := Item;
+      Exit(True);
+
+    end;
+
+    Result := False;
+
+end;
+
+function TParamsListHolder.Add(const _Name: String; _Params: TParams): TListParam;
+begin
+  Result := TListParam.Create(_Name, _Params);
+  inherited Add(Result);
+end;
+
+function TParamsListHolder.Get(const _Name: String; _Params: TParams): TListParam;
+begin
+  if not Find(_Name, Result) then
+    raise EParamsException.CreateFmt('Param list ''%s'' not found', [_Name]);
 end;
 
 { TParams }
@@ -1502,7 +1679,7 @@ begin
   FPathSeparator       := _PathSeparator;
   FSaveToStringOptions := _SaveToStringOptions;
 
-  FListHolder := TParamListHolder.Create;
+  FListHolder := TParamsListHolder.Create;
 
 end;
 
@@ -1517,15 +1694,18 @@ begin
   inherited Destroy;
 end;
 
-function TParams.GetList(const _Path: String): TParamList;
+function TParams.GetList(const _Path: String): TListParam;
 var
   PathRest: String;
   Params: TParams;
 begin
 
   PathRest := _Path;
-  Params := GetPath(PathRest);
-  Result := FListHolder.GetList(_Path, PathRest, Params);
+
+  if not FindPath(PathRest, Params) then
+    raise EParamsException.CreateFmt('Param %s not found', [_Path]);
+
+  Result := Params.ListHolder.Get(PathRest, Params);
 
 end;
 
@@ -1757,10 +1937,9 @@ end;
 function TParams.GetParam(_Path: String): TParam;
 begin
 
-  { Для возможности многострочных структур просто параметры не поддерживают чтение без типов. Сохранение с
-    зарегистрированными типами должно исполнятся в потомках. Поэтому, просто Add. }
-  { TODO 1 -oVasilyevSM -cTParams.GetParam: Параметрметр не переназначить. Лупит все в новый списком. }
-  Result := GetPath(_Path).Add(_Path);
+  with GetPath(_Path) do
+    if not FindParam(_Path, Result) then
+      Result := Add(_Path);
 
 end;
 
@@ -1953,6 +2132,21 @@ begin
   Result := _Default;
 end;
 
+function TParams.AddList(const _Path: String): TListParam;
+var
+  PathRest: String;
+  Params: TParams;
+begin
+
+  PathRest := _Path;
+  Params := GetPath(PathRest);
+
+  with Params.ListHolder do
+    if not Find(PathRest, Result) then
+      Result:= Add(PathRest, Params);
+
+end;
+
 function TParams.SaveToString: String;
 const
 
@@ -2143,6 +2337,7 @@ end;
 procedure TParamsReader.ReadValue(const _KeyWord: TKeyWord);
 var
   Value: String;
+  Index: Integer;
 begin
 
   Value := ReadItem(False);
@@ -2150,32 +2345,53 @@ begin
   { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
   CheckPresetType;
 
-  if Length(Value) > 0 then
+  {
 
-    case FCurrentType of
+    Для возможности считывания многострочных структур из источника просто параметры не поддерживают чтение из формата
+    без типов. Потому что если при чтении просто опираться на тип уже существующего по данному пути параметра,
+    полагая, что это и есть параметр с предопределенным типом, созданный перед чтением, то многострочные структуры будут
+    считываться как одна строка. Все последующие значения будут записываться в один параметр. Поэтому при считывании все
+    параметры безусловно добавляются. Для этого здесь безусловно используется AddList, поскольку обращение к
+    однострочному параметру через него возможно и ничего не меняет. То есть, лист с количеством записей 1 это тот же
+    просто параметр с таким же именем. И функция AddList добавляет лист только если не нашла уже имеющийся. Это,
+    конечно, потяжелее, но так логичнее и не нужны в TParams никакие "блатные" свойства специально для считывателя.
+    Работает тот же GetParam, который тоже добавляет, если не находит, тем самым обеспечивая изменение значения в
+    прикладном коде. В то время как List.Append добавляет параметр безусловно. Логично, потому что здесь не бывает
+    изменения значений параметров. Только добавление.
 
-      dtBoolean:    FParams.AsBoolean   [FCurrentName] := StrToBoolean(             Value );
-      dtInteger:    FParams.AsInteger   [FCurrentName] := StrToInt(     TrimDigital(Value));
-      dtBigInt:     FParams.AsBigInt    [FCurrentName] := StrToBigInt(  TrimDigital(Value));
-      dtFloat:      FParams.AsFloat     [FCurrentName] := StrToFloat (  TrimDigital(Value));
-      dtExtended:   FParams.AsExtended  [FCurrentName] := StrToExtended(TrimDigital(Value));
-      dtDateTime:   FParams.AsDateTime  [FCurrentName] := StrToDateTime(            Value );
-      dtGUID:       FParams.AsGUID      [FCurrentName] := StrToGUID(                Value );
-      dtAnsiString: FParams.AsAnsiString[FCurrentName] := StrToAnsiStr   (          Value );
-      dtString:     FParams.AsString    [FCurrentName] := UndoubleSymbols(          Value );
-      dtBLOB:       FParams.AsBLOB      [FCurrentName] := HexStrToBLOB(             Value );
-      dtData:       FParams.AsData      [FCurrentName] := ByteStrToData(            Value );
+    Считывание с зарегистрированными типами должно исполнятся в потомках с помощью отдельных свойств (Registered итд).
 
-    end
+  }
+  with FParams.AddList(FCurrentName) do begin
 
-  else
+    Index := Append;
 
-    with FParams.GetParam(FCurrentName) do begin
+    if Length(Value) > 0 then
 
-      IsNull := True;
-      SetDataType(FCurrentType);
+      case FCurrentType of
+
+        dtBoolean:    AsBoolean   [Index] := StrToBoolean(             Value );
+        dtInteger:    AsInteger   [Index] := StrToInt(     TrimDigital(Value));
+        dtBigInt:     AsBigInt    [Index] := StrToBigInt(  TrimDigital(Value));
+        dtFloat:      AsFloat     [Index] := StrToFloat (  TrimDigital(Value));
+        dtExtended:   AsExtended  [Index] := StrToExtended(TrimDigital(Value));
+        dtDateTime:   AsDateTime  [Index] := StrToDateTime(            Value );
+        dtGUID:       AsGUID      [Index] := StrToGUID(                Value );
+        dtAnsiString: AsAnsiString[Index] := StrToAnsiStr   (          Value );
+        dtString:     AsString    [Index] := UndoubleSymbols(          Value );
+        dtBLOB:       AsBLOB      [Index] := HexStrToBLOB(             Value );
+        dtData:       AsData      [Index] := ByteStrToData(            Value );
+
+      end
+
+    else begin
+
+      IsNull[Index] := True;
+      SetDataType(Index, FCurrentType);
 
     end;
+
+  end;
 
   FCurrentName := '';
   FCurrentType := dtUnknown;
