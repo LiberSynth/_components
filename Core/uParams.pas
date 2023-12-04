@@ -114,7 +114,7 @@ type
     property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
     property Name: String read FName;
 
-    { Если хэлпер надоест, чтобы далеко не лазить за ними. }
+    { Если хэлпер надоест, чтобы далеко не лазить за этими свойствами. }
 //    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
 //    property AsInteger: Integer read GetAsInteger write SetAsInteger;
 //    property AsBigInt: Int64 read GetAsBigInt write SetAsBigInt;
@@ -289,6 +289,7 @@ type
     FListHolder: TParamsListHolder;
 
     function GetList(const _Path: String): TMultiParamList;
+    function GetCount: Integer;
 
     function Add(const _Name: String): TParam;
 
@@ -340,10 +341,6 @@ type
 
     destructor Destroy; override;
 
-    { Для передачи без разбора типов }
-    procedure AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
-    procedure Assign(_Source: TParams; _ForceAdding: Boolean = True);
-
     { v Функции и свойства для основной работы v }
     function FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
     function FindInteger(const _Path: String; var _Value: Integer): Boolean;
@@ -369,10 +366,13 @@ type
     function AsStringDef(const _Path: String; _Default: String): String;
     function AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
     function AsDataDef(const _Path: String; _Default: TData): TData;
-    // Параметры снаружи напрямую не берем
+    { Параметры снаружи напрямую не берем с дефолтным значением, потому что объект не должен создаваться снаружи. }
 
+    { Для передачи без разбора типов }
+    procedure AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
+    procedure Assign(_Source: TParams; _ForceAdding: Boolean = True);
     function AddList(const _Path: String): TMultiParamList;
-    procedure Delete(const _Path: String);
+    procedure DeleteValue(const _Path: String);
     procedure Clear;
 
     function SaveToString: String;
@@ -396,6 +396,7 @@ type
 
     property PathSeparator: Char read FPathSeparator;
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions;
+    property Count: Integer read GetCount;
 
   end;
 
@@ -1680,6 +1681,11 @@ begin
 
 end;
 
+function TParams.GetCount: Integer;
+begin
+  Result := Items.Count;
+end;
+
 function TParams.Add(const _Name: String): TParam;
 begin
   Result := TParam.Create(_Name, FPathSeparator);
@@ -1914,33 +1920,6 @@ begin
 
 end;
 
-procedure TParams.AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
-var
-  Dst: TParam;
-begin
-
-  if _ForceAdding then Dst := Add(_Name)
-  else Dst := GetParam(_Name);
-
-  with Dst do
-
-    if _Source.DataType = dtParams then begin
-
-      SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
-      AsParams.Assign(_Source.AsParams, _ForceAdding);
-
-    end else AssignValue(_Source, _ForceAdding);
-
-end;
-
-procedure TParams.Assign(_Source: TParams; _ForceAdding: Boolean);
-var
-  Src: TParam;
-begin
-  for Src in _Source.Items do
-    AssignValue(Src.Name, Src, _ForceAdding);
-end;
-
 function TParams.FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
 var
   P: TParam;
@@ -2103,6 +2082,33 @@ begin
   Result := _Default;
 end;
 
+procedure TParams.AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
+var
+  Dst: TParam;
+begin
+
+  if _ForceAdding then Dst := Add(_Name)
+  else Dst := GetParam(_Name);
+
+  with Dst do
+
+    if _Source.DataType = dtParams then begin
+
+      SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
+      AsParams.Assign(_Source.AsParams, _ForceAdding);
+
+    end else AssignValue(_Source, _ForceAdding);
+
+end;
+
+procedure TParams.Assign(_Source: TParams; _ForceAdding: Boolean);
+var
+  Src: TParam;
+begin
+  for Src in _Source.Items do
+    AssignValue(Src.Name, Src, _ForceAdding);
+end;
+
 function TParams.AddList(const _Path: String): TMultiParamList;
 var
   PathRest: String;
@@ -2118,7 +2124,7 @@ begin
 
 end;
 
-procedure TParams.Delete(const _Path: String);
+procedure TParams.DeleteValue(const _Path: String);
 var
   PathRest: String;
   Params: TParams;
