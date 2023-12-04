@@ -38,6 +38,7 @@ type
   TElement = (etName, etType, etValue);
 
   TKeyWordType = (
+  { inherits from uCustomStringParser.TKeyWordType }
 
       ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktNestedOpening,
       ktNestedClosing
@@ -62,15 +63,34 @@ type
 
   end;
 
-  TReadProc = procedure (const KeyWord: TKeyWord) of object;
+  TReadProc = procedure of object;
 
   TReadInfo = record
 
     Element: TElement;
-    Terminator: TKeyWordType;
+    TerminatorInternal: Integer;
     Nested: Boolean;
     NextElement: TElement;
     ReadProc: TReadProc;
+
+    constructor Create(
+
+        _Element: TElement;
+        _TerminatorInternal: Integer;
+        _Nested: Boolean;
+        _NextElement: TElement;
+        _ReadProc: TReadProc
+
+    );
+
+  end;
+
+  TReadInfoHelper = record helper for TReadInfo
+
+  private
+
+    function GetTerminator: TKeyWordType;
+    procedure SetTerminator(const _Value: TKeyWordType);
 
     constructor Create(
 
@@ -80,13 +100,25 @@ type
         _NextElement: TElement;
         _ReadProc: TReadProc
 
-    );
+    ); overload;
+
+    property Terminator: TKeyWordType read GetTerminator write SetTerminator;
 
   end;
 
   TReadInfoList = class(TList<TReadInfo>)
 
-  private
+  public
+
+    procedure Add(
+
+        _Element: TElement;
+        _TerminatorInternal: Integer;
+        _Nested: Boolean;
+        _NextElement: TElement;
+        _ReadProc: TReadProc
+
+    ); overload;
 
     procedure Add(
 
@@ -96,7 +128,7 @@ type
         _NextElement: TElement;
         _ReadProc: TReadProc
 
-    );
+    ); overload;
 
   end;
 
@@ -133,6 +165,7 @@ type
 
   end;
 
+  { 1 TODO -oVasilyevSM -cTParamsStringParser: В хэлп. }
   {
 
     Просто параметры и этот парсер НЕ ДОЛЖНЫ:
@@ -173,26 +206,26 @@ type
 
     function ElementTerminating(
 
-        const _KeyWord: TKeyWord;
+        _KeyType: TKeyWordType;
         var _NextElement: TElement;
         var _ReadProc: TReadProc
 
     ): Boolean;
     procedure CheckSyntax(const _KeyWord: TKeyWord);
     procedure CheckParams(_KeyWord: TKeyWord);
-    procedure CompleteElement(const _KeyWord: TKeyWord);
 
   protected
 
     procedure InitParser; override;
 
-    procedure ReadName(const _KeyWord: TKeyWord); virtual; abstract;
-    procedure ReadType(const _KeyWord: TKeyWord); virtual; abstract;
-    procedure ReadValue(const _KeyWord: TKeyWord); virtual; abstract;
+    procedure ReadName; virtual; abstract;
+    procedure ReadType; virtual; abstract;
+    procedure ReadValue; virtual; abstract;
     procedure ReadParams(const _KeyWord: TKeyWord); virtual;
     function IsParamsType: Boolean; virtual; abstract;
 
-    property DoublingChar: Char read FDoublingChar;
+    property Reading: TReadInfoList read FReading;
+    property DoublingChar: Char read FDoublingChar write FDoublingChar;
 
   public
 
@@ -207,7 +240,7 @@ type
     (*                           *)
     (*****************************)
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
-    procedure SpecialRegionClosed(_Region: TSpecialRegion); override;
+    procedure CompleteElement(const _KeyWord: TKeyWord);
 
   end;
 
@@ -238,6 +271,7 @@ type
   protected
 
     function CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; override;
+    procedure SpecialRegionClosed(_Parser: TCustomStringParser); override;
 
   end;
 
@@ -304,17 +338,39 @@ end;
 constructor TReadInfo.Create;
 begin
 
-  Element     := _Element;
-  Terminator  := _Terminator;
-  Nested      := _Nested;
-  NextElement := _NextElement;
-  ReadProc    := _ReadProc;
+  Element            := _Element;
+  TerminatorInternal := _TerminatorInternal;
+  Nested             := _Nested;
+  NextElement        := _NextElement;
+  ReadProc           := _ReadProc;
 
+end;
+
+{ TReadInfoHelper }
+
+constructor TReadInfoHelper.Create(_Element: TElement; _Terminator: TKeyWordType; _Nested: Boolean; _NextElement: TElement; _ReadProc: TReadProc);
+begin
+  Create(_Element, Integer(_Terminator), _Nested, _NextElement, _ReadProc);
+end;
+
+function TReadInfoHelper.GetTerminator: TKeyWordType;
+begin
+  Result := TKeyWordType(TerminatorInternal);
+end;
+
+procedure TReadInfoHelper.SetTerminator(const _Value: TKeyWordType);
+begin
+  TerminatorInternal := Integer(_Value);
 end;
 
 { TReadInfoList }
 
-procedure TReadInfoList.Add;
+procedure TReadInfoList.Add(_Element: TElement; _TerminatorInternal: Integer; _Nested: Boolean; _NextElement: TElement; _ReadProc: TReadProc);
+begin
+  inherited Add(TReadInfo.Create(_Element, _TerminatorInternal, _Nested, _NextElement,_ReadProc));
+end;
+
+procedure TReadInfoList.Add(_Element: TElement; _Terminator: TKeyWordType; _Nested: Boolean; _NextElement: TElement; _ReadProc: TReadProc);
 begin
   inherited Add(TReadInfo.Create(_Element, _Terminator, _Nested, _NextElement,_ReadProc));
 end;
@@ -370,7 +426,7 @@ begin
 
 end;
 
-function TParamsStringParser.ElementTerminating(const _KeyWord: TKeyWord; var _NextElement: TElement; var _ReadProc: TReadProc): Boolean;
+function TParamsStringParser.ElementTerminating(_KeyType: TKeyWordType; var _NextElement: TElement; var _ReadProc: TReadProc): Boolean;
 var
   RI: TReadInfo;
 begin
@@ -383,9 +439,9 @@ begin
 
       if
 
-          (RI.Element    = FElement         ) and
-          (RI.Terminator = _KeyWord.KeyType) and
-          (RI.Nested     = Nested          )
+          (RI.Element    = FElement) and
+          (RI.Terminator = _KeyType) and
+          (RI.Nested     = Nested  )
 
       then begin
 
@@ -449,20 +505,6 @@ begin
 
 end;
 
-procedure TParamsStringParser.CompleteElement(const _KeyWord: TKeyWord);
-var
-  ReadProc: TReadProc;
-  Next: TElement;
-begin
-
-  if ElementTerminating(_KeyWord, Next, ReadProc) then begin
-
-    ReadProc(_KeyWord);
-    FElement := Next;
-
-  end;
-
-end;
 procedure TParamsStringParser.InitParser;
 begin
 
@@ -482,7 +524,7 @@ begin
 
   end;
 
-  with FReading do begin
+  with Reading do begin
 
     {   Element  Terminator        Nested NextElement ReadProc }
     Add(etName,  ktTypeIdent,      False, etType,     ReadName );
@@ -495,7 +537,7 @@ begin
     Add(etValue, ktLineEnd,        True,  etName,     ReadValue);
     Add(etValue, ktSplitter,       False, etName,     ReadValue);
     Add(etValue, ktSplitter,       True,  etName,     ReadValue);
-    Add(etValue, ktNestedClosing, True,  etName,     ReadValue);
+    Add(etValue, ktNestedClosing,  True,  etName,     ReadValue);
     Add(etValue, ktSourceEnd,      False, etName,     ReadValue);
     Add(etValue, ktSourceEnd,      True,  etName,     ReadValue);
     Add(etValue, ktStringBorder,   True,  etName,     ReadValue);
@@ -538,23 +580,16 @@ begin
 
 end;
 
-procedure TParamsStringParser.SpecialRegionClosed(_Region: TSpecialRegion);
+procedure TParamsStringParser.CompleteElement(const _KeyWord: TKeyWord);
+var
+  ReadProc: TReadProc;
+  Next: TElement;
 begin
 
-  with _Region do begin
+  if ElementTerminating(_KeyWord.KeyType, Next, ReadProc) then begin
 
-    if ClosingKey.KeyLength = 1 then
-      FDoublingChar := ClosingKey.StrValue[1];
-
-    Move(- ClosingKey.KeyLength);
-    try
-
-      CompleteElement(_Region.ClosingKey);
-
-    finally
-      Move(_Region.ClosingKey.KeyLength);
-      FDoublingChar := #0;
-    end;
+    ReadProc;
+    FElement := Next;
 
   end;
 
@@ -575,13 +610,39 @@ begin
     _Parser.MoveEvent;
     _Parser.Move(2);
 
-  end;
+  end else _Handled := False;
 
 end;
 
 function TQoutedStringRegion.CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
   Result := inherited and not Doubling(_Parser, _Handled);
+end;
+
+procedure TQoutedStringRegion.SpecialRegionClosed(_Parser: TCustomStringParser);
+begin
+
+  inherited SpecialRegionClosed(_Parser);
+
+  with _Parser as TParamsStringParser do begin
+
+    if ClosingKey.KeyLength = 1 then
+      DoublingChar := ClosingKey.StrValue[1];
+
+    Move(- ClosingKey.KeyLength);
+    try
+
+      CompleteElement(ClosingKey);
+
+    finally
+
+      Move(ClosingKey.KeyLength);
+      DoublingChar := #0;
+
+    end;
+
+  end;
+
 end;
 
 end.

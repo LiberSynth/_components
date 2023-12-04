@@ -279,6 +279,9 @@ type
 
   end;
 
+  TParamsReader = class;
+  TParamsReaderClass = class of TParamsReader;
+
   TParams = class
 
   strict private
@@ -334,6 +337,10 @@ type
     property Items: TParamList read FItems;
     property ListHolder: TParamsListHolder read FListHolder;
 
+  protected
+
+    function ParamsReaderClass: TParamsReaderClass; virtual;
+
   public
 
     constructor Create(const _PathSeparator: Char = '.'; const _SaveToStringOptions: TSaveToStringOptions = []); overload;
@@ -375,7 +382,7 @@ type
     procedure DeleteValue(const _Path: String);
     procedure Clear;
 
-    function SaveToString: String;
+    function SaveToString: String; virtual;
     procedure LoadFromString(const _Value: String);
     { TODO 5 -oVasilyevSM -cuParams: SaveToStream/LoadFromStream }
 
@@ -399,17 +406,6 @@ type
     property Count: Integer read GetCount;
 
   end;
-
-  EParamsException = class(ECoreException);
-
-function ParamDataTypeToStr(Value: TParamDataType): String;
-function StrToParamDataType(Value: String): TParamDataType;
-function ParamsToStr(Params: TParams): String;
-procedure StrToParams(const Value: String; Params: TParams);
-
-implementation
-
-type
 
   { Этот класс нужен только для обращения к здешним объектам без циркулярной ссылки. Также, благодаря этому свойства
     и методы для изменения данных в обход установленного протокола (As... :=) остаются в прайват. }
@@ -439,13 +435,26 @@ type
 
   protected
 
-    procedure ReadName(const _KeyWord: TKeyWord); override;
-    procedure ReadType(const _KeyWord: TKeyWord); override;
-    procedure ReadValue(const _KeyWord: TKeyWord); override;
+    procedure ReadName; override;
+    procedure ReadType; override;
+    procedure ReadValue; override;
     procedure ReadParams(const _KeyWord: TKeyWord); override;
     function IsParamsType: Boolean; override;
 
+  public
+
+    property Params: TParams read FParams;
+
   end;
+
+  EParamsException = class(ECoreException);
+
+function ParamDataTypeToStr(Value: TParamDataType): String;
+function StrToParamDataType(Value: String): TParamDataType;
+function ParamsToStr(Params: TParams): String;
+procedure StrToParams(const Value: String; Params: TParams);
+
+implementation
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 const
@@ -1748,6 +1757,11 @@ begin
     raise EParamsException.CreateFmt('Param %s not found', [_Path]);
 end;
 
+function TParams.ParamsReaderClass: TParamsReaderClass;
+begin
+  Result := TParamsReader;
+end;
+
 function TParams.GetIsNull(const _Path: String): Boolean;
 begin
   Result := ParamByName(_Path).IsNull;
@@ -2257,7 +2271,7 @@ end;
 procedure TParams.LoadFromString(const _Value: String);
 begin
 
-  with TParamsReader.Create(_Value, Self) do
+  with ParamsReaderClass.Create(_Value, Self) do
 
     try
 
@@ -2319,7 +2333,7 @@ begin
 
 end;
 
-procedure TParamsReader.ReadName(const _KeyWord: TKeyWord);
+procedure TParamsReader.ReadName;
 var
   Value: String;
 begin
@@ -2331,13 +2345,13 @@ begin
 
 end;
 
-procedure TParamsReader.ReadType(const _KeyWord: TKeyWord);
+procedure TParamsReader.ReadType;
 begin
   FCurrentType := StrToParamDataType(ReadItem(True));
   CheckPresetType;
 end;
 
-procedure TParamsReader.ReadValue(const _KeyWord: TKeyWord);
+procedure TParamsReader.ReadValue;
 var
   Value: String;
   Index: Integer;

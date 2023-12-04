@@ -44,7 +44,7 @@ type
     StrValue: String;
     KeyLength: Integer;
 
-    constructor Create(_KeyType: Integer; const _StrValue: String);
+    constructor Create(_KeyTypeInternal: Integer; const _StrValue: String);
 
     function Equal(_Value: TKeyWord): Boolean;
 
@@ -98,6 +98,8 @@ type
 
     function CanOpen(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; virtual;
     function CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; virtual;
+    procedure SpecialRegionOpened(_Parser: TCustomStringParser); virtual;
+    procedure SpecialRegionClosed(_Parser: TCustomStringParser); virtual;
 
   public
 
@@ -185,8 +187,6 @@ type
     { События для потомков }
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
     procedure MoveEvent; virtual;
-    procedure SpecialRegionOpened(_Region: TSpecialRegion); virtual;
-    procedure SpecialRegionClosed(_Region: TSpecialRegion); virtual;
 
     { Методы и свойства для управления }
     function Nested: Boolean;
@@ -259,10 +259,10 @@ end;
 
 { TKeyWord }
 
-constructor TKeyWord.Create(_KeyType: Integer; const _StrValue: String);
+constructor TKeyWord.Create(_KeyTypeInternal: Integer; const _StrValue: String);
 begin
 
-  KeyTypeInternal := _KeyType;
+  KeyTypeInternal := _KeyTypeInternal;
   StrValue        := _StrValue;
   KeyLength       := Length(StrValue);
 
@@ -317,12 +317,14 @@ end;
 
 procedure TSpecialRegion.Open(_Parser: TCustomStringParser);
 begin
+  SpecialRegionOpened(_Parser);
   _Parser.Move(OpeningKey.KeyLength);
 end;
 
 procedure TSpecialRegion.Close(_Parser: TCustomStringParser);
 begin
   _Parser.Move(ClosingKey.KeyLength);
+  SpecialRegionClosed(_Parser);
 end;
 
 procedure TSpecialRegion.CheckUnterminating;
@@ -343,6 +345,14 @@ begin
   _Handled := Result;
 end;
 
+procedure TSpecialRegion.SpecialRegionOpened(_Parser: TCustomStringParser);
+begin
+end;
+
+procedure TSpecialRegion.SpecialRegionClosed(_Parser: TCustomStringParser);
+begin
+end;
+
 { TSpecialRegionList }
 
 procedure TSpecialRegionList.Refresh(_Parser: TCustomStringParser; var _Handled: Boolean);
@@ -357,8 +367,6 @@ begin
     if FActiveRegion.CanClose(_Parser, _Handled) then begin
 
       FActiveRegion.Close(_Parser);
-      _Parser.SpecialRegionClosed(FActiveRegion);
-
       FActiveRegion := nil;
       FActive       := False;
 
@@ -371,8 +379,6 @@ begin
       if Region.CanOpen(_Parser, _Handled) then begin
 
         Region.Open(_Parser);
-        _Parser.SpecialRegionOpened(Region);
-
         FActiveRegion := Region;
         FActive       := True;
 
@@ -550,14 +556,6 @@ begin
 
 end;
 
-procedure TCustomStringParser.SpecialRegionOpened(_Region: TSpecialRegion);
-begin
-end;
-
-procedure TCustomStringParser.SpecialRegionClosed(_Region: TSpecialRegion);
-begin
-end;
-
 function TCustomStringParser.Nested: Boolean;
 begin
   Result := NestedLevel > 0;
@@ -635,10 +633,7 @@ begin
 
     on E: Exception do
 
-      if Nested then
-
-        raise
-
+      if Nested then raise
       else
 
         raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Column: %d, Position: %d', [
