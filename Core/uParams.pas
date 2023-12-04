@@ -25,8 +25,7 @@ unit uParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 1 -oVasilyevSM -cuParams: ƒл€ работы с мультистроковыми параметрами нужно какое-то удобное средство, List или
-  как табличные записи. —ейчас ParamByName вернет первый из списка и все.  }
+{ TODO 2 -oVasilyevSM -cuParams: „истка и уборка }
 
 interface
 
@@ -220,7 +219,7 @@ type
     Ќо это не набор записей, потому что условные пол€ здесь лежат в одну линию по вертикали.
 
   }
-  TListParam = class
+  TMultiParamList = class
   { _Index - это везде внешний индекс, в разрезе текущего имени. InternalIndex - индекс в FParams }
 
   strict private
@@ -301,27 +300,35 @@ type
   end;
 
   { сильно похож на лишний класс }
-  TParamsListHolder = class(TObjectList<TListParam>)
+  TParamsListHolder = class(TObjectList<TMultiParamList>)
 
   private
 
-    function Find(const _Name: String; var _ParamList: TListParam): Boolean;
-    function Add(const _Name: String; _Params: TParams): TListParam;
-    function Get(const _Name: String; _Params: TParams): TListParam;
+    function Find(const _Name: String; var _ParamList: TMultiParamList): Boolean;
+    function Add(const _Name: String; _Params: TParams): TMultiParamList;
+    function Get(const _Name: String; _Params: TParams): TMultiParamList;
+
+  end;
+
+  TParamList = class(TObjectList<TParam>)
+
+  protected
+
+    procedure Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification); override;
 
   end;
 
   { Ќекоторые корневые свойства намеренно задаютс€ один раз при создании объекта. Ќе нужно их мен€ть на ходу. }
-  { TODO 1 -oVasilyevSM -cTParams: Ќе наследоватьс€ т листа, чтобы не публиковать лишнего.  }
-  TParams = class(TObjectList<TParam>)
+  TParams = class
 
   strict private
 
     FPathSeparator: Char;
     FSaveToStringOptions: TSaveToStringOptions;
+    FItems: TParamList;
     FListHolder: TParamsListHolder;
 
-    function GetList(const _Path: String): TListParam;
+    function GetList(const _Path: String): TMultiParamList;
 
     function Add(const _Name: String): TParam;
 
@@ -363,11 +370,8 @@ type
     function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
     function GetParam(_Path: String): TParam;
 
+    property Items: TParamList read FItems;
     property ListHolder: TParamsListHolder read FListHolder;
-
-  protected
-
-    procedure Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification); override;
 
   public
 
@@ -406,7 +410,8 @@ type
     function AsDataDef(const _Path: String; _Default: TData): TData;
     // ѕараметры снаружи не берем
 
-    function AddList(const _Path: String): TListParam;
+    function AddList(const _Path: String): TMultiParamList;
+    procedure Clear;
 
     function SaveToString: String;
     procedure LoadFromString(const _Value: String);
@@ -425,7 +430,7 @@ type
     property AsBLOB[const _Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
     property AsData[const _Path: String]: TData read GetAsData write SetAsData;
     property AsParams[const _Path: String]: TParams read GetAsParams;
-    property List[const _Path: String]: TListParam read GetList;
+    property List[const _Path: String]: TMultiParamList read GetList;
 
     property PathSeparator: Char read FPathSeparator;
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions;
@@ -1421,9 +1426,9 @@ begin
 
 end;
 
-{ TListParam }
+{ TParamsList }
 
-constructor TListParam.Create;
+constructor TMultiParamList.Create;
 begin
 
   inherited Create;
@@ -1433,168 +1438,168 @@ begin
 
 end;
 
-function TListParam.CreateNewParam: TParam;
+function TMultiParamList.CreateNewParam: TParam;
 begin
   Result := TParam.Create(FName, FParams.PathSeparator);
 end;
 
-function TListParam.GetCount: Integer;
+function TMultiParamList.GetCount: Integer;
 var
   Param: TParam;
 begin
 
   Result := 0;
 
-  for Param in FParams do
+  for Param in FParams.Items do
     if SameText(Param.Name, FName) then
       Inc(Result);
 
 end;
 
-function TListParam.GetDataType(_Index: Integer): TParamDataType;
+function TMultiParamList.GetDataType(_Index: Integer): TParamDataType;
 begin
   Result := Items[_Index].DataType;
 end;
 
-function TListParam.GetIsNull(_Index: Integer): Boolean;
+function TMultiParamList.GetIsNull(_Index: Integer): Boolean;
 begin
   Result := Items[_Index].IsNull;
 end;
 
-function TListParam.GetItems(_Index: Integer): TParam;
+function TMultiParamList.GetItems(_Index: Integer): TParam;
 begin
-  Result := FParams[InternalIndex(_Index)];
+  Result := FParams.Items[InternalIndex(_Index)];
 end;
 
-function TListParam.GetAsAnsiString(_Index: Integer): AnsiString;
+function TMultiParamList.GetAsAnsiString(_Index: Integer): AnsiString;
 begin
   Result := Items[_Index].AsAnsiString;
 end;
 
-function TListParam.GetAsBigInt(_Index: Integer): Int64;
+function TMultiParamList.GetAsBigInt(_Index: Integer): Int64;
 begin
   Result := Items[_Index].AsBigInt;
 end;
 
-function TListParam.GetAsBLOB(_Index: Integer): BLOB;
+function TMultiParamList.GetAsBLOB(_Index: Integer): BLOB;
 begin
   Result := Items[_Index].AsBLOB;
 end;
 
-function TListParam.GetAsBoolean(_Index: Integer): Boolean;
+function TMultiParamList.GetAsBoolean(_Index: Integer): Boolean;
 begin
   Result := Items[_Index].AsBoolean;
 end;
 
-function TListParam.GetAsData(_Index: Integer): TData;
+function TMultiParamList.GetAsData(_Index: Integer): TData;
 begin
   Result := Items[_Index].AsData;
 end;
 
-function TListParam.GetAsDateTime(_Index: Integer): TDateTime;
+function TMultiParamList.GetAsDateTime(_Index: Integer): TDateTime;
 begin
   Result := Items[_Index].AsDateTime;
 end;
 
-function TListParam.GetAsExtended(_Index: Integer): Extended;
+function TMultiParamList.GetAsExtended(_Index: Integer): Extended;
 begin
   Result := Items[_Index].AsExtended;
 end;
 
-function TListParam.GetAsFloat(_Index: Integer): Double;
+function TMultiParamList.GetAsFloat(_Index: Integer): Double;
 begin
   Result := Items[_Index].AsFloat;
 end;
 
-function TListParam.GetAsGUID(_Index: Integer): TGUID;
+function TMultiParamList.GetAsGUID(_Index: Integer): TGUID;
 begin
   Result := Items[_Index].AsGUID;
 end;
 
-function TListParam.GetAsInteger(_Index: Integer): Integer;
+function TMultiParamList.GetAsInteger(_Index: Integer): Integer;
 begin
   Result := Items[_Index].AsInteger;
 end;
 
-function TListParam.GetAsString(_Index: Integer): String;
+function TMultiParamList.GetAsString(_Index: Integer): String;
 begin
   Result := Items[_Index].AsString;
 end;
 
-procedure TListParam.SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
+procedure TMultiParamList.SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
 begin
   Items[_Index].AsAnsiString := _Value;
 end;
 
-procedure TListParam.SetAsBigInt(_Index: Integer; const _Value: Int64);
+procedure TMultiParamList.SetAsBigInt(_Index: Integer; const _Value: Int64);
 begin
   Items[_Index].AsBigInt := _Value;
 end;
 
-procedure TListParam.SetAsBLOB(_Index: Integer; const _Value: BLOB);
+procedure TMultiParamList.SetAsBLOB(_Index: Integer; const _Value: BLOB);
 begin
   Items[_Index].AsBLOB := _Value;
 end;
 
-procedure TListParam.SetAsBoolean(_Index: Integer; const _Value: Boolean);
+procedure TMultiParamList.SetAsBoolean(_Index: Integer; const _Value: Boolean);
 begin
   Items[_Index].AsBoolean := _Value;
 end;
 
-procedure TListParam.SetAsData(_Index: Integer; const _Value: TData);
+procedure TMultiParamList.SetAsData(_Index: Integer; const _Value: TData);
 begin
   Items[_Index].AsData := _Value;
 end;
 
-procedure TListParam.SetAsDateTime(_Index: Integer; const _Value: TDateTime);
+procedure TMultiParamList.SetAsDateTime(_Index: Integer; const _Value: TDateTime);
 begin
   Items[_Index].AsDateTime := _Value;
 end;
 
-procedure TListParam.SetAsExtended(_Index: Integer; const _Value: Extended);
+procedure TMultiParamList.SetAsExtended(_Index: Integer; const _Value: Extended);
 begin
   Items[_Index].AsExtended := _Value;
 end;
 
-procedure TListParam.SetAsFloat(_Index: Integer; const _Value: Double);
+procedure TMultiParamList.SetAsFloat(_Index: Integer; const _Value: Double);
 begin
   Items[_Index].AsFloat := _Value;
 end;
 
-procedure TListParam.SetAsGUID(_Index: Integer; const _Value: TGUID);
+procedure TMultiParamList.SetAsGUID(_Index: Integer; const _Value: TGUID);
 begin
   Items[_Index].AsGUID := _Value;
 end;
 
-procedure TListParam.SetAsInteger(_Index: Integer; const _Value: Integer);
+procedure TMultiParamList.SetAsInteger(_Index: Integer; const _Value: Integer);
 begin
   Items[_Index].AsInteger := _Value;
 end;
 
-procedure TListParam.SetAsString(_Index: Integer; const _Value: String);
+procedure TMultiParamList.SetAsString(_Index: Integer; const _Value: String);
 begin
   Items[_Index].AsString := _Value;
 end;
 
-procedure TListParam.SetDataType(_Index: Integer; const _Value: TParamDataType);
+procedure TMultiParamList.SetDataType(_Index: Integer; const _Value: TParamDataType);
 begin
   Items[_Index].SetDataType(_Value);
 end;
 
-procedure TListParam.SetIsNull(_Index: Integer; const _Value: Boolean);
+procedure TMultiParamList.SetIsNull(_Index: Integer; const _Value: Boolean);
 begin
   Items[_Index].IsNull := _Value;
 end;
 
-function TListParam.InternalIndex(_Index: Integer): Integer;
+function TMultiParamList.InternalIndex(_Index: Integer): Integer;
 var
   i: Integer;
 begin
 
   Inc(_Index);
-  for i := 0 to FParams.Count - 1 do begin
+  for i := 0 to FParams.Items.Count - 1 do begin
 
-    if SameText(FParams[i].Name, FName) then
+    if SameText(FParams.Items[i].Name, FName) then
       Dec(_Index);
 
     if _Index = 0 then
@@ -1606,7 +1611,7 @@ begin
 
 end;
 
-function TListParam.ExternalIndex(_InternalIndex: Integer): Integer;
+function TMultiParamList.ExternalIndex(_InternalIndex: Integer): Integer;
 var
   i: Integer;
 begin
@@ -1614,34 +1619,32 @@ begin
   Result := -1;
 
   for i := 0 to _InternalIndex do
-    if SameText(FParams[i].Name, FName) then
+    if SameText(FParams.Items[i].Name, FName) then
       Inc(Result);
 
 end;
 
-function TListParam.Insert(_Index: Integer): Integer;
+function TMultiParamList.Insert(_Index: Integer): Integer;
 begin
-  with FParams do
-    Insert(InternalIndex(_Index), CreateNewParam);
+  FParams.Items.Insert(InternalIndex(_Index), CreateNewParam);
   Result := _Index;
 end;
 
-function TListParam.Append: Integer;
+function TMultiParamList.Append: Integer;
 begin
-  with FParams do
-    Result := ExternalIndex(Add(CreateNewParam));
+  Result := ExternalIndex(FParams.Items.Add(CreateNewParam));
 end;
 
-procedure TListParam.Delete(_Index: Integer);
+procedure TMultiParamList.Delete(_Index: Integer);
 begin
-  FParams.Delete(InternalIndex(_Index));
+  FParams.Items.Delete(InternalIndex(_Index));
 end;
 
 { TParamsListHolder }
 
-function TParamsListHolder.Find(const _Name: String; var _ParamList: TListParam): Boolean;
+function TParamsListHolder.Find(const _Name: String; var _ParamList: TMultiParamList): Boolean;
 var
-  Item: TListParam;
+  Item: TMultiParamList;
 begin
 
   for Item in Self do
@@ -1657,16 +1660,25 @@ begin
 
 end;
 
-function TParamsListHolder.Add(const _Name: String; _Params: TParams): TListParam;
+function TParamsListHolder.Add(const _Name: String; _Params: TParams): TMultiParamList;
 begin
-  Result := TListParam.Create(_Name, _Params);
+  Result := TMultiParamList.Create(_Name, _Params);
   inherited Add(Result);
 end;
 
-function TParamsListHolder.Get(const _Name: String; _Params: TParams): TListParam;
+function TParamsListHolder.Get(const _Name: String; _Params: TParams): TMultiParamList;
 begin
   if not Find(_Name, Result) then
     raise EParamsException.CreateFmt('Param list ''%s'' not found', [_Name]);
+end;
+
+{ TParamList }
+
+procedure TParamList.Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification);
+begin
+  if (_Action = cnRemoved) and (_Item.DataType = dtParams) then
+    _Item.Clear;
+  inherited Notify(_Item, _Action);
 end;
 
 { TParams }
@@ -1679,8 +1691,14 @@ begin
   FPathSeparator       := _PathSeparator;
   FSaveToStringOptions := _SaveToStringOptions;
 
+  FItems      := TParamList.Create;
   FListHolder := TParamsListHolder.Create;
 
+end;
+
+procedure TParams.Clear;
+begin
+  Items.Clear;
 end;
 
 constructor TParams.Create(const _SaveToStringOptions: TSaveToStringOptions);
@@ -1690,11 +1708,15 @@ end;
 
 destructor TParams.Destroy;
 begin
+
   FreeAndNil(FListHolder);
+  FreeAndNil(FItems     );
+
   inherited Destroy;
+
 end;
 
-function TParams.GetList(const _Path: String): TListParam;
+function TParams.GetList(const _Path: String): TMultiParamList;
 var
   PathRest: String;
   Params: TParams;
@@ -1712,7 +1734,7 @@ end;
 function TParams.Add(const _Name: String): TParam;
 begin
   Result := TParam.Create(_Name, FPathSeparator);
-  inherited Add(Result);
+  Items.Add(Result);
 end;
 
 function TParams.FindPath(var _Path: String; var _Params: TParams): Boolean;
@@ -1911,7 +1933,7 @@ begin
 
   if Result then
 
-    for Param in Params do
+    for Param in Params.Items do
 
       if
 
@@ -1943,22 +1965,12 @@ begin
 
 end;
 
-procedure TParams.Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification);
-begin
-
-  if (_Action = cnRemoved) and (_Item.DataType = dtParams) then
-    _Item.Clear;
-
-  inherited Notify(_Item, _Action);
-
-end;
-
 procedure TParams.Assign(_Source: TParams);
 var
   Src, Dst: TParam;
 begin
 
-  for Src in _Source do begin
+  for Src in _Source.Items do begin
 
     Dst := Add(Src.Name);
     if Src.DataType = dtParams then
@@ -2132,7 +2144,7 @@ begin
   Result := _Default;
 end;
 
-function TParams.AddList(const _Path: String): TListParam;
+function TParams.AddList(const _Path: String): TMultiParamList;
 var
   PathRest: String;
   Params: TParams;
@@ -2224,7 +2236,7 @@ begin
     end;
 
   Result := '';
-  for Param in Self do
+  for Param in Items do
 
     if Param.DataType = dtParams then
 
