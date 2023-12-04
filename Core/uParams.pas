@@ -436,8 +436,7 @@ type
     // Параметры снаружи напрямую не берем
 
     function AddList(const _Path: String): TMultiParamList;
-    { TODO 1 -oVasilyevSM -cTParams: Метод Delete(_Path). Можно удалять привязанные к удаляемому параметру листы. }
-    { TODO 1 -oVasilyevSM -cTParams: Вот мы надобавляли листов. А удалять их может понадобиться кому-то? Пока под вопросом. }
+    procedure Delete(const _Path: String);
     procedure Clear;
 
     function SaveToString: String;
@@ -2180,6 +2179,27 @@ begin
   with Params.ListHolder do
     if not Find(PathRest, Result) then
       Result:= Add(PathRest, Params);
+
+end;
+
+procedure TParams.Delete(const _Path: String);
+var
+  PathRest: String;
+  Params: TParams;
+  Param: TParam;
+begin
+
+  PathRest := _Path;
+  if FindPath(PathRest, Params) then
+
+    with Params, Items do begin
+
+      Param := ParamByName(PathRest);
+      Delete(IndexOf(Param));
+
+    end
+
+  else raise EParamsException.CreateFmt('Param %s not found', [_Path]);
 
 end;
 
