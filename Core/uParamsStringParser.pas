@@ -25,8 +25,6 @@ unit uParamsStringParser;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 5 -oVasilyevSM -cTCustomStringParser: Этот юнит надо отладить и "заморозить". }
-
 interface
 
 uses
@@ -41,8 +39,8 @@ type
 
   TKeyWordType = (
 
-      ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktOpeningBracket,
-      ktClosingBracket
+      ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktNestedOpening,
+      ktNestedClosing
 
   );
   TKeyWordTypes = set of TKeyWordType;
@@ -56,7 +54,9 @@ type
     function GetKeyType: TKeyWordType;
     procedure SetKeyType(const _Value: TKeyWordType);
 
+    {$HINTS OFF}
     function TypeInSet(const _Set: TKeyWordTypes): Boolean;
+    {$HINTS ON}
 
     property KeyType: TKeyWordType read GetKeyType write SetKeyType;
 
@@ -201,7 +201,11 @@ type
 
     destructor Destroy; override;
 
-    { Осоновная работа здесь }
+    (*****************************)
+    (*                           *)
+    (*   Главный рабочий метод   *)
+    (*                           *)
+    (*****************************)
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
     procedure SpecialRegionClosed(_Region: TSpecialRegion); override;
 
@@ -220,8 +224,8 @@ const
   KWR_ASSIGNING:            TKeyWord = (KeyTypeInternal: Integer(ktAssigning);        StrValue: '=';   KeyLength: Length('=') );
   KWR_QUOTE_SINGLE:         TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '''';  KeyLength: Length(''''));
   KWR_QUOTE_DOBLE:          TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '"';   KeyLength: Length('"') );
-  KWR_OPENING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktOpeningBracket);   StrValue: '(';   KeyLength: Length('(') );
-  KWR_CLOSING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktClosingBracket);   StrValue: ')';   KeyLength: Length(')') );
+  KWR_OPENING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktNestedOpening);    StrValue: '(';   KeyLength: Length('(') );
+  KWR_CLOSING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktNestedClosing);    StrValue: ')';   KeyLength: Length(')') );
 
 type
 
@@ -250,8 +254,8 @@ const
       { ktTypeIdent      } 'TypeIdent',
       { ktAssigning      } 'Assigning',
       { ktStringBorder   } 'StringBorder',
-      { ktOpeningBracket } 'OpeningBracket',
-      { ktClosingBracket } 'ClosingBracket'
+      { ktNestedOpening  } 'OpeningBracket',
+      { ktNestedClosing  } 'ClosingBracket'
 
   );
 
@@ -422,11 +426,11 @@ begin
   if (FElement = etValue) and IsParamsType then begin
 
     { Контейнер. Проверка синтаксиса. }
-    if not _KeyWord.TypeInSet([ktSpace, ktLineEnd, ktOpeningBracket]) then
+    if not _KeyWord.TypeInSet([ktSpace, ktLineEnd, ktNestedOpening]) then
       raise EParamsReadException.CreateFmt('''('' expected but ''%s'' found', [_KeyWord.StrValue]);
 
     { Контейнер. Вход во вложенную структуру. }
-    if _KeyWord.KeyType = ktOpeningBracket then
+    if _KeyWord.KeyType = ktNestedOpening then
       ReadParams(_KeyWord);
 
   end;
@@ -434,7 +438,7 @@ begin
   { Вложенный объект. Завершение. }
   if Nested then begin
 
-    if _KeyWord.KeyType = ktClosingBracket then
+    if _KeyWord.KeyType = ktNestedClosing then
       Terminate;
 
     { Вложенный объект. Проверка синтаксиса. }
@@ -491,7 +495,7 @@ begin
     Add(etValue, ktLineEnd,        True,  etName,     ReadValue);
     Add(etValue, ktSplitter,       False, etName,     ReadValue);
     Add(etValue, ktSplitter,       True,  etName,     ReadValue);
-    Add(etValue, ktClosingBracket, True,  etName,     ReadValue);
+    Add(etValue, ktNestedClosing, True,  etName,     ReadValue);
     Add(etValue, ktSourceEnd,      False, etName,     ReadValue);
     Add(etValue, ktSourceEnd,      True,  etName,     ReadValue);
     Add(etValue, ktStringBorder,   True,  etName,     ReadValue);
@@ -501,13 +505,13 @@ begin
 
   with FSyntax do begin
 
-    {   Element ItemBody Nested InvalidKeys                               }
-    Add(etName, False,   False, [ktOpeningBracket, ktClosingBracket]      );
-    Add(etName, False,   True,  [ktOpeningBracket]                        );
-    Add(etName, True,    True,  [ktClosingBracket]                        );
-    Add(etName, True,    False, [ktClosingBracket, ktSourceEnd]           );
-    Add(etType, True,    False, [ktClosingBracket, ktLineEnd, ktSourceEnd]);
-    Add(etType, True,    True,  [ktClosingBracket, ktLineEnd, ktSourceEnd]);
+    {   Element ItemBody Nested InvalidKeys                              }
+    Add(etName, False,   False, [ktNestedOpening, ktNestedClosing]       );
+    Add(etName, False,   True,  [ktNestedOpening]                        );
+    Add(etName, True,    True,  [ktNestedClosing]                        );
+    Add(etName, True,    False, [ktNestedClosing, ktSourceEnd]           );
+    Add(etType, True,    False, [ktNestedClosing, ktLineEnd, ktSourceEnd]);
+    Add(etType, True,    True,  [ktNestedClosing, ktLineEnd, ktSourceEnd]);
 
   end;
 
@@ -570,7 +574,6 @@ begin
 
     _Parser.MoveEvent;
     _Parser.Move(2);
-    _Handled := True;
 
   end;
 

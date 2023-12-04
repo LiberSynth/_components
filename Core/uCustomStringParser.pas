@@ -334,11 +334,13 @@ end;
 function TSpecialRegion.CanOpen(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
   Result := _Parser.IsCursorKey(OpeningKey);
+  _Handled := Result;
 end;
 
 function TSpecialRegion.CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
   Result := _Parser.IsCursorKey(ClosingKey);
+  _Handled := Result;
 end;
 
 { TSpecialRegionList }
@@ -358,8 +360,7 @@ begin
       _Parser.SpecialRegionClosed(FActiveRegion);
 
       FActiveRegion := nil;
-      FActive := False;
-      _Handled:= True;
+      FActive       := False;
 
     end else
 
@@ -374,7 +375,6 @@ begin
 
         FActiveRegion := Region;
         FActive       := True;
-        _Handled      := True;
 
         Break;
 
