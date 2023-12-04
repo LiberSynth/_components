@@ -72,23 +72,6 @@ type
 
   TCustomStringParser = class;
 
-  {
-
-    Объект, позволяющий НЕ считать ключевыми словами любые символы внутри особого региона (строка, комментарий итд)
-    кроме закрывающего этото регион ключа.
-    Особые регионы настраиваются в потомках парсера добавлением в виртуальном методе InitParser с помощью
-    AddSpecialRegion.
-    Для специфической настройки региона нужно пронаследовать класс обработчика (от TSpecialRegion) и воспользовться
-    двумя виртуальными методами:
-
-    CanOpen  - условие открытия особого региона
-    CanClose - условие закрытия особого региона
-
-    По завершению региона вызывается событие парсера SpecialRegionClosed, в котором можно выполнить чтение.
-
-    Пример - TQoutedStringRegion. Регион для строк в кавычках, исполняющий обработку сдублированного закрывающего ключа.
-
-  }
   TSpecialRegion = class
   strict private
 
@@ -113,7 +96,7 @@ type
 
   protected
 
-    function CanOpen(_Parser: TCustomStringParser): Boolean; virtual;
+    function CanOpen(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; virtual;
     function CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; virtual;
 
   public
@@ -220,7 +203,11 @@ type
 
     );
 
-    { Главный рабочий метод }
+    (*****************************)
+    (*                           *)
+    (*   Главный рабочий метод   *)
+    (*                           *)
+    (*****************************)
     procedure Read;
 
     property Source: String read FSource;
@@ -248,6 +235,27 @@ const
   LOC_INITIAL: TLocation = (CurrentLine: 1; CurrentLineStart: 1; LastItemLine: 1; LastLineStart: 1; LastItemBegin: 1);
 
 implementation
+
+{$IFDEF DEBUG}
+procedure CheckSpecialRegions(_SpecialRegions: TSpecialRegionList);
+var
+  SSA, SSB: TSpecialRegion;
+begin
+
+  for SSA in _SpecialRegions do
+    for SSB in _SpecialRegions do
+      if SSA <> SSB then
+        if
+
+            (not SSA.OpeningKey.Equal(KWR_EMPTY) and SSA.OpeningKey.Equal(SSB.OpeningKey)) or
+            (not SSA.OpeningKey.Equal(KWR_EMPTY) and SSA.OpeningKey.Equal(SSB.ClosingKey)) or
+            (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.OpeningKey)) or
+            (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.ClosingKey))
+
+        then raise ECoreException.Create('Special regions setting is wrong. Some keys are intersected.');
+
+end;
+{$ENDIF}
 
 { TKeyWord }
 
@@ -323,7 +331,7 @@ begin
     raise EStringParserException.Create(FUnterminatedMessage);
 end;
 
-function TSpecialRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
+function TSpecialRegion.CanOpen(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
 begin
   Result := _Parser.IsCursorKey(OpeningKey);
 end;
@@ -359,7 +367,7 @@ begin
 
     for Region in Self do
 
-      if Region.CanOpen(_Parser) then begin
+      if Region.CanOpen(_Parser, _Handled) then begin
 
         Region.Open(_Parser);
         _Parser.SpecialRegionOpened(Region);
@@ -380,33 +388,12 @@ begin
     FActiveRegion.CheckUnterminating;
 end;
 
-{$IFDEF DEBUG}
-procedure CheckSpecialRegions(_SpecialRegions: TSpecialRegionList);
-var
-  SSA, SSB: TSpecialRegion;
-begin
-
-  for SSA in _SpecialRegions do
-    for SSB in _SpecialRegions do
-      if SSA <> SSB then
-        if
-
-            (not SSA.OpeningKey.Equal(KWR_EMPTY) and SSA.OpeningKey.Equal(SSB.OpeningKey)) or
-            (not SSA.OpeningKey.Equal(KWR_EMPTY) and SSA.OpeningKey.Equal(SSB.ClosingKey)) or
-            (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.OpeningKey)) or
-            (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.ClosingKey))
-
-        then raise ECoreException.Create('Special regions setting is wrong. Some keys are intersected.');
-
-end;
-{$ENDIF}
-
 { TLocation }
 
 procedure TLocation.Remember(_Cursor: Int64);
 begin
 
-  LastItemLine      := CurrentLine;
+  LastItemLine  := CurrentLine;
   LastLineStart := CurrentLineStart;
   LastItemBegin := _Cursor;
 
@@ -480,12 +467,6 @@ begin
 
 end;
 
-function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
-begin
-  with _KeyWord do
-    Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
-end;
-
 function TCustomStringParser.GetRest: Int64;
 begin
   Result := SrcLen - Cursor + 1;
@@ -530,6 +511,12 @@ begin
 
 end;
 
+function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
+begin
+  with _KeyWord do
+    Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
+end;
+
 procedure TCustomStringParser.InitParser;
 begin
 
@@ -563,17 +550,12 @@ begin
 
 end;
 
-procedure TCustomStringParser.SpecialRegionClosed(_Region: TSpecialRegion);
-begin
-end;
-
 procedure TCustomStringParser.SpecialRegionOpened(_Region: TSpecialRegion);
 begin
 end;
 
-procedure TCustomStringParser.AddSpecialRegion;
+procedure TCustomStringParser.SpecialRegionClosed(_Region: TSpecialRegion);
 begin
-  FSpecialRegions.Add(_RegionClass.Create(_OpeningKey, _ClosingKey, _UnterminatedMessage));
 end;
 
 function TCustomStringParser.Nested: Boolean;
@@ -584,6 +566,38 @@ end;
 procedure TCustomStringParser.Move(_Incrementer: Int64);
 begin
   Inc(FCursor, _Incrementer);
+end;
+
+procedure TCustomStringParser.Terminate;
+begin
+  FTerminated := True;
+end;
+
+function TCustomStringParser.ReadItem(_Trim: Boolean): String;
+begin
+
+  if ItemStart > 0 then
+
+    if _Trim then
+      Result := Trim(Copy(Source, ItemStart, Cursor - ItemStart))
+    else
+      Result := Copy(Source, ItemStart, Cursor - ItemStart)
+
+  else Result := '';
+
+  CompleteItem;
+
+end;
+
+procedure TCustomStringParser.CompleteItem;
+begin
+  ItemBody  := False;
+  ItemStart := 0;
+end;
+
+procedure TCustomStringParser.AddSpecialRegion;
+begin
+  FSpecialRegions.Add(_RegionClass.Create(_OpeningKey, _ClosingKey, _UnterminatedMessage));
 end;
 
 procedure TCustomStringParser.Read;
@@ -639,33 +653,6 @@ begin
 
   end;
 
-end;
-
-procedure TCustomStringParser.Terminate;
-begin
-  FTerminated := True;
-end;
-
-function TCustomStringParser.ReadItem(_Trim: Boolean): String;
-begin
-
-  if ItemStart > 0 then
-
-    if _Trim then
-      Result := Trim(Copy(Source, ItemStart, Cursor - ItemStart))
-    else
-      Result := Copy(Source, ItemStart, Cursor - ItemStart)
-
-  else Result := '';
-
-  CompleteItem;
-
-end;
-
-procedure TCustomStringParser.CompleteItem;
-begin
-  ItemBody  := False;
-  ItemStart := 0;
 end;
 
 end.
