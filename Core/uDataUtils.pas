@@ -33,9 +33,15 @@ uses
   { LiberSynth }
   uConsts, uTypes, uCore;
 
-{ v Преобразование основных типов данных друг в друга. Полный набор. v }
-{ TODO 1 -oVasilyevSM -cuDataUtils: где '//' - Добавлять исполнение и отлаживать. Осталось пять пар: DateTime/Integer,
+{ v Преобразование основных типов данных друг в друга. v }
+{ Представлен полный набор, чтобы голову не ломать, как это делать в каждом отдельном сочетании. Логика простая,
+  <Тип A>To<Тип B>. Типы перечислены в uParams, что не до конца правильно, поскольку он зависимый от uDataUtils. Это
+  на подумать. <Тип> это любой элемент TParamDataType без префикса. Исключения: Int[eger], Str[ing], AnsiStr[ing]. }
+{ TODO 5 -oVasilyevSM -cuDataUtils: Где '//' - добавлять исполнение и отлаживать. Осталось пять пар: DateTime/Integer,
   DateTime/BigInt, Data/Integer, Data/BigInt и Data/Extended. }
+{ TODO 5 -oVasilyevSM -cuParams: Похоже, что Double это действительно псевдоним Extended. Значения с большим
+  количеством знаков урезаются одинаково. Странно только что в Win64 SizeOf(Extended) = 10, а не 16, как утверждает
+  справка по RADStudio. }
 function BooleanToInt(Value: Boolean): Integer;
 function BooleanToBigInt(Value: Boolean): Int64;
 function BooleanToFloat(Value: Boolean): Double;

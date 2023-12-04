@@ -25,7 +25,7 @@ unit uParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 10 -oVasilyevSM -cuParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство. GetList или
+{ TODO 1 -oVasilyevSM -cuParams: Для работы с мультистроковыми параметрами нужно какое-то удобное средство, List или
   как табличные записи. Сейчас ParamByName вернет первый из списка и все.  }
 
 interface
@@ -38,12 +38,25 @@ uses
 
 type
 
-  { Похоже, что Double это действительно псевдоним Extended. Значения с большим количеством знаков урезаются одинаково.
-    Странно только что в Win64 SizeOf(Extended) = 10, а не 16, как утверждает справка по RADStudio. }
-  TParamDataType = (dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, dtExtended, dtDateTime, dtGUID, dtAnsiString, dtString, dtBLOB, dtData, dtParams);
+  TParamDataType = (
+
+      dtUnknown, dtBoolean, dtInteger, dtBigInt, dtFloat, dtExtended, dtDateTime, dtGUID, dtAnsiString, dtString,
+      dtBLOB, dtData, dtParams
+
+  );
 
   TParams = class;
 
+  {
+
+    Объект, к которому нет достума снаружи. Все его свойства задаются через его владельца (TParams).
+    Параметр поддерживает сохранение всех типов данных во все типы данных, в которые может. Например, при попытке
+    записать в параметр с типом dtDateTime значения типа dtInteger (с помощью свойства AsInteger) оно будет
+    сконвертировано в дату и сохранено там. Этот режим можно выключить при помощи свойства StrictDataType = True. Тогда
+    при попытке записи в параметр несоответствующего типа будет генерироваться исключение. Этот функционал исполнен
+    хэлпером TParamHelper.
+
+  }
   TParam = class
 
   const
@@ -64,6 +77,8 @@ type
     procedure AllocData;
     procedure FreeData;
     function DataSize: Cardinal;
+
+    procedure CheckDataType(_DataType: TParamDataType);
     procedure PresetData(_DataType: TParamDataType);
 
   private
@@ -98,14 +113,7 @@ type
     procedure SetAsParams(_Value: TParams);
     { ^ Using FData methods ^ }
 
-  protected
-
-    procedure CheckDataType(_DataType: TParamDataType);
-
-  public
-
     constructor Create(const _Name: String; const _PathSeparator: Char = '.');
-    destructor Destroy; override;
 
     procedure Clear;
     { Для передачи без разбора типов }
@@ -117,17 +125,17 @@ type
     property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
     property Name: String read FName;
 
-    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
-    property AsInteger: Integer read GetAsInteger write SetAsInteger;
-    property AsBigInt: Int64 read GetAsBigInt write SetAsBigInt;
-    property AsFloat: Double read GetAsFloat write SetAsFloat;
-    property AsExtended: Extended read GetAsExtended write SetAsExtended;
-    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
-    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
-    property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
-    property AsString: String read GetAsString write SetAsString;
-    property AsBLOB: BLOB read GetAsBLOB write SetAsBLOB;
-    property AsData: TData read GetAsData write SetAsData;
+//    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
+//    property AsInteger: Integer read GetAsInteger write SetAsInteger;
+//    property AsBigInt: Int64 read GetAsBigInt write SetAsBigInt;
+//    property AsFloat: Double read GetAsFloat write SetAsFloat;
+//    property AsExtended: Extended read GetAsExtended write SetAsExtended;
+//    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
+//    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
+//    property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
+//    property AsString: String read GetAsString write SetAsString;
+//    property AsBLOB: BLOB read GetAsBLOB write SetAsBLOB;
+//    property AsData: TData read GetAsData write SetAsData;
     {
 
       Это свойство должно записываться только из класса TParams по вызову As... с указанием пути. В смысле, в конце
@@ -137,6 +145,10 @@ type
 
     }
     property AsParams: TParams read GetAsParams;
+
+  public
+
+    destructor Destroy; override;
 
   end;
 
@@ -168,7 +180,7 @@ type
     procedure _SetAsBLOB(const _Value: BLOB);
     procedure _SetAsData(const _Value: TData);
 
-  public
+  private
 
     property AsBoolean: Boolean read _GetAsBoolean write _SetAsBoolean;
     property AsInteger: Integer read _GetAsInteger write _SetAsInteger;
@@ -186,17 +198,81 @@ type
 
   {
 
-    _Name - всегда чистое имя параметра без пути. Путь через "." это _Path, причем, вместе с именем на последнем.
-    месте.
+    _Name - всегда чистое имя параметра без пути. Путь через "." это _Path, причем, вместе с именем на последнем месте.
     Методы SetAs... создают путь и конечный параметр, используя GetParam, если их нет.
     Метод FindParam ничего не создает, только ищет существующий.
-    Метод ParamByName вовсе генерирует исключение, если чего-то не хватает.
-    Краткая запись при сохранении с предопределенными типами здесь не поддерживается. Нужно исполнять ее в потомках.
+    Метод ParamByName генерирует исключение, если чего-то не хватает.
+    Краткая запись в строку при сохранении с предопределенными типами здесь не поддерживается. Нужно исполнять ее в
+    потомках.
 
   }
 
   TSaveToStringOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
   TSaveToStringOptions = set of TSaveToStringOption;
+
+  {
+
+    Это не список параметров, а особый объект - лист, позволяющий работать с многострочными структурами как с набором
+    записей. Примерно так: Params.List['Country.City'].Count, Params.List['Country.City'].AsString[i].
+    Методы List.Insert и List.Append добавляют условную запись, или строку как элемент многострочной структуры.
+    List.Delete - удавляет.
+    Но это не набор записей, потому что условные поля здесь лежат в одну линию по вертикали.
+
+  }
+  TParamList = class
+
+  strict private
+
+    { _Index - это всегда внешний индекс, в разрезе текущего имени. InternalIndex - индекс в FParams }
+    FPath: String;
+    FName: String;
+    FParams: TParams;
+
+    function CreateNewParam: TParam;
+
+    function GetCount: Integer;
+    function GetItems(_Index: Integer): TParam;
+
+    function GetAsString(_Index: Integer): String;
+
+    procedure SetAsString(_Index: Integer; const _Value: String);
+
+    function InternalIndex(_Index: Integer): Integer;
+    function ExternalIndex(_InternalIndex: Integer): Integer;
+
+  private
+
+    constructor Create(const _Path, _Name: String; _Params: TParams);
+
+    property Path: String read FPath;
+    property Items[_Index: Integer]: TParam read GetItems; default;
+
+  public
+
+    function Insert(_Index: Integer): Integer;
+    function Append: Integer;
+    procedure Delete(_Index: Integer);
+
+    property Count: Integer read GetCount;
+
+    property AsString[_Index: Integer]: String read GetAsString write SetAsString;
+
+  end;
+
+  { сильно похож на лишний класс }
+  TParamListHolder = class(TObjectList<TParamList>)
+
+  private
+
+    function GetList(
+
+        const _Path: String;
+        const _Name: String;
+        _Params: TParams
+
+    ): TParamList;
+
+  end;
 
   { Некоторые корневые свойства намеренно задаются один раз при создании объекта. Не нужно их менять на ходу. }
   TParams = class(TObjectList<TParam>)
@@ -205,6 +281,15 @@ type
 
     FPathSeparator: Char;
     FSaveToStringOptions: TSaveToStringOptions;
+    FListHolder: TParamListHolder;
+
+    function GetList(const _Path: String): TParamList;
+
+    function Add(const _Name: String): TParam;
+
+    function FindPath(var _Path: String; var _Params: TParams): Boolean;
+    function GetPath(var _Path: String): TParams;
+    function ParamByName(const _Path: String): TParam;
 
   private
 
@@ -212,30 +297,32 @@ type
     function GetAsBoolean(const _Path: String): Boolean;
     function GetAsInteger(const _Path: String): Integer;
     function GetAsBigInt(const _Path: String): Int64;
-    function GetAsFloat(_Path: String): Double;
-    function GetAsExtended(_Path: String): Extended;
-    function GetAsDateTime(_Path: String): TDateTime;
-    function GetAsGUID(_Path: String): TGUID;
-    function GetAsAnsiString(_Path: String): AnsiString;
-    function GetAsString(_Path: String): String;
-    function GetAsBLOB(_Path: String): BLOB;
-    function GetAsData(_Path: String): TData;
-    function GetAsParams(_Path: String): TParams;
+    function GetAsFloat(const _Path: String): Double;
+    function GetAsExtended(const _Path: String): Extended;
+    function GetAsDateTime(const _Path: String): TDateTime;
+    function GetAsGUID(const _Path: String): TGUID;
+    function GetAsAnsiString(const _Path: String): AnsiString;
+    function GetAsString(const _Path: String): String;
+    function GetAsBLOB(const _Path: String): BLOB;
+    function GetAsData(const _Path: String): TData;
+    function GetAsParams(const _Path: String): TParams;
 
     procedure SetIsNull(const _Path: String; const _Value: Boolean);
     procedure SetAsBoolean(const _Path: String; _Value: Boolean);
     procedure SetAsInteger(const _Path: String; _Value: Integer);
     procedure SetAsBigInt(const _Path: String; _Value: Int64);
-    procedure SetAsFloat(_Path: String; _Value: Double);
-    procedure SetAsExtended(_Path: String; _Value: Extended);
-    procedure SetAsDateTime(_Path: String; _Value: TDateTime);
-    procedure SetAsGUID(_Path: String; const _Value: TGUID);
-    procedure SetAsAnsiString(_Path: String; const _Value: AnsiString);
-    procedure SetAsString(_Path: String; const _Value: String);
-    procedure SetAsBLOB(_Path: String; const _Value: BLOB);
-    procedure SetAsData(_Path: String; const _Value: TData);
-    procedure SetAsParams(_Path: String; _Value: TParams);
+    procedure SetAsFloat(const _Path: String; _Value: Double);
+    procedure SetAsExtended(const _Path: String; _Value: Extended);
+    procedure SetAsDateTime(const _Path: String; _Value: TDateTime);
+    procedure SetAsGUID(const _Path: String; const _Value: TGUID);
+    procedure SetAsAnsiString(const _Path: String; const _Value: AnsiString);
+    procedure SetAsString(const _Path: String; const _Value: String);
+    procedure SetAsBLOB(const _Path: String; const _Value: BLOB);
+    procedure SetAsData(const _Path: String; const _Value: TData);
+    procedure SetAsParams(const _Path: String; _Value: TParams);
 
+    function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
+    function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
     function GetParam(_Path: String): TParam;
 
   protected
@@ -247,12 +334,7 @@ type
     constructor Create(const _PathSeparator: Char = '.'; const _SaveToStringOptions: TSaveToStringOptions = []); overload;
     constructor Create(const _SaveToStringOptions: TSaveToStringOptions); overload;
 
-    function Add(const _Name: String): TParam;
-    function Insert(_Index: Integer; const _Name: String): TParam;
-
-    function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
-    function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
-    function ParamByName(const _Path: String): TParam;
+    destructor Destroy; override;
 
     { Для передачи без разбора типов }
     procedure Assign(_Source: TParams);
@@ -286,24 +368,25 @@ type
 
     function SaveToString: String;
     procedure LoadFromString(const _Value: String);
-    { TODO 10 -oVasilyevSM -cuParams: SaveToStream/LoadFromStream }
+    { TODO 5 -oVasilyevSM -cuParams: SaveToStream/LoadFromStream }
 
     property IsNull[const _Path: String]: Boolean read GetIsNull write SetIsNull;
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
     property AsBigInt[const _Path: String]: Int64 read GetAsBigInt write SetAsBigInt;
-    property AsFloat[_Path: String]: Double read GetAsFloat write SetAsFloat;
-    property AsExtended[_Path: String]: Extended read GetAsExtended write SetAsExtended;
-    property AsDateTime[_Path: String]: TDateTime read GetAsDateTime write SetAsDateTime;
-    property AsGUID[_Path: String]: TGUID read GetAsGUID write SetAsGUID;
-    property AsAnsiString[_Path: String]: AnsiString read GetAsAnsiString write SetAsAnsiString;
-    property AsString[_Path: String]: String read GetAsString write SetAsString;
-    property AsBLOB[_Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
-    property AsData[_Path: String]: TData read GetAsData write SetAsData;
-    property AsParams[_Path: String]: TParams read GetAsParams;
+    property AsFloat[const _Path: String]: Double read GetAsFloat write SetAsFloat;
+    property AsExtended[const _Path: String]: Extended read GetAsExtended write SetAsExtended;
+    property AsDateTime[const _Path: String]: TDateTime read GetAsDateTime write SetAsDateTime;
+    property AsGUID[const _Path: String]: TGUID read GetAsGUID write SetAsGUID;
+    property AsAnsiString[const _Path: String]: AnsiString read GetAsAnsiString write SetAsAnsiString;
+    property AsString[const _Path: String]: String read GetAsString write SetAsString;
+    property AsBLOB[const _Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
+    property AsData[const _Path: String]: TData read GetAsData write SetAsData;
+    property AsParams[const _Path: String]: TParams read GetAsParams;
 
     property PathSeparator: Char read FPathSeparator;
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions;
+    property List[const _Path: String]: TParamList read GetList;
 
     { v Функции и свойства для основной работы v }
 
@@ -1296,6 +1379,119 @@ begin
 
 end;
 
+{ TParamList }
+
+constructor TParamList.Create;
+begin
+
+  inherited Create;
+
+  FPath   := _Path;
+  FName   := _Name;
+  FParams := _Params;
+
+end;
+
+function TParamList.CreateNewParam: TParam;
+begin
+  Result := TParam.Create(FName, FParams.PathSeparator);
+end;
+
+function TParamList.GetCount: Integer;
+var
+  Param: TParam;
+begin
+
+  Result := 0;
+
+  for Param in FParams do
+    if SameText(Param.Name, FName) then
+      Inc(Result);
+
+end;
+
+function TParamList.GetItems(_Index: Integer): TParam;
+begin
+  Result := FParams[InternalIndex(_Index)];
+end;
+
+function TParamList.GetAsString(_Index: Integer): String;
+begin
+  Result := Items[_Index].AsString;
+end;
+
+procedure TParamList.SetAsString(_Index: Integer; const _Value: String);
+begin
+  Items[_Index].AsString := _Value;
+end;
+
+function TParamList.InternalIndex(_Index: Integer): Integer;
+var
+  i: Integer;
+begin
+
+  Inc(_Index);
+  for i := 0 to FParams.Count - 1 do begin
+
+    if SameText(FParams[i].Name, FName) then
+      Dec(_Index);
+
+    if _Index = 0 then
+      Exit(i);
+
+  end;
+
+  Result := -1;
+
+end;
+
+function TParamList.ExternalIndex(_InternalIndex: Integer): Integer;
+var
+  i: Integer;
+begin
+
+  Result := -1;
+
+  for i := 0 to _InternalIndex do
+    if SameText(FParams[i].Name, FName) then
+      Inc(Result);
+
+end;
+
+function TParamList.Insert(_Index: Integer): Integer;
+begin
+  with FParams do
+    Insert(InternalIndex(_Index), CreateNewParam);
+  Result := _Index;
+end;
+
+function TParamList.Append: Integer;
+begin
+  with FParams do
+    Result := ExternalIndex(Add(CreateNewParam));
+end;
+
+procedure TParamList.Delete(_Index: Integer);
+begin
+  FParams.Delete(InternalIndex(_Index));
+end;
+
+{ TParamListHolder }
+
+function TParamListHolder.GetList(const _Path, _Name: String; _Params: TParams): TParamList;
+var
+  Item: TParamList;
+begin
+
+  for Item in Self do
+    if SameText(Item.Path, _Path) then
+      Exit(Item);
+
+  Result := TParamList.Create(_Path, _Name, _Params);
+  Add(Result);
+
+end;
+
 { TParams }
 
 constructor TParams.Create(const _PathSeparator: Char; const _SaveToStringOptions: TSaveToStringOptions);
@@ -1306,11 +1502,93 @@ begin
   FPathSeparator       := _PathSeparator;
   FSaveToStringOptions := _SaveToStringOptions;
 
+  FListHolder := TParamListHolder.Create;
+
 end;
 
 constructor TParams.Create(const _SaveToStringOptions: TSaveToStringOptions);
 begin
   Create('.', _SaveToStringOptions);
+end;
+
+destructor TParams.Destroy;
+begin
+  FreeAndNil(FListHolder);
+  inherited Destroy;
+end;
+
+function TParams.GetList(const _Path: String): TParamList;
+var
+  PathRest: String;
+  Params: TParams;
+begin
+
+  PathRest := _Path;
+  Params := GetPath(PathRest);
+  Result := FListHolder.GetList(_Path, PathRest, Params);
+
+end;
+
+function TParams.Add(const _Name: String): TParam;
+begin
+  Result := TParam.Create(_Name, FPathSeparator);
+  inherited Add(Result);
+end;
+
+function TParams.FindPath(var _Path: String; var _Params: TParams): Boolean;
+var
+  Param: TParam;
+  SingleName: String;
+begin
+
+  _Params := Self;
+
+  while Pos(FPathSeparator, _Path) > 0 do begin
+
+    SingleName := ReadStrTo(_Path, FPathSeparator, False);
+
+    if _Params.FindParam(SingleName, dtParams, Param) then
+
+      _Params := Param.AsParams
+
+    else Exit(False);
+
+  end;
+
+  Result := True;
+
+end;
+
+function TParams.GetPath(var _Path: String): TParams;
+var
+  SingleName: String;
+  Param: TParam;
+begin
+
+  Result := Self;
+
+  while Pos(FPathSeparator, _Path) > 0 do begin
+
+    SingleName := ReadStrTo(_Path, FPathSeparator, False);
+
+    if Result.FindParam(SingleName, dtParams, Param) then Result := Param.AsParams
+    else
+
+      with Result.Add(SingleName) do begin
+
+        SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
+        Result := AsParams;
+
+      end;
+
+  end;
+
+end;
+
+function TParams.ParamByName(const _Path: String): TParam;
+begin
+  if not FindParam(_Path, Result) then
+    raise EParamsException.CreateFmt('Param %s not found', [_Path]);
 end;
 
 function TParams.GetIsNull(const _Path: String): Boolean;
@@ -1333,47 +1611,47 @@ begin
   Result := ParamByName(_Path).AsBigInt;
 end;
 
-function TParams.GetAsFloat(_Path: String): Double;
+function TParams.GetAsFloat(const _Path: String): Double;
 begin
   Result := ParamByName(_Path).AsFloat;
 end;
 
-function TParams.GetAsExtended(_Path: String): Extended;
+function TParams.GetAsExtended(const _Path: String): Extended;
 begin
   Result := ParamByName(_Path).AsExtended;
 end;
 
-function TParams.GetAsDateTime(_Path: String): TDateTime;
+function TParams.GetAsDateTime(const _Path: String): TDateTime;
 begin
   Result := ParamByName(_Path).AsDateTime;
 end;
 
-function TParams.GetAsGUID(_Path: String): TGUID;
+function TParams.GetAsGUID(const _Path: String): TGUID;
 begin
   Result := ParamByName(_Path).AsGUID;
 end;
 
-function TParams.GetAsAnsiString(_Path: String): AnsiString;
+function TParams.GetAsAnsiString(const _Path: String): AnsiString;
 begin
   Result := ParamByName(_Path).AsAnsiString;
 end;
 
-function TParams.GetAsString(_Path: String): String;
+function TParams.GetAsString(const _Path: String): String;
 begin
   Result := ParamByName(_Path).AsString;
 end;
 
-function TParams.GetAsBLOB(_Path: String): BLOB;
+function TParams.GetAsBLOB(const _Path: String): BLOB;
 begin
   Result := ParamByName(_Path).AsBLOB;
 end;
 
-function TParams.GetAsData(_Path: String): TData;
+function TParams.GetAsData(const _Path: String): TData;
 begin
   Result := ParamByName(_Path).AsData;
 end;
 
-function TParams.GetAsParams(_Path: String): TParams;
+function TParams.GetAsParams(const _Path: String): TParams;
 begin
   Result := ParamByName(_Path).AsParams;
 end;
@@ -1398,80 +1676,91 @@ begin
   GetParam(_Path).AsBigInt := _Value;
 end;
 
-procedure TParams.SetAsFloat(_Path: String; _Value: Double);
+procedure TParams.SetAsFloat(const _Path: String; _Value: Double);
 begin
   GetParam(_Path).AsFloat := _Value;
 end;
 
-procedure TParams.SetAsExtended(_Path: String; _Value: Extended);
+procedure TParams.SetAsExtended(const _Path: String; _Value: Extended);
 begin
   GetParam(_Path).AsExtended := _Value;
 end;
 
-procedure TParams.SetAsDateTime(_Path: String; _Value: TDateTime);
+procedure TParams.SetAsDateTime(const _Path: String; _Value: TDateTime);
 begin
   GetParam(_Path).AsDateTime := _Value;
 end;
 
-procedure TParams.SetAsGUID(_Path: String; const _Value: TGUID);
+procedure TParams.SetAsGUID(const _Path: String; const _Value: TGUID);
 begin
   GetParam(_Path).AsGUID := _Value;
 end;
 
-procedure TParams.SetAsAnsiString(_Path: String; const _Value: AnsiString);
+procedure TParams.SetAsAnsiString(const _Path: String; const _Value: AnsiString);
 begin
   GetParam(_Path).AsAnsiString := _Value;
 end;
 
-procedure TParams.SetAsString(_Path: String; const _Value: String);
+procedure TParams.SetAsString(const _Path: String; const _Value: String);
 begin
   GetParam(_Path).AsString := _Value;
 end;
 
-procedure TParams.SetAsBLOB(_Path: String; const _Value: BLOB);
+procedure TParams.SetAsBLOB(const _Path: String; const _Value: BLOB);
 begin
   GetParam(_Path).AsBLOB := _Value;
 end;
 
-procedure TParams.SetAsData(_Path: String; const _Value: TData);
+procedure TParams.SetAsData(const _Path: String; const _Value: TData);
 begin
   GetParam(_Path).AsData := _Value;
 end;
 
-procedure TParams.SetAsParams(_Path: String; _Value: TParams);
+procedure TParams.SetAsParams(const _Path: String; _Value: TParams);
 begin
   GetParam(_Path).SetAsParams(_Value);
 end;
 
-function TParams.GetParam(_Path: String): TParam;
+function TParams.FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean;
 var
-  SingleName: String;
   Params: TParams;
   Param: TParam;
 begin
 
-  Params := Self;
+  Result := FindPath(_Path, Params);
 
-  { TODO 1 -oVasilyevSM -cTParams.GetParam: Параметрметр не переназначить. Херачит все в новый списком. }
-  while Pos(FPathSeparator, _Path) > 0 do begin
+  if Result then
 
-    SingleName := ReadStrTo(_Path, FPathSeparator, False);
+    for Param in Params do
 
-    if Params.FindParam(SingleName, dtParams, Param) then Params := Param.AsParams
-    else
+      if
 
-      with Params.Add(SingleName) do begin
+          SameText(Param.Name, _Path) and
+          ((_DataType = dtUnknown) or (Param.DataType = _DataType))
 
-        SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
-        Params := AsParams;
+      then begin
+
+        _Value := Param;
+        Exit(True);
 
       end;
 
-  end;
+  Result := False;
+
+end;
+
+function TParams.FindParam(_Path: String; var _Value: TParam): Boolean;
+begin
+  Result := FindParam(_Path, dtUnknown, _Value);
+end;
+
+function TParams.GetParam(_Path: String): TParam;
+begin
 
   { Для возможности многострочных структур просто параметры не поддерживают чтение без типов. Сохранение с
     зарегистрированными типами должно исполнятся в потомках. Поэтому, просто Add. }
-  Result := Params.Add(_Path);
+  { TODO 1 -oVasilyevSM -cTParams.GetParam: Параметрметр не переназначить. Лупит все в новый списком. }
+  Result := GetPath(_Path).Add(_Path);
 
 end;
 
@@ -1500,68 +1789,6 @@ begin
 
   end;
 
-end;
-
-function TParams.Add(const _Name: String): TParam;
-begin
-  Result := TParam.Create(_Name, FPathSeparator);
-  inherited Add(Result);
-end;
-
-function TParams.Insert(_Index: Integer; const _Name: String): TParam;
-begin
-  Result := TParam.Create(_Name, FPathSeparator);
-  inherited Insert(_Index, Result);
-end;
-
-function TParams.FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean;
-var
-  SingleName: String;
-  Params: TParams;
-  Param: TParam;
-begin
-
-  Params := Self;
-
-  while Pos(FPathSeparator, _Path) > 0 do begin
-
-    SingleName := ReadStrTo(_Path, FPathSeparator, False);
-
-    if Params.FindParam(SingleName, dtParams, Param) then
-
-      Params := Param.AsParams
-
-    else Exit(False);
-
-  end;
-
-  for Param in Params do
-
-    if
-
-        SameText(Param.Name, _Path) and
-        ((_DataType = dtUnknown) or (Param.DataType = _DataType))
-
-    then begin
-
-      _Value := Param;
-      Exit(True);
-
-    end;
-
-  Result := False;
-
-end;
-
-function TParams.FindParam(_Path: String; var _Value: TParam): Boolean;
-begin
-  Result := FindParam(_Path, dtUnknown, _Value);
-end;
-
-function TParams.ParamByName(const _Path: String): TParam;
-begin
-  if not FindParam(_Path, Result) then
-    raise EParamsException.CreateFmt('Param %s not found', [_Path]);
 end;
 
 function TParams.FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
