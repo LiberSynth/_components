@@ -13,7 +13,7 @@ unit uParams;
 (*   /:::/    /     /\    \ /:::/\:::\    \ \   \:::\ ___\ \   \:::\    \ \   \:::\____\   *)
 (*  /:::/____/     /::\    /:::/  \:::\____\ \   \:::|    | \   \:::\____\ \   \:::|    |  *)
 (*  \:::\    \     \:::\  /:::/    \::/    / :\  /:::|____| :\   \::/    / :\  /:::|____|  *)
-(*   \:::\    \     \:::\/:::/    / \/____/ :::\/:::/    / :::\   \/____/_:::\/:::/    /   *)
+(*   \:::\    \     \:::\/:::/    / \/____/ :::\/:::/    / :::\   \/____/ :::\/:::/    /   *)
 (*    \:::\    \     \::::::/    /  \:::\   \::::::/    /  \:::\    \  |:::::::::/    /    *)
 (*     \:::\    \     \::::/____/    \:::\   \::::/    /    \:::\____\ |::|\::::/    /     *)
 (*      \:::\    \     \:::\    \     \:::\  /:::/    / :\   \::/    / |::| \::/____/      *)
@@ -25,7 +25,67 @@ unit uParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 2 -oVasilyevSM -cuParams: Чистка и уборка }
+{
+
+
+  Параметр поддерживает сохранение всех типов данных во все типы данных, в которые может. Например, при попытке
+  записать в параметр с типом dtDateTime значения типа dtInteger (с помощью свойства AsInteger) оно будет
+  сконвертировано в дату и сохранено. Этот режим можно выключить при помощи свойства StrictDataType = True. Тогда
+  при попытке записи в параметр несоответствующего типа будет генерироваться исключение. Этот функционал исполнен
+  хэлпером TParamHelper.
+
+  Для передачи значений без разбора типов служат методв Assign и AssignValue.
+
+  Некоторые корневые свойства как TParams, так и TParam намеренно задаются один раз при создании объекта. Не нужно их
+  менять на ходу.
+
+  Свойство TParam.AsParams записывается из контейнера TParams при присвоении значения любому свойству As... с указанием
+  пути через разделитель (AsBoolean['System.Debug.Enabled'] := True). Такая формализация позволяет безопасно управлять
+  любыми вложенными структурами из прикладного кода. Объект должен создаваться и уничтожаться одним и тем же условным
+  владельцем. Или по крайней мере контролировать уничтожение должен владелец. Поскольку TParamList уничтожает весь
+  список, желательно и создавать эти объекты здесь, а не снаружи.
+
+  _Name - всегда имя параметра без пути. Путь через разделитель (по умолчанию '.') это всегда _Path, причем, вместе с
+  именем на последнем месте ('System.Debug.Enabled')).
+  Методы SetAs... создают путь в виде вложенных параметров с типом dtParams и конечный параметр, используя
+  TParams.GetParam. Этот метод ищет параметр по указанному пути, если не находит, то создает его. Поиск пути
+  осуществляется методом TParams.GetPath, который тоже или находит или создает промжуточный параметры.
+  Метод FindParam не создает ни параметра, ни пути, только ищет существующий без генерации исключения. Просто по
+  указанному пути или с уточнением типа параметра.
+
+  TMultiParamList это не список параметров, а особый объект - лист, позволяющий работать с многострочными структурами
+  как с набором записей. Примерно так: Params.List['Country.City'].Count, Params.List['Country.City'].AsString[i].
+  Методы List.Insert и List.Append добавляют условную запись как элемент многострочной структуры. List.Delete -
+  удавляет. Но это не набор записей, потому что условные поля здесь лежат в одну линию по вертикали и добавление листа
+  подразумевает только одно условное поле в нем. Физически соответствующий листам объект TParams обслуживает путь и
+  держит значения в своем общем списке. А лист их фильтрует по имени при обращении.
+  Поэтому в свойствах и методах листа _Index - это везде внешний индекс, используемый в прикладном коле в разрезе
+  имени в листе. Внутри листа InternalIndex - настоящий индекс параметра в FParams.
+
+  Метод ParamByName генерирует исключение, если не хватает пути или оконечного параметра. Он используется при чтении
+  свойств TParams.As.... То есть, при обращении B := AsBoolean[<несуществующий путь>] будет исключение.
+  Краткая записи (напрмер, в строку) имеет смысл только при использовании параметров с предопределенными типами. То
+  есть, если структура параметров постоянна, то она должна быть сначала зарегистрирована в приложении. Тогда можно не
+  сохранять типы данны. Здесь не поддерживается. Нужно исполнять это в потомках.
+
+  Метод TParam.AsString особый. Он нужен как для прикладных визуальных задач так и для отладки. Для прикладного уровня
+  он возвращает данные для отображения в виде текста самого базового формата. При отладке он помогает в виде внятной
+  строки увидеть в отладчике что угодно. Например, дату или GUID.
+
+  Считыванием данных из строки занимается класс TParamsReader.
+  Для возможности считывания многострочных структур из источника просто параметры не поддерживают чтение из формата
+  без типов. Потому что если при чтении просто опираться на тип уже существующего по данному пути параметра,
+  полагая, что это и есть параметр с предопределенным типом, созданный перед чтением, то многострочные структуры будут
+  считываться как одна строка. Все последующие значения будут записываться в один параметр. Поэтому при считывании все
+  параметры безусловно добавляются. Для этого здесь используется List, поскольку обращение к однострочному параметру
+  через него возможно и ничего не меняет. То есть, лист с количеством записей 1 это тот же просто параметр с таким же
+  именем. И функция AddList добавляет лист только если не нашла уже имеющийся. Это, конечно, потяжелее, но логично. И
+  не нужны в TParams никакие "блатные" свойства специально для считывателя, есть одна логика и ее все используют.
+  Работает тот же GetParam, который добавляет, если не находит, тем самым обеспечивая возможность изменение значения
+  из прикладного кода. В то время как List.Append добавляет параметр безусловно. При считывани не бывает изменения
+  имеющихся значений, только добавление. И метод List.Append как раз такой в отличие от As... :=.
+
+}
 
 interface
 
@@ -46,16 +106,8 @@ type
 
   TParams = class;
 
-  {
-
-    Объект, к которому нет достума снаружи. Все его свойства задаются через его владельца (TParams).
-    Параметр поддерживает сохранение всех типов данных во все типы данных, в которые может. Например, при попытке
-    записать в параметр с типом dtDateTime значения типа dtInteger (с помощью свойства AsInteger) оно будет
-    сконвертировано в дату и сохранено там. Этот режим можно выключить при помощи свойства StrictDataType = True. Тогда
-    при попытке записи в параметр несоответствующего типа будет генерироваться исключение. Этот функционал исполнен
-    хэлпером TParamHelper.
-
-  }
+  { TParam - объект, к которому нет доступа снаружи, потому что создавать его без контейнера и изменять его свойства не
+    имеет никакого смысла. Все свойства объекта TParam задаются через контейнер TParams. }
   TParam = class
 
   const
@@ -136,14 +188,7 @@ type
 //    property AsString: String read GetAsString write SetAsString;
 //    property AsBLOB: BLOB read GetAsBLOB write SetAsBLOB;
 //    property AsData: TData read GetAsData write SetAsData;
-    {
 
-      Это свойство должно записываться только из класса TParams по вызову As... с указанием пути. В смысле, в конце
-      параметр, но с путем, который создается в виде вложенных параметров. И только так, потому что AsParams, заданный
-      снаружи должен оставаться в памяти, пока он нужен создавшему его объекту и должен освобождатсья этим объектом.
-      Это ненадежно, потому что допускает вероятность ошибок, влекущих утечки. Да и вообще, каша получится.
-
-    }
     property AsParams: TParams read GetAsParams;
 
   public
@@ -196,31 +241,10 @@ type
 
   end;
 
-  {
-
-    _Name - всегда чистое имя параметра без пути. Путь через "." это _Path, причем, вместе с именем на последнем месте.
-    Методы SetAs... создают путь и конечный параметр, используя GetParam, если их нет.
-    Метод FindParam ничего не создает, только ищет существующий.
-    Метод ParamByName генерирует исключение, если чего-то не хватает.
-    Краткая запись в строку при сохранении с предопределенными типами здесь не поддерживается. Нужно исполнять ее в
-    потомках.
-
-  }
-
   TSaveToStringOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
   TSaveToStringOptions = set of TSaveToStringOption;
 
-  {
-
-    Это не список параметров, а особый объект - лист, позволяющий работать с многострочными структурами как с набором
-    записей. Примерно так: Params.List['Country.City'].Count, Params.List['Country.City'].AsString[i].
-    Методы List.Insert и List.Append добавляют условную запись, или строку как элемент многострочной структуры.
-    List.Delete - удавляет.
-    Но это не набор записей, потому что условные поля здесь лежат в одну линию по вертикали.
-
-  }
   TMultiParamList = class
-  { _Index - это везде внешний индекс, в разрезе текущего имени. InternalIndex - индекс в FParams }
 
   strict private
 
@@ -241,8 +265,8 @@ type
     function GetAsFloat(_Index: Integer): Double;
     function GetAsExtended(_Index: Integer): Extended;
     function GetAsDateTime(_Index: Integer): TDateTime;
-    function GetAsAnsiString(_Index: Integer): AnsiString;
     function GetAsGUID(_Index: Integer): TGUID;
+    function GetAsAnsiString(_Index: Integer): AnsiString;
     function GetAsString(_Index: Integer): String;
     function GetAsBLOB(_Index: Integer): BLOB;
     function GetAsData(_Index: Integer): TData;
@@ -299,7 +323,6 @@ type
 
   end;
 
-  { сильно похож на лишний класс }
   TParamsListHolder = class(TObjectList<TMultiParamList>)
 
   private
@@ -318,7 +341,6 @@ type
 
   end;
 
-  { Некоторые корневые свойства намеренно задаются один раз при создании объекта. Не нужно их менять на ходу. }
   TParams = class
 
   strict private
@@ -382,6 +404,7 @@ type
 
     { Для передачи без разбора типов }
     procedure Assign(_Source: TParams);
+    { TODO 1 -oVasilyevSM -cTParams: AssignValue надо как-то сделать. }
 
     { v Функции и свойства для основной работы v }
     function FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
@@ -408,9 +431,11 @@ type
     function AsStringDef(const _Path: String; _Default: String): String;
     function AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
     function AsDataDef(const _Path: String; _Default: TData): TData;
-    // Параметры снаружи не берем
+    // Параметры снаружи напрямую не берем
 
     function AddList(const _Path: String): TMultiParamList;
+    { TODO 1 -oVasilyevSM -cTParams: Метод Delete(_Path). Можно удалять привязанные к удаляемому параметру листы. }
+    { TODO 1 -oVasilyevSM -cTParams: Вот мы надобавляли листов. А удалять их может понадобиться кому-то? Пока под вопросом. }
     procedure Clear;
 
     function SaveToString: String;
@@ -435,8 +460,6 @@ type
     property PathSeparator: Char read FPathSeparator;
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions;
 
-    { v Функции и свойства для основной работы v }
-
   end;
 
   EParamsException = class(ECoreException);
@@ -450,8 +473,8 @@ implementation
 
 type
 
-  { Этот класс нужен только для обращения к здешним объектам без циркулярной ссылки. Также, благодаря этому свойство
-    TParams.AsParams остается только для чтения и метод TParams.SetAsParams private. }
+  { Этот класс нужен только для обращения к здешним объектам без циркулярной ссылки. Также, благодаря этому свойства
+    и методы для изменения данных в обход установленного протокола (As... :=) остаются в прайват. }
   TParamsReader = class(TParamsStringParser)
 
   strict private
@@ -555,6 +578,99 @@ begin
   inherited Destroy;
 end;
 
+procedure TParam.SetIsNull(const _Value: Boolean);
+begin
+
+  if _Value <> FIsNull then begin
+
+    FIsNull := _Value;
+    FreeData;
+
+  end;
+
+end;
+
+procedure TParam.AllocData;
+begin
+  if not (DataType in ([dtUnknown] + SC_SELF_ALLOCATED_TYPES)) then
+    FData := AllocMem(DataSize);
+end;
+
+procedure TParam.FreeData;
+begin
+
+  { Объекту надо вызвать собственный деструктор }
+  if DataType = dtParams then
+    TParams(FData).Free;
+
+  if not (DataType in ([dtUnknown] + SC_SELF_ALLOCATED_TYPES)) then
+    FreeMemory(FData);
+
+  { Память строк освобождается так. }
+  case FDataType of
+
+    dtAnsiString: AnsiString(FData) := '';
+    dtString:     String(FData)     := '';
+    dtBLOB:       BLOB(FData)       := '';
+    dtData:       SetLength(TData(FData), 0);
+
+  end;
+
+  FData := nil;
+
+end;
+
+function TParam.DataSize: Cardinal;
+begin
+
+  case FDataType of
+
+    dtUnknown:    Result := 0;
+    dtBoolean:    Result := SizeOf(Boolean);
+    dtInteger:    Result := SizeOf(Integer);
+    dtBigInt:     Result := SizeOf(Int64);
+    dtFloat:      Result := SizeOf(Double);
+    dtExtended:   Result := SizeOf(Extended);
+    dtDateTime:   Result := SizeOf(TDateTime);
+    dtAnsiString: Result := 0;
+    dtString:     Result := 0;
+    dtGUID:       Result := SizeOf(TGUID);
+    dtBLOB:       Result := 0;
+    dtData:       Result := 0;
+    dtParams:     Result := SizeOf(TObject);
+
+  else
+    raise EUncompletedMethod.Create;
+  end;
+
+end;
+
+procedure TParam.CheckDataType(_DataType: TParamDataType);
+begin
+
+  if FDataType <> _DataType then
+
+    raise EParamsException.CreateFmt('Unable to read data type %s as %s', [
+
+        ParamDataTypeToStr(FDataType),
+        ParamDataTypeToStr(_DataType)
+
+    ]);
+
+end;
+
+procedure TParam.PresetData(_DataType: TParamDataType);
+begin
+
+  FreeData;
+
+  FDataType := _DataType;
+  FIsNull := False;
+
+  AllocData;
+
+end;
+
 procedure TParam.SetDataType(_Value: TParamDataType);
 begin
 
@@ -648,13 +764,7 @@ end;
 function TParam.GetAsString: String;
 begin
 
-  {
-
-    Этот метод особый. Он нужен как для прикладных визуальных задач, посколку возвращает отображаемый текст в самом
-    корневом виде, так и для отладочных. Можно в виде строки увидеть в отладчике что-то, имеющее непотребный вид.
-    Например, дату или GUID. Поэтому здесь проверку типа делать не надо. Пусть возвращает абсолютно все.
-
-  }
+  { Проверки типа данных нет, метод должен вернуть значение гарантированно. }
 
   if IsNull then Result := ''
   else
@@ -771,119 +881,12 @@ begin
   TParams(FData) := _Value;
 end;
 
-procedure TParam.SetIsNull(const _Value: Boolean);
-begin
-
-  if _Value <> FIsNull then begin
-
-    FIsNull := _Value;
-    FreeData;
-
-  end;
-
-end;
-
-class procedure TParam.ValidateName(const _Value, _PathSeparator: String);
-const
-  SC_PARAM_NAME_FORBIDDEN_CHARS = [' '];
-var
-  i: Integer;
-begin
-
-  if Length(_Value) = 0 then
-    raise EParamsReadException.Create('Empty param name');
-
-  for i := 1 to Length(_Value) do
-    if not CharInSet(_Value[i], SC_TYPED_CHARS) then
-      raise EParamsException.CreateFmt('Character #%d in invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
-
-  for i := 1 to Length(_Value) do
-    if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
-      raise EParamsException.CreateFmt('Character ''%s'' in invalid in param name ''%s''', [_Value[i], _Value]);
-
-  if Pos(_PathSeparator, _Value) > 0 then
-    raise EParamsException.CreateFmt('Character ''%s'' is used as a path separator. So it is invalid in param name ''%s''.', [_PathSeparator, _Value]);
-
-end;
-
-procedure TParam.AllocData;
-begin
-  if not (DataType in ([dtUnknown] + SC_SELF_ALLOCATED_TYPES)) then
-    FData := AllocMem(DataSize);
-end;
-
-procedure TParam.FreeData;
-begin
-
-  { Объекту надо вызвать собственный деструктор }
-  if DataType = dtParams then
-    TParams(FData).Free;
-
-  if not (DataType in ([dtUnknown] + SC_SELF_ALLOCATED_TYPES)) then
-    FreeMemory(FData);
-
-  { Память строк освобождается так. }
-  case FDataType of
-
-    dtAnsiString: AnsiString(FData) := '';
-    dtString:     String(FData)     := '';
-    dtBLOB:       BLOB(FData)       := '';
-    dtData:       SetLength(TData(FData), 0);
-
-  end;
-
-  FData := nil;
-
-end;
-
-function TParam.DataSize: Cardinal;
-begin
-
-  case FDataType of
-
-    dtUnknown:    Result := 0;
-    dtBoolean:    Result := SizeOf(Boolean);
-    dtInteger:    Result := SizeOf(Integer);
-    dtBigInt:     Result := SizeOf(Int64);
-    dtFloat:      Result := SizeOf(Double);
-    dtExtended:   Result := SizeOf(Extended);
-    dtDateTime:   Result := SizeOf(TDateTime);
-    dtAnsiString: Result := 0;
-    dtString:     Result := 0;
-    dtGUID:       Result := SizeOf(TGUID);
-    dtBLOB:       Result := 0;
-    dtData:       Result := 0;
-    dtParams:     Result := SizeOf(TObject);
-
-  else
-    raise EUncompletedMethod.Create;
-  end;
-
-end;
-
-procedure TParam.PresetData(_DataType: TParamDataType);
+procedure TParam.Clear;
 begin
 
   FreeData;
-
-  FDataType := _DataType;
-  FIsNull := False;
-
-  AllocData;
-
-end;
-
-procedure TParam.CheckDataType(_DataType: TParamDataType);
-begin
-
-  if FDataType <> _DataType then
-
-    raise EParamsException.CreateFmt('Unable to read data type %s as %s', [
-
-        ParamDataTypeToStr(FDataType),
-        ParamDataTypeToStr(_DataType)
-
-    ]);
+  FIsNull := True;
+  FDataType := dtUnknown;
 
 end;
 
@@ -918,12 +921,26 @@ begin
 
 end;
 
-procedure TParam.Clear;
+class procedure TParam.ValidateName(const _Value, _PathSeparator: String);
+const
+  SC_PARAM_NAME_FORBIDDEN_CHARS = [' '];
+var
+  i: Integer;
 begin
 
-  FreeData;
-  FIsNull := True;
-  FDataType := dtUnknown;
+  if Length(_Value) = 0 then
+    raise EParamsReadException.Create('Empty param name');
+
+  for i := 1 to Length(_Value) do
+    if not CharInSet(_Value[i], SC_TYPED_CHARS) then
+      raise EParamsException.CreateFmt('Character #%d in invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
+
+  for i := 1 to Length(_Value) do
+    if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
+      raise EParamsException.CreateFmt('Character ''%s'' in invalid in param name ''%s''', [_Value[i], _Value]);
+
+  if Pos(_PathSeparator, _Value) > 0 then
+    raise EParamsException.CreateFmt('Character ''%s'' is used as a path separator. So it is invalid in param name ''%s''.', [_PathSeparator, _Value]);
 
 end;
 
@@ -1426,7 +1443,7 @@ begin
 
 end;
 
-{ TParamsList }
+{ TMultiParamList }
 
 constructor TMultiParamList.Create;
 begin
@@ -1456,6 +1473,11 @@ begin
 
 end;
 
+function TMultiParamList.GetItems(_Index: Integer): TParam;
+begin
+  Result := FParams.Items[InternalIndex(_Index)];
+end;
+
 function TMultiParamList.GetDataType(_Index: Integer): TParamDataType;
 begin
   Result := Items[_Index].DataType;
@@ -1466,54 +1488,9 @@ begin
   Result := Items[_Index].IsNull;
 end;
 
-function TMultiParamList.GetItems(_Index: Integer): TParam;
-begin
-  Result := FParams.Items[InternalIndex(_Index)];
-end;
-
-function TMultiParamList.GetAsAnsiString(_Index: Integer): AnsiString;
-begin
-  Result := Items[_Index].AsAnsiString;
-end;
-
-function TMultiParamList.GetAsBigInt(_Index: Integer): Int64;
-begin
-  Result := Items[_Index].AsBigInt;
-end;
-
-function TMultiParamList.GetAsBLOB(_Index: Integer): BLOB;
-begin
-  Result := Items[_Index].AsBLOB;
-end;
-
 function TMultiParamList.GetAsBoolean(_Index: Integer): Boolean;
 begin
   Result := Items[_Index].AsBoolean;
-end;
-
-function TMultiParamList.GetAsData(_Index: Integer): TData;
-begin
-  Result := Items[_Index].AsData;
-end;
-
-function TMultiParamList.GetAsDateTime(_Index: Integer): TDateTime;
-begin
-  Result := Items[_Index].AsDateTime;
-end;
-
-function TMultiParamList.GetAsExtended(_Index: Integer): Extended;
-begin
-  Result := Items[_Index].AsExtended;
-end;
-
-function TMultiParamList.GetAsFloat(_Index: Integer): Double;
-begin
-  Result := Items[_Index].AsFloat;
-end;
-
-function TMultiParamList.GetAsGUID(_Index: Integer): TGUID;
-begin
-  Result := Items[_Index].AsGUID;
 end;
 
 function TMultiParamList.GetAsInteger(_Index: Integer): Integer;
@@ -1521,24 +1498,54 @@ begin
   Result := Items[_Index].AsInteger;
 end;
 
+function TMultiParamList.GetAsBigInt(_Index: Integer): Int64;
+begin
+  Result := Items[_Index].AsBigInt;
+end;
+
+function TMultiParamList.GetAsFloat(_Index: Integer): Double;
+begin
+  Result := Items[_Index].AsFloat;
+end;
+
+function TMultiParamList.GetAsExtended(_Index: Integer): Extended;
+begin
+  Result := Items[_Index].AsExtended;
+end;
+
+function TMultiParamList.GetAsDateTime(_Index: Integer): TDateTime;
+begin
+  Result := Items[_Index].AsDateTime;
+end;
+
+function TMultiParamList.GetAsGUID(_Index: Integer): TGUID;
+begin
+  Result := Items[_Index].AsGUID;
+end;
+
+function TMultiParamList.GetAsAnsiString(_Index: Integer): AnsiString;
+begin
+  Result := Items[_Index].AsAnsiString;
+end;
+
 function TMultiParamList.GetAsString(_Index: Integer): String;
 begin
   Result := Items[_Index].AsString;
 end;
 
-procedure TMultiParamList.SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
+function TMultiParamList.GetAsBLOB(_Index: Integer): BLOB;
 begin
-  Items[_Index].AsAnsiString := _Value;
+  Result := Items[_Index].AsBLOB;
 end;
 
-procedure TMultiParamList.SetAsBigInt(_Index: Integer; const _Value: Int64);
+function TMultiParamList.GetAsData(_Index: Integer): TData;
 begin
-  Items[_Index].AsBigInt := _Value;
+  Result := Items[_Index].AsData;
 end;
 
-procedure TMultiParamList.SetAsBLOB(_Index: Integer; const _Value: BLOB);
+procedure TMultiParamList.SetIsNull(_Index: Integer; const _Value: Boolean);
 begin
-  Items[_Index].AsBLOB := _Value;
+  Items[_Index].IsNull := _Value;
 end;
 
 procedure TMultiParamList.SetAsBoolean(_Index: Integer; const _Value: Boolean);
@@ -1546,19 +1553,14 @@ begin
   Items[_Index].AsBoolean := _Value;
 end;
 
-procedure TMultiParamList.SetAsData(_Index: Integer; const _Value: TData);
+procedure TMultiParamList.SetAsInteger(_Index: Integer; const _Value: Integer);
 begin
-  Items[_Index].AsData := _Value;
+  Items[_Index].AsInteger := _Value;
 end;
 
-procedure TMultiParamList.SetAsDateTime(_Index: Integer; const _Value: TDateTime);
+procedure TMultiParamList.SetAsBigInt(_Index: Integer; const _Value: Int64);
 begin
-  Items[_Index].AsDateTime := _Value;
-end;
-
-procedure TMultiParamList.SetAsExtended(_Index: Integer; const _Value: Extended);
-begin
-  Items[_Index].AsExtended := _Value;
+  Items[_Index].AsBigInt := _Value;
 end;
 
 procedure TMultiParamList.SetAsFloat(_Index: Integer; const _Value: Double);
@@ -1566,14 +1568,24 @@ begin
   Items[_Index].AsFloat := _Value;
 end;
 
+procedure TMultiParamList.SetAsExtended(_Index: Integer; const _Value: Extended);
+begin
+  Items[_Index].AsExtended := _Value;
+end;
+
+procedure TMultiParamList.SetAsDateTime(_Index: Integer; const _Value: TDateTime);
+begin
+  Items[_Index].AsDateTime := _Value;
+end;
+
 procedure TMultiParamList.SetAsGUID(_Index: Integer; const _Value: TGUID);
 begin
   Items[_Index].AsGUID := _Value;
 end;
 
-procedure TMultiParamList.SetAsInteger(_Index: Integer; const _Value: Integer);
+procedure TMultiParamList.SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
 begin
-  Items[_Index].AsInteger := _Value;
+  Items[_Index].AsAnsiString := _Value;
 end;
 
 procedure TMultiParamList.SetAsString(_Index: Integer; const _Value: String);
@@ -1581,14 +1593,14 @@ begin
   Items[_Index].AsString := _Value;
 end;
 
-procedure TMultiParamList.SetDataType(_Index: Integer; const _Value: TParamDataType);
+procedure TMultiParamList.SetAsBLOB(_Index: Integer; const _Value: BLOB);
 begin
-  Items[_Index].SetDataType(_Value);
+  Items[_Index].AsBLOB := _Value;
 end;
 
-procedure TMultiParamList.SetIsNull(_Index: Integer; const _Value: Boolean);
+procedure TMultiParamList.SetAsData(_Index: Integer; const _Value: TData);
 begin
-  Items[_Index].IsNull := _Value;
+  Items[_Index].AsData := _Value;
 end;
 
 function TMultiParamList.InternalIndex(_Index: Integer): Integer;
@@ -1622,6 +1634,11 @@ begin
     if SameText(FParams.Items[i].Name, FName) then
       Inc(Result);
 
+end;
+
+procedure TMultiParamList.SetDataType(_Index: Integer; const _Value: TParamDataType);
+begin
+  Items[_Index].SetDataType(_Value);
 end;
 
 function TMultiParamList.Insert(_Index: Integer): Integer;
@@ -1694,11 +1711,6 @@ begin
   FItems      := TParamList.Create;
   FListHolder := TParamsListHolder.Create;
 
-end;
-
-procedure TParams.Clear;
-begin
-  Items.Clear;
 end;
 
 constructor TParams.Create(const _SaveToStringOptions: TSaveToStringOptions);
@@ -2159,6 +2171,11 @@ begin
 
 end;
 
+procedure TParams.Clear;
+begin
+  Items.Clear;
+end;
+
 function TParams.SaveToString: String;
 const
 
@@ -2321,7 +2338,7 @@ begin
 
   { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
     условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
-    потому что дублирование не нужно в комментариях. }
+    потому что дублирование не нужно в комментариях совсем. }
 
   if DoublingChar > #0 then Result := UndoubleStr(_Value, DoublingChar)
   else Result := _Value;
@@ -2357,23 +2374,7 @@ begin
   { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
   CheckPresetType;
 
-  {
-
-    Для возможности считывания многострочных структур из источника просто параметры не поддерживают чтение из формата
-    без типов. Потому что если при чтении просто опираться на тип уже существующего по данному пути параметра,
-    полагая, что это и есть параметр с предопределенным типом, созданный перед чтением, то многострочные структуры будут
-    считываться как одна строка. Все последующие значения будут записываться в один параметр. Поэтому при считывании все
-    параметры безусловно добавляются. Для этого здесь безусловно используется AddList, поскольку обращение к
-    однострочному параметру через него возможно и ничего не меняет. То есть, лист с количеством записей 1 это тот же
-    просто параметр с таким же именем. И функция AddList добавляет лист только если не нашла уже имеющийся. Это,
-    конечно, потяжелее, но так логичнее и не нужны в TParams никакие "блатные" свойства специально для считывателя.
-    Работает тот же GetParam, который тоже добавляет, если не находит, тем самым обеспечивая изменение значения в
-    прикладном коде. В то время как List.Append добавляет параметр безусловно. Логично, потому что здесь не бывает
-    изменения значений параметров. Только добавление.
-
-    Считывание с зарегистрированными типами должно исполнятся в потомках с помощью отдельных свойств (Registered итд).
-
-  }
+  { Считывание с зарегистрированными типами должно исполнятся в потомках с помощью отдельных свойств (Registered итд). }
   with FParams.AddList(FCurrentName) do begin
 
     Index := Append;
