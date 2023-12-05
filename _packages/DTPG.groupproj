@@ -3,13 +3,13 @@
 			<ProjectGuid>{31BA45E7-D876-439B-98A9-0D001647FC80}</ProjectGuid>
 		</PropertyGroup>
 		<ItemGroup>
-			<Projects Include="0001.VCore\VCore.dproj">
+			<Projects Include="0001.VCore\Sources\VCore.dproj">
 				<Dependencies/>
 			</Projects>
-			<Projects Include="0002.VUtils\VUtils.dproj">
+			<Projects Include="0002.VUtils\Sources\VUtils.dproj">
 				<Dependencies/>
 			</Projects>
-			<Projects Include="0003.VDebug\VDebug.dproj">
+			<Projects Include="0003.VDebug\Sources\VDebug.dproj">
 				<Dependencies/>
 			</Projects>
 		</ItemGroup>
@@ -21,31 +21,31 @@
 			</BorlandProject>
 		</ProjectExtensions>
 		<Target Name="VCore">
-			<MSBuild Projects="0001.VCore\VCore.dproj"/>
+			<MSBuild Projects="0001.VCore\Sources\VCore.dproj"/>
 		</Target>
 		<Target Name="VCore:Clean">
-			<MSBuild Projects="0001.VCore\VCore.dproj" Targets="Clean"/>
+			<MSBuild Projects="0001.VCore\Sources\VCore.dproj" Targets="Clean"/>
 		</Target>
 		<Target Name="VCore:Make">
-			<MSBuild Projects="0001.VCore\VCore.dproj" Targets="Make"/>
+			<MSBuild Projects="0001.VCore\Sources\VCore.dproj" Targets="Make"/>
 		</Target>
 		<Target Name="VUtils">
-			<MSBuild Projects="0002.VUtils\VUtils.dproj"/>
+			<MSBuild Projects="0002.VUtils\Sources\VUtils.dproj"/>
 		</Target>
 		<Target Name="VUtils:Clean">
-			<MSBuild Projects="0002.VUtils\VUtils.dproj" Targets="Clean"/>
+			<MSBuild Projects="0002.VUtils\Sources\VUtils.dproj" Targets="Clean"/>
 		</Target>
 		<Target Name="VUtils:Make">
-			<MSBuild Projects="0002.VUtils\VUtils.dproj" Targets="Make"/>
+			<MSBuild Projects="0002.VUtils\Sources\VUtils.dproj" Targets="Make"/>
 		</Target>
 		<Target Name="VDebug">
-			<MSBuild Projects="0003.VDebug\VDebug.dproj"/>
+			<MSBuild Projects="0003.VDebug\Sources\VDebug.dproj"/>
 		</Target>
 		<Target Name="VDebug:Clean">
-			<MSBuild Projects="0003.VDebug\VDebug.dproj" Targets="Clean"/>
+			<MSBuild Projects="0003.VDebug\Sources\VDebug.dproj" Targets="Clean"/>
 		</Target>
 		<Target Name="VDebug:Make">
-			<MSBuild Projects="0003.VDebug\VDebug.dproj" Targets="Make"/>
+			<MSBuild Projects="0003.VDebug\Sources\VDebug.dproj" Targets="Make"/>
 		</Target>
 		<Target Name="Build">
 			<CallTarget Targets="VCore;VUtils;VDebug"/>
