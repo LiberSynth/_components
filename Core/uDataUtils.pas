@@ -150,6 +150,14 @@ function Power(const Base, Exponent: Double): Double; overload;
 function Power(const Base, Exponent: Single): Single; overload;
 { ^ Жизнь без Math в каждом юните)) ^ }
 
+type
+
+  Matrix<T> = class abstract
+
+    class function Get(Value: T; const Map: array of String): String;
+
+  end;
+
 implementation
 
 function BooleanToInt(Value: Boolean): Integer;
@@ -905,6 +913,16 @@ asm // StackAlignSafe
 @@Done:
   fstp    st(1)
 @@Exit:
+end;
+
+{ Matrix<T> }
+
+class function Matrix<T>.Get(Value: T; const Map: array of String): String;
+var
+  B: Byte;
+begin
+  Move(Value, B, 1);
+  Result := Map[B];
 end;
 
 end.
