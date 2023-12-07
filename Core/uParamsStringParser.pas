@@ -31,78 +31,41 @@ uses
   { VCL }
   Generics.Collections, SysUtils,
   { LiberSynth }
-  uConsts, uCustomStringParser, uStrUtils;
+  uConsts, uTypes, uCustomStringParser, uStrUtils;
+
+{ TODO 2 -oVasilyevSM -cTParamsReader: Как потом будут читаться пустые вложенные A:Params = () }
 
 type
 
-  TElement = (etName, etType, etValue);
+  TItemType = (itName, itType, itValue);
 
-  TKeyWordType = (
-  { inherits from uCustomStringParser.TKeyWordType }
+  TKeyType = (
+  { inherits from uCustomStringParser.TKeyType }
 
       ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktNestedOpening,
       ktNestedClosing
 
   );
-  TKeyWordTypes = set of TKeyWordType;
+  TKeyTypes = set of TKeyType;
 
-  TKeyWordHelper = record helper for TKeyWord
-
-  private
-
-    constructor Create(_KeyType: TKeyWordType; const _StrValue: String); overload;
-
-    function GetKeyType: TKeyWordType;
-    procedure SetKeyType(const _Value: TKeyWordType);
-
-    {$HINTS OFF}
-    function TypeInSet(const _Set: TKeyWordTypes): Boolean;
-    {$HINTS ON}
-
-    property KeyType: TKeyWordType read GetKeyType write SetKeyType;
-
-  end;
-
-  TReadProc = procedure of object;
+  TOperation = (opProcessing, opTerminating);
+  TNested    = (nsNested, nsNotNested, nsNoMatter);
 
   TReadInfo = record
 
-    Element: TElement;
-    TerminatorInternal: Integer;
-    Nested: Boolean;
-    NextElement: TElement;
-    ReadProc: TReadProc;
+    Operation: TOperation;
+    ItemType: TItemType;
+    Nested: TNested;
+    KeyTypes: TKeyTypes;
 
     constructor Create(
 
-        _Element: TElement;
-        _TerminatorInternal: Integer;
-        _Nested: Boolean;
-        _NextElement: TElement;
-        _ReadProc: TReadProc
+        _Operation: TOperation;
+        _ItemType: TItemType;
+        _Nested: TNested;
+        _KeyTypes: TKeyTypes
 
     );
-
-  end;
-
-  TReadInfoHelper = record helper for TReadInfo
-
-  private
-
-    function GetTerminator: TKeyWordType;
-    procedure SetTerminator(const _Value: TKeyWordType);
-
-    constructor Create(
-
-        _Element: TElement;
-        _Terminator: TKeyWordType;
-        _Nested: Boolean;
-        _NextElement: TElement;
-        _ReadProc: TReadProc
-
-    ); overload;
-
-    property Terminator: TKeyWordType read GetTerminator write SetTerminator;
 
   end;
 
@@ -112,39 +75,28 @@ type
 
     procedure Add(
 
-        _Element: TElement;
-        _TerminatorInternal: Integer;
-        _Nested: Boolean;
-        _NextElement: TElement;
-        _ReadProc: TReadProc
+        _Operation: TOperation;
+        _ItemType: TItemType;
+        _Nested: TNested;
+        _KeyTypes: TKeyTypes
 
-    ); overload;
-
-    procedure Add(
-
-        _Element: TElement;
-        _Terminator: TKeyWordType;
-        _Nested: Boolean;
-        _NextElement: TElement;
-        _ReadProc: TReadProc
-
-    ); overload;
+    );
 
   end;
 
   TSyntaxInfo = record
 
-    Element: TElement;
-    ItemBody: Boolean;
-    Nested: Boolean;
-    InvalidKeys: TKeyWordTypes;
+    ItemType: TItemType;
+    ItemStanding: TStanding;
+    Nested: TNested;
+    Keys: TKeyTypes;
 
     constructor Create(
 
-        _Element: TElement;
-        _ItemBody: Boolean;
-        _Nested: Boolean;
-        _InvalidKeys: TKeyWordTypes
+        _ItemType: TItemType;
+        _ItemStanding: TStanding;
+        _Nested: TNested;
+        _Keys: TKeyTypes
 
     );
 
@@ -156,10 +108,10 @@ type
 
     procedure Add(
 
-        _Element: TElement;
-        _ItemBody: Boolean;
-        _Nested: Boolean;
-        _InvalidKeys: TKeyWordTypes
+        _ItemType: TItemType;
+        _ItemStanding: TStanding;
+        _Nested: TNested;
+        _Keys: TKeyTypes
 
     );
 
@@ -190,57 +142,57 @@ type
           переходов на следующую строку и комментрариев. Перед значением - только пробелы, табуляция и комментарии.
       4.  Все что вызывает неадекватное чтение или неадекватную ошибку должно контролироваться в проверке синтаксиса.
           Настройка синтаксиса - InitParser - FSyntax.Add. Можно?пополнять по мере обнаружения.
+      5.  ; в конце последнего параметра в структуре допустима, но не является предпочтительной формой записи:
+          A:Params=(B:Params=(C:Integer=123;););
+          Перход на следующую строку означает конец элемента, поэтому ; в начале строки не допустима.
+      6.  Пустая вложенная структура допустима
 
   }
 
   TParamsStringParser = class(TCustomStringParser)
 
+  const
+
+    TA_TypedNested: array[Boolean] of TNested = (nsNotNested, nsNested);
+
   strict private
 
-    FElement: TElement;
+    FItemType: TItemType;
 
     FReading: TReadInfoList;
-    FSyntax: TSyntaxInfoList;
+    FExcludingSyntax: TSyntaxInfoList;
+    FStrictSyntax: TSyntaxInfoList;
 
     FDoublingChar: Char;
-
-    function ElementTerminating(
-
-        _KeyType: TKeyWordType;
-        var _NextElement: TElement;
-        var _ReadProc: TReadProc
-
-    ): Boolean;
-    procedure CheckSyntax(const _KeyWord: TKeyWord);
-    procedure CheckParams(_KeyWord: TKeyWord);
 
   protected
 
     procedure InitParser; override;
 
+    function ItemProcessingKey(_KeyWord: TKeyWord): Boolean; override;
+    function ItemTerminatingKey(_KeyWord: TKeyWord): Boolean; override;
+    procedure CheckSyntax(const _KeyWord: TKeyWord); override;
+    procedure DoAfterKey(_KeyWord: TKeyWord); override;
+
     procedure ReadName; virtual; abstract;
     procedure ReadType; virtual; abstract;
     procedure ReadValue; virtual; abstract;
-    procedure ReadParams(const _KeyWord: TKeyWord); virtual;
+    procedure ReadParams(_CursorShift: Int64); virtual; abstract;
     function IsParamsType: Boolean; virtual; abstract;
 
+    property ItemType: TItemType read FItemType write FItemType;
     property Reading: TReadInfoList read FReading;
     property DoublingChar: Char read FDoublingChar write FDoublingChar;
 
   public
 
     constructor Create(const _Source: String);
-    constructor CreateNested(_Master: TCustomStringParser; _CursorShift: Int64);
+    constructor CreateNested(_Master: TCustomStringParser);
 
     destructor Destroy; override;
 
-    (*****************************)
-    (*                           *)
-    (*   Главный рабочий метод   *)
-    (*                           *)
-    (*****************************)
-    procedure KeyEvent(const _KeyWord: TKeyWord); override;
-    procedure CompleteElement(const _KeyWord: TKeyWord);
+    procedure ProcessItem; override;
+    procedure ToggleItem(_KeyWord: TKeyWord); override;
 
   end;
 
@@ -262,23 +214,50 @@ const
 
 type
 
-  TQoutedStringRegion = class(TSpecialRegion)
+  TKeyWordHelper = record helper for TKeyWord
 
-  strict private
+  private
 
-    function Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
+    constructor Create(_KeyType: TKeyType; const _StrValue: String); overload;
 
-  protected
+    function GetKeyType: TKeyType;
+    procedure SetKeyType(const _Value: TKeyType);
 
-    function CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean; override;
-    procedure SpecialRegionClosed(_Parser: TCustomStringParser); override;
+    {$HINTS OFF}
+    function TypeInSet(const _Set: TKeyTypes): Boolean;
+    {$HINTS ON}
+
+    property KeyType: TKeyType read GetKeyType write SetKeyType;
 
   end;
 
-function KeyWordTypeToStr(Value: TKeyWordType): String;
+  TQoutedStringRegion = class(TRegion)
+
+  strict private
+
+    function Doubling(_Parser: TCustomStringParser): Boolean;
+
+  protected
+
+    function CanOpen(_Parser: TCustomStringParser): Boolean; override;
+    function CanClose(_Parser: TCustomStringParser): Boolean; override;
+    procedure RegionOpened(_Parser: TCustomStringParser); override;
+    procedure RegionClosed(_Parser: TCustomStringParser); override;
+
+  end;
+
+  TNestedParamsRegion = class(TRegion)
+
+    function CanOpen(_Parser: TCustomStringParser): Boolean; override;
+    procedure RegionOpened(_Parser: TCustomStringParser); override;
+    procedure RegionClosed(_Parser: TCustomStringParser); override;
+
+  end;
+
+function KeyTypeToStr(Value: TKeyType): String;
 const
 
-  SA_StringValues: array[TKeyWordType] of String = (
+  SA_StringValues: array[TKeyType] of String = (
 
       { ktNone           } 'None',
       { ktSourceEnd      } 'SourceEnd',
@@ -297,40 +276,17 @@ begin
   Result := SA_StringValues[Value];
 end;
 
-function StrToKeyWordType(const Value: String): TKeyWordType;
+function StrToKeyType(const Value: String): TKeyType;
 var
-  Item: TKeyWordType;
+  Item: TKeyType;
 begin
 
-  for Item := Low(TKeyWordType) to High(TKeyWordType) do
-    if SameText(KeyWordTypeToStr(Item), Value) then
+  for Item := Low(TKeyType) to High(TKeyType) do
+    if SameText(KeyTypeToStr(Item), Value) then
       Exit(Item);
 
-  raise EConvertError.CreateFmt('%s is not a TKeyWordType value', [Value]);
+  raise EConvertError.CreateFmt('%s is not a TKeyType value', [Value]);
 
-end;
-
-{ TKeyWordHelper }
-
-constructor TKeyWordHelper.Create(_KeyType: TKeyWordType; const _StrValue: String);
-begin
-  Create(Integer(_KeyType), _StrValue);
-end;
-
-function TKeyWordHelper.GetKeyType: TKeyWordType;
-begin
-  Result := TKeyWordType(KeyTypeInternal)
-end;
-
-procedure TKeyWordHelper.SetKeyType(const _Value: TKeyWordType);
-begin
-  if Integer(_Value) <> KeyTypeInternal then
-    KeyTypeInternal := Integer(_Value)
-end;
-
-function TKeyWordHelper.TypeInSet(const _Set: TKeyWordTypes): Boolean;
-begin
-  Result := KeyType in _Set;
 end;
 
 { TReadInfo }
@@ -338,41 +294,18 @@ end;
 constructor TReadInfo.Create;
 begin
 
-  Element            := _Element;
-  TerminatorInternal := _TerminatorInternal;
-  Nested             := _Nested;
-  NextElement        := _NextElement;
-  ReadProc           := _ReadProc;
+  Operation := _Operation;
+  ItemType  := _ItemType;
+  KeyTypes  := _KeyTypes;
+  Nested    := _Nested;
 
-end;
-
-{ TReadInfoHelper }
-
-constructor TReadInfoHelper.Create(_Element: TElement; _Terminator: TKeyWordType; _Nested: Boolean; _NextElement: TElement; _ReadProc: TReadProc);
-begin
-  Create(_Element, Integer(_Terminator), _Nested, _NextElement, _ReadProc);
-end;
-
-function TReadInfoHelper.GetTerminator: TKeyWordType;
-begin
-  Result := TKeyWordType(TerminatorInternal);
-end;
-
-procedure TReadInfoHelper.SetTerminator(const _Value: TKeyWordType);
-begin
-  TerminatorInternal := Integer(_Value);
 end;
 
 { TReadInfoList }
 
-procedure TReadInfoList.Add(_Element: TElement; _TerminatorInternal: Integer; _Nested: Boolean; _NextElement: TElement; _ReadProc: TReadProc);
+procedure TReadInfoList.Add;
 begin
-  inherited Add(TReadInfo.Create(_Element, _TerminatorInternal, _Nested, _NextElement,_ReadProc));
-end;
-
-procedure TReadInfoList.Add(_Element: TElement; _Terminator: TKeyWordType; _Nested: Boolean; _NextElement: TElement; _ReadProc: TReadProc);
-begin
-  inherited Add(TReadInfo.Create(_Element, _Terminator, _Nested, _NextElement,_ReadProc));
+  inherited Add(TReadInfo.Create(_Operation, _ItemType, _Nested, _KeyTypes));
 end;
 
 { TSyntaxInfo }
@@ -380,10 +313,10 @@ end;
 constructor TSyntaxInfo.Create;
 begin
 
-  Element     := _Element;
-  ItemBody    := _ItemBody;
-  Nested      := _Nested;
-  InvalidKeys := _InvalidKeys;
+  ItemType     := _ItemType;
+  ItemStanding := _ItemStanding;
+  Nested       := _Nested;
+  Keys         := _Keys;
 
 end;
 
@@ -391,7 +324,7 @@ end;
 
 procedure TSyntaxInfoList.Add;
 begin
-  inherited Add(TSyntaxInfo.Create(_Element, _ItemBody, _Nested, _InvalidKeys));
+  inherited Add(TSyntaxInfo.Create(_ItemType, _ItemStanding, _Nested, _Keys));
 end;
 
 { TParamsStringParser }
@@ -399,8 +332,9 @@ end;
 constructor TParamsStringParser.Create;
 begin
 
-  FReading := TReadInfoList.Create;
-  FSyntax  := TSyntaxInfoList.Create;
+  FReading         := TReadInfoList.Create;
+  FExcludingSyntax := TSyntaxInfoList.Create;
+  FStrictSyntax    := TSyntaxInfoList.Create;
 
   inherited Create(_Source);
 
@@ -410,98 +344,144 @@ constructor TParamsStringParser.CreateNested;
 begin
 
   FReading := TReadInfoList.Create;
-  FSyntax  := TSyntaxInfoList.Create;
+  FExcludingSyntax := TSyntaxInfoList.Create;
+  FStrictSyntax    := TSyntaxInfoList.Create;
 
-  inherited CreateNested(_Master, _CursorShift);
+  inherited CreateNested(_Master);
 
 end;
 
 destructor TParamsStringParser.Destroy;
 begin
 
+  FreeAndNil(FStrictSyntax );
+  FreeAndNil(FExcludingSyntax);
   FreeAndNil(FReading);
-  FreeAndNil(FSyntax );
 
   inherited Destroy;
 
 end;
 
-function TParamsStringParser.ElementTerminating(_KeyType: TKeyWordType; var _NextElement: TElement; var _ReadProc: TReadProc): Boolean;
+function TParamsStringParser.ItemProcessingKey(_KeyWord: TKeyWord): Boolean;
 var
   RI: TReadInfo;
 begin
 
-  Result := ItemBody or (FElement = etValue);
+  for RI in FReading do
 
-  if Result then
+    if
 
-    for RI in FReading do
+        (RI.Operation = opProcessing) and
+        (RI.ItemType  = ItemType) and
+        (RI.Nested in [TA_TypedNested[Nested], nsNoMatter]) and
+        _KeyWord.TypeInSet(RI.KeyTypes)
 
-      if
+    then Exit(True);
 
-          (RI.Element    = FElement) and
-          (RI.Terminator = _KeyType) and
-          (RI.Nested     = Nested  )
+  Result := False;
 
-      then begin
+end;
 
-        _NextElement := RI.NextElement;
-        _ReadProc    := RI.ReadProc;
+function TParamsStringParser.ItemTerminatingKey(_KeyWord: TKeyWord): Boolean;
+var
+  RI: TReadInfo;
+begin
 
-        Exit;
+  for RI in FReading do
 
-      end;
+    if
+
+        (RI.Operation = opTerminating) and
+        (RI.ItemType  = FItemType) and
+        (RI.Nested in [TA_TypedNested[Nested], nsNoMatter]) and
+        _KeyWord.TypeInSet(RI.KeyTypes)
+
+    then Exit(True);
 
   Result := False;
 
 end;
 
 procedure TParamsStringParser.CheckSyntax(const _KeyWord: TKeyWord);
+
+  function _GetMessage: String;
+  begin
+
+    if _KeyWord.KeyType = ktSourceEnd then Result := 'Unexpected source end'
+    else if Length(_KeyWord.StrValue) > 0 then Result := Format('Unexpected keyword ''%s''', [_KeyWord.StrValue])
+    else Result := Format('Unexpected key ''%s''', [Copy(Source, Cursor, 1)])
+
+  end;
+
 var
   SI: TSyntaxInfo;
 begin
 
-  for SI in FSyntax do
+
+  inherited CheckSyntax(_KeyWord);
+
+  for SI in FExcludingSyntax do
 
     if
 
-        (SI.Element = FElement) and
-        (SI.ItemBody = ItemBody) and
-        (SI.Nested = Nested) and
-        _KeyWord.TypeInSet(SI.InvalidKeys)
+        (SI.ItemType = ItemType) and
+        (SI.ItemStanding = ItemStanding) and
+        (SI.Nested in [TA_TypedNested[Nested], nsNoMatter]) and
+        _KeyWord.TypeInSet(SI.Keys)
 
-    then
+    then begin
 
-      raise EParamsReadException.CreateFmt('Unexcpected keyword ''%s''', [_KeyWord.StrValue]);
+      raise EParamsReadException.Create(_GetMessage);
+
+    end;
+
+  for SI in FStrictSyntax do
+
+    if
+
+        (SI.ItemType = ItemType) and
+        (SI.ItemStanding = ItemStanding) and
+        (SI.Nested in [TA_TypedNested[Nested], nsNoMatter]) and
+        not _KeyWord.TypeInSet(SI.Keys)
+
+    then begin
+
+      raise EParamsReadException.Create(_GetMessage);
+
+    end;
 
 end;
 
-procedure TParamsStringParser.CheckParams(_KeyWord: TKeyWord);
+procedure TParamsStringParser.DoAfterKey(_KeyWord: TKeyWord);
+begin
+  if Nested and (_KeyWord.KeyType = ktNestedClosing) then
+    Terminate;
+end;
+
+procedure TParamsStringParser.ToggleItem(_KeyWord: TKeyWord);
 begin
 
-  if (FElement = etValue) and IsParamsType then begin
+  case ItemType of
 
-    { Контейнер. Проверка синтаксиса. }
-    if not _KeyWord.TypeInSet([ktSpace, ktLineEnd, ktNestedOpening]) then
-      raise EParamsReadException.CreateFmt('''('' expected but ''%s'' found', [_KeyWord.StrValue]);
+    itName:
 
-    { Контейнер. Вход во вложенную структуру. }
-    if _KeyWord.KeyType = ktNestedOpening then
-      ReadParams(_KeyWord);
+      case _KeyWord.KeyType of
 
+        ktTypeIdent: ItemType := itType;
+        ktAssigning: ItemType := itValue;
+
+      else
+        Exit;
+      end;
+
+    itType:  ItemType := itValue;
+    itValue: ItemType := itName;
+
+  else
+    Exit;
   end;
 
-  { Вложенный объект. Завершение. }
-  if Nested then begin
-
-    if _KeyWord.KeyType = ktNestedClosing then
-      Terminate;
-
-    { Вложенный объект. Проверка синтаксиса. }
-    if (_KeyWord.KeyType = ktSourceEnd) and not Terminated then
-      raise EParamsReadException.Create('Unterminated nested params');
-
-  end;
+  inherited ToggleItem(_KeyWord);
 
 end;
 
@@ -526,78 +506,91 @@ begin
 
   with Reading do begin
 
-    {   Element  Terminator        Nested NextElement ReadProc }
-    Add(etName,  ktTypeIdent,      False, etType,     ReadName );
-    Add(etName,  ktTypeIdent,      True,  etType,     ReadName );
-    Add(etName,  ktAssigning,      False, etValue,    ReadName );
-    Add(etName,  ktAssigning,      True,  etValue,    ReadName );
-    Add(etType,  ktAssigning,      False, etValue,    ReadType );
-    Add(etType,  ktAssigning,      True,  etValue,    ReadType );
-    Add(etValue, ktLineEnd,        False, etName,     ReadValue);
-    Add(etValue, ktLineEnd,        True,  etName,     ReadValue);
-    Add(etValue, ktSplitter,       False, etName,     ReadValue);
-    Add(etValue, ktSplitter,       True,  etName,     ReadValue);
-    Add(etValue, ktNestedClosing,  True,  etName,     ReadValue);
-    Add(etValue, ktSourceEnd,      False, etName,     ReadValue);
-    Add(etValue, ktSourceEnd,      True,  etName,     ReadValue);
-    Add(etValue, ktStringBorder,   True,  etName,     ReadValue);
-    Add(etValue, ktStringBorder,   False, etName,     ReadValue);
+// ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktNestedOpening, ktNestedClosing
+    {   Operation      ItemType  Nested      KeyTypes                                      }
+    Add(opProcessing,  itName,   nsNoMatter, [ktLineEnd, ktSpace, ktTypeIdent, ktAssigning]);
+    Add(opTerminating, itName,   nsNoMatter, [ktTypeIdent, ktAssigning]                    );
+
+    Add(opProcessing,  itType,   nsNoMatter, [ktLineEnd, ktSpace, ktAssigning]);
+    Add(opTerminating, itType,   nsNoMatter, [ktAssigning]                    );
+
+    Add(opProcessing,  itValue,  nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]);
+    Add(opTerminating, itValue,  nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]);
+
+    Add(opProcessing,  itValue,  nsNested,    [ktLineEnd, ktSplitter, ktSourceEnd, ktNestedClosing]);
+    Add(opTerminating, itValue,  nsNested,    [ktLineEnd, ktSplitter, ktSourceEnd, ktNestedClosing]);
 
   end;
 
-  with FSyntax do begin
+  with FExcludingSyntax do begin
 
-    {   Element ItemBody Nested InvalidKeys                              }
-    Add(etName, False,   False, [ktNestedOpening, ktNestedClosing]       );
-    Add(etName, False,   True,  [ktNestedOpening]                        );
-    Add(etName, True,    True,  [ktNestedClosing]                        );
-    Add(etName, True,    False, [ktNestedClosing, ktSourceEnd]           );
-    Add(etType, True,    False, [ktNestedClosing, ktLineEnd, ktSourceEnd]);
-    Add(etType, True,    True,  [ktNestedClosing, ktLineEnd, ktSourceEnd]);
+    {   ItemType  ItemStanding  Nested      Keys            }
+    Add(itName,   stInside,     nsNoMatter, [ktSourceEnd]);
+    Add(itName,   stAfter,      nsNoMatter, [ktSourceEnd]);
+    Add(itType,   stInside,     nsNoMatter, [ktSourceEnd]);
+    Add(itType,   stAfter,      nsNoMatter, [ktSourceEnd]);
 
   end;
 
-  {                RegionClass           OpeningKey        ClosingKey        UnterminatedMessage  }
-  AddSpecialRegion(TQoutedStringRegion, KWR_QUOTE_SINGLE, KWR_QUOTE_SINGLE, 'Unterminated string');
-  AddSpecialRegion(TQoutedStringRegion, KWR_QUOTE_DOBLE,  KWR_QUOTE_DOBLE,  'Unterminated string');
+  with FStrictSyntax do begin
 
-end;
-
-procedure TParamsStringParser.ReadParams(const _KeyWord: TKeyWord);
-begin
-  FElement := etName;
-end;
-
-procedure TParamsStringParser.KeyEvent(const _KeyWord: TKeyWord);
-begin
-
-  inherited KeyEvent(_KeyWord);
-
-  CheckSyntax(_KeyWord);
-  CheckParams(_KeyWord);
-
-  CompleteElement(_KeyWord);
-
-end;
-
-procedure TParamsStringParser.CompleteElement(const _KeyWord: TKeyWord);
-var
-  ReadProc: TReadProc;
-  Next: TElement;
-begin
-
-  if ElementTerminating(_KeyWord.KeyType, Next, ReadProc) then begin
-
-    ReadProc;
-    FElement := Next;
+    {   ItemType  ItemStanding Nested       Keys                                                          }
+    Add(itName,   stBefore,    nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                             );
+    Add(itName,   stBefore,    nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]            );
+    Add(itValue,  stBefore,    nsNoMatter,  [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]);
+    Add(itValue,  stAfter,     nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                 );
+    Add(itValue,  stAfter,     nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing, ktSplitter]);
 
   end;
 
+  {         RegionClass          OpeningKey           ClosingKey           Caption }
+  AddRegion(TQoutedStringRegion, KWR_QUOTE_SINGLE,    KWR_QUOTE_SINGLE,    'string'    );
+  AddRegion(TQoutedStringRegion, KWR_QUOTE_DOBLE,     KWR_QUOTE_DOBLE,     'string'    );
+  AddRegion(TNestedParamsRegion, KWR_OPENING_BRACKET, KWR_CLOSING_BRACKET, 'parameters');
+
+end;
+
+procedure TParamsStringParser.ProcessItem;
+begin
+
+  case ItemType of
+
+    itName:  ReadName;
+    itType:  ReadType;
+    itValue: ReadValue;
+
+  end;
+
+  inherited ProcessItem;
+
+end;
+
+{ TKeyWordHelper }
+
+constructor TKeyWordHelper.Create(_KeyType: TKeyType; const _StrValue: String);
+begin
+  Create(Integer(_KeyType), _StrValue);
+end;
+
+function TKeyWordHelper.GetKeyType: TKeyType;
+begin
+  Result := TKeyType(KeyTypeInternal)
+end;
+
+procedure TKeyWordHelper.SetKeyType(const _Value: TKeyType);
+begin
+  if Integer(_Value) <> KeyTypeInternal then
+    KeyTypeInternal := Integer(_Value)
+end;
+
+function TKeyWordHelper.TypeInSet(const _Set: TKeyTypes): Boolean;
+begin
+  Result := KeyType in _Set;
 end;
 
 { TQoutedStringRegion }
 
-function TQoutedStringRegion.Doubling(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
+function TQoutedStringRegion.Doubling(_Parser: TCustomStringParser): Boolean;
 begin
 
   Result :=
@@ -608,21 +601,49 @@ begin
   if Result then begin
 
     _Parser.MoveEvent;
-    _Parser.Move(2);
+    _Parser.Move;
 
-  end else _Handled := False;
+  end;
 
 end;
 
-function TQoutedStringRegion.CanClose(_Parser: TCustomStringParser; var _Handled: Boolean): Boolean;
+function TQoutedStringRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
 begin
-  Result := inherited and not Doubling(_Parser, _Handled);
+
+  with _Parser as TParamsStringParser do
+
+    Result :=
+
+        (ItemType = itValue) and
+        (ItemStanding = stBefore) and
+        inherited;
+
 end;
 
-procedure TQoutedStringRegion.SpecialRegionClosed(_Parser: TCustomStringParser);
+function TQoutedStringRegion.CanClose(_Parser: TCustomStringParser): Boolean;
+begin
+  Result := inherited and not Doubling(_Parser);
+end;
+
+procedure TQoutedStringRegion.RegionOpened(_Parser: TCustomStringParser);
 begin
 
-  inherited SpecialRegionClosed(_Parser);
+  inherited RegionOpened(_Parser);
+
+//  with _Parser as TParamsStringParser do begin
+//
+//    ItemStanding := stInside;
+//    ItemStart := Cursor;
+//    FLocation.Remember(Cursor);
+//
+//  end;
+
+end;
+
+procedure TQoutedStringRegion.RegionClosed(_Parser: TCustomStringParser);
+begin
+
+  inherited RegionClosed(_Parser);
 
   with _Parser as TParamsStringParser do begin
 
@@ -632,14 +653,49 @@ begin
     Move(- ClosingKey.KeyLength);
     try
 
-      CompleteElement(ClosingKey);
+      ProcessItem;
 
     finally
 
       Move(ClosingKey.KeyLength);
       DoublingChar := #0;
+      Location.Remember(Cursor);
+
 
     end;
+
+  end;
+
+end;
+
+{ TNestedParamsRegion }
+
+function TNestedParamsRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
+begin
+  Result := inherited and (_Parser as TParamsStringParser).IsParamsType;
+end;
+
+procedure TNestedParamsRegion.RegionOpened(_Parser: TCustomStringParser);
+begin
+
+  with _Parser as TParamsStringParser do begin
+
+    Move(OpeningKey.KeyLength);
+    ReadParams({}OpeningKey.KeyLength{});
+
+  end;
+
+end;
+
+procedure TNestedParamsRegion.RegionClosed(_Parser: TCustomStringParser);
+begin
+
+  with _Parser as TParamsStringParser do begin
+
+    ItemType := itValue;
+    ItemStanding := stAfter;
+    ItemStart := 0;
+    Location.Remember(Cursor + ClosingKey.KeyLength);
 
   end;
 

@@ -38,8 +38,8 @@ type
 
   TBOM = (bomForward, bomBackward);
 
-  TProc = procedure;
-  TProcedure = procedure () of object;
+  TRegProc = procedure;
+  TObjProc = procedure () of object;
 
 implementation
 

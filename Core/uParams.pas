@@ -44,8 +44,6 @@ type
 
   TParams = class;
 
-  { TParam - объект, к которому нет доступа снаружи, потому что создавать его без контейнера и изменять его свойства не
-    имеет никакого смысла. Все свойства объекта TParam задаются через контейнер TParams. }
   TParam = class
 
   const
@@ -261,6 +259,8 @@ type
 
   end;
 
+  TParamClass = class of TParam;
+
   TParamsListHolder = class(TObjectList<TMultiParamList>)
 
   private
@@ -291,16 +291,18 @@ type
     FItems: TParamList;
     FListHolder: TParamsListHolder;
 
-    function GetList(const _Path: String): TMultiParamList;
-    function GetCount: Integer;
-
     function Add(const _Name: String): TParam;
 
     function FindPath(var _Path: String; var _Params: TParams): Boolean;
     function GetPath(var _Path: String): TParams;
     function ParamByName(const _Path: String): TParam;
 
+    function GetList(const _Path: String): TMultiParamList;
+    function GetCount: Integer;
+
   private
+
+    function CreateNewParam(const _Name: String): TParam;
 
     function GetIsNull(const _Path: String): Boolean;
     function GetAsBoolean(const _Path: String): Boolean;
@@ -339,6 +341,7 @@ type
 
   protected
 
+    function ParamClass: TParamClass; virtual;
     function ParamsReaderClass: TParamsReaderClass; virtual;
 
   public
@@ -382,7 +385,7 @@ type
     procedure DeleteValue(const _Path: String);
     procedure Clear;
 
-    function SaveToString: String; virtual;
+    function SaveToString: String;
     procedure LoadFromString(const _Value: String);
     { TODO 5 -oVasilyevSM -cuParams: SaveToStream/LoadFromStream }
 
@@ -414,6 +417,7 @@ type
   strict private
 
     FParams: TParams;
+    FPresetTypes: Boolean;
 
     FCurrentName: String;
     FCurrentType: TParamDataType;
@@ -422,24 +426,23 @@ type
     function TrimDigital(const _Value: String): String;
     function UndoubleSymbols(const _Value: String): String;
 
+    property PresetTypes: Boolean read FPresetTypes;
+
   private
 
     constructor Create(const _Source: String; _Params: TParams);
-    constructor CreateNested(
-
-        _MasterParser: TParamsReader;
-        _Params: TParams;
-        _CursorShift: Int64
-
-    );
+    constructor CreateNested(_MasterParser: TParamsReader; _Params: TParams);
 
   protected
 
     procedure ReadName; override;
     procedure ReadType; override;
     procedure ReadValue; override;
-    procedure ReadParams(const _KeyWord: TKeyWord); override;
+    procedure ReadParams(_CursorShift: Int64); override;
     function IsParamsType: Boolean; override;
+
+    property CurrentName: String read FCurrentName;
+    property CurrentType: TParamDataType read FCurrentType;
 
   public
 
@@ -1404,7 +1407,7 @@ end;
 
 function TMultiParamList.CreateNewParam: TParam;
 begin
-  Result := TParam.Create(FName, FParams.PathSeparator);
+  Result := FParams.CreateNewParam(FName);
 end;
 
 function TMultiParamList.GetCount: Integer;
@@ -1675,29 +1678,19 @@ begin
 
 end;
 
-function TParams.GetList(const _Path: String): TMultiParamList;
-var
-  PathRest: String;
-  Params: TParams;
+function TParams.ParamClass: TParamClass;
 begin
-
-  PathRest := _Path;
-
-  if not FindPath(PathRest, Params) then
-    raise EParamsException.CreateFmt('Param %s not found', [_Path]);
-
-  Result := Params.ListHolder.Get(PathRest, Params);
-
+  Result := TParam;
 end;
 
-function TParams.GetCount: Integer;
+function TParams.CreateNewParam(const _Name: String): TParam;
 begin
-  Result := Items.Count;
+  Result := ParamClass.Create(_Name, PathSeparator);
 end;
 
 function TParams.Add(const _Name: String): TParam;
 begin
-  Result := TParam.Create(_Name, FPathSeparator);
+  Result := CreateNewParam(_Name);
   Items.Add(Result);
 end;
 
@@ -1760,6 +1753,26 @@ end;
 function TParams.ParamsReaderClass: TParamsReaderClass;
 begin
   Result := TParamsReader;
+end;
+
+function TParams.GetList(const _Path: String): TMultiParamList;
+var
+  PathRest: String;
+  Params: TParams;
+begin
+
+  PathRest := _Path;
+
+  if not FindPath(PathRest, Params) then
+    raise EParamsException.CreateFmt('Param %s not found', [_Path]);
+
+  Result := Params.ListHolder.Get(PathRest, Params);
+
+end;
+
+function TParams.GetCount: Integer;
+begin
+  Result := Items.Count;
 end;
 
 function TParams.GetIsNull(const _Path: String): Boolean;
@@ -2167,14 +2180,40 @@ end;
 function TParams.SaveToString: String;
 const
 
-  SC_SINGLE_PARAM_TYPED_MULTI_STRING     = '%0:s: %2:s = %1:s' + CRLF;
-  SC_SINGLE_PARAM_UNTYPED_MULTI_STRING   = '%0:s = %1:s' + CRLF;
-  SC_SINGLE_PARAM_TYPED_SINGLE_STRING    = '%0:s:%2:s=%1:s;';
-  SC_SINGLE_PARAM_UNTYPED_SINGLE_STRING  = '%0:s=%1:s;';
-  SC_NESTED_PARAMS_TYPED_MULTI_STRING    = '%0:s: %2:s = (' + CRLF + '%1:s' + ')' + CRLF;
-  SC_NESTED_PARAMS_UNTYPED_MULTI_STRING  = '%0:s = (' + CRLF + '%1:s' + ')' + CRLF;
-  SC_NESTED_PARAMS_TYPED_SINGLE_STRING   = '%0:s:%2:s=(%1:s);';
-  SC_NESTED_PARAMS_UNTYPED_SINGLE_STRING = '%0:s=(%1:s);';
+  SC_SINGLE_TYPED_MULTI     = '%0:s: %2:s = %1:s' + CRLF;
+  SC_SINGLE_UNTYPED_MULTI   = '%0:s = %1:s' + CRLF;
+  SC_SINGLE_TYPED_SINGLE    = '%0:s:%2:s=%1:s;';
+  SC_SINGLE_UNTYPED_SINGLE  = '%0:s=%1:s;';
+  SC_NESTED_TYPED_MULTI    = '%0:s: %2:s = (' + CRLF + '%1:s' + ')' + CRLF;
+  SC_NESTED_UNTYPED_MULTI  = '%0:s = (' + CRLF + '%1:s' + ')' + CRLF;
+  SC_NESTED_TYPED_SINGLE   = '%0:s:%2:s=(%1:s);';
+  SC_NESTED_UNTYPED_SINGLE = '%0:s=(%1:s);';
+
+  SA_SingleFormatMap: array[0..7] of String = (
+
+      {                                                } SC_SINGLE_TYPED_MULTI,
+      { soSingleString                                 } SC_SINGLE_TYPED_SINGLE,
+      {                soForceQuoteStrings             } SC_SINGLE_TYPED_MULTI,
+      { soSingleString soForceQuoteStrings             } SC_SINGLE_TYPED_SINGLE,
+      {                                    soTypesFree } SC_SINGLE_UNTYPED_MULTI,
+      { soSingleString                     soTypesFree } SC_SINGLE_UNTYPED_SINGLE,
+      {                soForceQuoteStrings soTypesFree } SC_SINGLE_UNTYPED_MULTI,
+      { soSingleString soForceQuoteStrings soTypesFree } SC_SINGLE_UNTYPED_SINGLE
+
+  );
+
+  SA_NestedFormatMap: array[0..7] of String = (
+
+      {                                                } SC_NESTED_TYPED_MULTI,
+      { soSingleString                                 } SC_NESTED_TYPED_SINGLE,
+      {                soForceQuoteStrings             } SC_NESTED_TYPED_MULTI,
+      { soSingleString soForceQuoteStrings             } SC_NESTED_TYPED_SINGLE,
+      {                                    soTypesFree } SC_NESTED_UNTYPED_MULTI,
+      { soSingleString                     soTypesFree } SC_NESTED_UNTYPED_SINGLE,
+      {                soForceQuoteStrings soTypesFree } SC_NESTED_UNTYPED_MULTI,
+      { soSingleString soForceQuoteStrings soTypesFree } SC_NESTED_UNTYPED_SINGLE
+
+  );
 
   function _GetNested(_Param: TParam): String;
   begin
@@ -2197,55 +2236,30 @@ const
           (Pos(CR,   Result) > 0) or
           (Pos(LF,   Result) > 0) or
           (Pos(';',  Result) > 0) or
-          (Pos('''', Result) > 0) or
-          (Pos('"',  Result) > 0) or
+          (Pos('=',  Result) > 0) or
+          (Pos(':',  Result) > 0){ or
           (Pos('(',  Result) > 0) or
-          (Pos(')',  Result) > 0)
+          (Pos(')',  Result) > 0)}
 
       then Result := QuoteStr(Result);
 
   end;
 
 var
-  SingleParamFormat: String;
-  NestedParamsFormat: String;
+  SingleFormat: String;
+  NestedFormat: String;
   Param: TParam;
 begin
 
-  if soSingleString in SaveToStringOptions then
-
-    if soTypesFree in SaveToStringOptions then begin
-
-      SingleParamFormat  := SC_SINGLE_PARAM_UNTYPED_SINGLE_STRING;
-      NestedParamsFormat := SC_NESTED_PARAMS_UNTYPED_SINGLE_STRING;
-
-    end else begin
-
-      SingleParamFormat  := SC_SINGLE_PARAM_TYPED_SINGLE_STRING;
-      NestedParamsFormat := SC_NESTED_PARAMS_TYPED_SINGLE_STRING;
-
-    end
-
-  else
-
-    if soTypesFree in SaveToStringOptions then begin
-
-      SingleParamFormat  := SC_SINGLE_PARAM_UNTYPED_MULTI_STRING;
-      NestedParamsFormat := SC_NESTED_PARAMS_UNTYPED_MULTI_STRING;
-
-    end else begin
-
-      SingleParamFormat  := SC_SINGLE_PARAM_TYPED_MULTI_STRING;
-      NestedParamsFormat := SC_NESTED_PARAMS_TYPED_MULTI_STRING;
-
-    end;
+  SingleFormat := Matrix<TSaveToStringOptions>.Get(SaveToStringOptions, SA_SingleFormatMap);
+  NestedFormat := Matrix<TSaveToStringOptions>.Get(SaveToStringOptions, SA_NestedFormatMap);
 
   Result := '';
   for Param in Items do
 
     if Param.DataType = dtParams then
 
-      Result := Result + Format(NestedParamsFormat, [
+      Result := Result + Format(NestedFormat, [
 
           Param.Name,
           _GetNested(Param),
@@ -2255,7 +2269,7 @@ begin
 
     else
 
-      Result := Result + Format(SingleParamFormat, [
+      Result := Result + Format(SingleFormat, [
 
           Param.Name,
           _QuoteString(Param),
@@ -2265,6 +2279,8 @@ begin
 
   if soSingleString in SaveToStringOptions then
     CutStr(Result, 1);
+
+  { TODO 2 -oVasilyevSM -cTParams.SaveToString: Кто-то добавляет лишний CRLF в конце }
 
 end;
 
@@ -2293,7 +2309,7 @@ end;
 
 constructor TParamsReader.CreateNested;
 begin
-  inherited CreateNested(_MasterParser, _CursorShift);
+  inherited CreateNested(_MasterParser);
   FParams := _Params;
 end;
 
@@ -2305,13 +2321,13 @@ begin
   { Определенный заранее тип данных }
   if
 
-      (FCurrentType = dtUnknown) and
-      FParams.FindParam(FCurrentName, P) and
+      (CurrentType = dtUnknown) and
+      Params.FindParam(CurrentName, P) and
       (P.DataType <> dtUnknown)
 
   then FCurrentType := P.DataType;
 
-  if FCurrentType = dtUnknown then
+  if CurrentType = dtUnknown then
     raise EParamsReadException.Create('Unknown param data type');
 
 end;
@@ -2340,7 +2356,7 @@ begin
 
   Value := ReadItem(True);
 
-  TParam.ValidateName(Value, FParams.PathSeparator);
+  TParam.ValidateName(Value, Params.PathSeparator);
   FCurrentName := Value;
 
 end;
@@ -2359,17 +2375,18 @@ begin
 
   Value := ReadItem(False);
 
-  { Здесь нужно это вызывать. Тип может не храниться в строке и его чтения не будет. Тогда вытаскиваем его здесь. }
-  CheckPresetType;
+  if PresetTypes then
+    CheckPresetType;
 
   { Считывание с зарегистрированными типами должно исполнятся в потомках с помощью отдельных свойств (Registered итд). }
-  with FParams.AddList(FCurrentName) do begin
+  with Params.AddList(CurrentName) do begin
 
-    Index := Append;
+    if PresetTypes and (Count > 0) then Index := 0
+    else Index := Append;
 
     if Length(Value) > 0 then
 
-      case FCurrentType of
+      case CurrentType of
 
         dtBoolean:    AsBoolean   [Index] := StrToBoolean(             Value );
         dtInteger:    AsInteger   [Index] := StrToInt(     TrimDigital(Value));
@@ -2388,7 +2405,7 @@ begin
     else begin
 
       IsNull[Index] := True;
-      SetDataType(Index, FCurrentType);
+      SetDataType(Index, CurrentType);
 
     end;
 
@@ -2399,45 +2416,44 @@ begin
 
 end;
 
-procedure TParamsReader.ReadParams(const _KeyWord: TKeyWord);
+procedure TParamsReader.ReadParams(_CursorShift: Int64);
 var
-  P: TParams;
+  P: TParam;
+  NestedParams: TParams;
 begin
 
-  P := TParams.Create(FParams.PathSeparator, FParams.SaveToStringOptions);
-  try
+  if PresetTypes and Params.FindParam(CurrentName, dtParams, P) then NestedParams := P.AsParams
+  else begin
 
-    with TParamsReader.CreateNested(Self, P, _KeyWord.KeyLength) do
-
-      try
-
-        Read;
-
-      finally
-
-        Self.Move(Cursor - _KeyWord.KeyLength - Self.Cursor);
-        Self.Location := Location;
-
-        Free;
-
-      end;
-
-  finally
-
-    FParams.SetAsParams(FCurrentName, P);
-
-    CompleteItem;
-    FCurrentName := '';
-    FCurrentType := dtUnknown;
-
-    inherited ReadParams(_KeyWord);
+    NestedParams := TParams.Create(Params.PathSeparator, Params.SaveToStringOptions);
+    with Params.AddList(CurrentName) do
+      Items[Append].SetAsParams(NestedParams);
 
   end;
+
+  with TParamsReader.CreateNested(Self, NestedParams) do
+
+    try
+
+      Read;
+
+    finally
+
+      Self.Move(Cursor - _CursorShift - Self.Cursor);
+      Self.Location := Location;
+
+      Free;
+
+    end;
+
+  FCurrentName := '';
+  FCurrentType := dtUnknown;
 
 end;
 
 function TParamsReader.IsParamsType: Boolean;
 begin
+  CheckPresetType;
   Result := FCurrentType = dtParams;
 end;
 

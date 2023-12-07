@@ -204,7 +204,7 @@ begin
   if SameText(Value, 'FALSE') or SameText(Value, '0') then Exit(False);
   if SameText(Value, 'TRUE' ) or SameText(Value, '1') then Exit(True );
 
-  raise EConvertError.CreateFmt('%s is not a Boolean value', [Value]);
+  raise EConvertError.CreateFmt('''%s'' is not a Boolean value', [Value]);
 
 end;
 
