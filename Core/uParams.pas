@@ -57,6 +57,8 @@ type
     FIsNull: Boolean;
     FPathSeparator: Char;
     FStrictDataType: Boolean;
+    { TODO -oVasilyevSM -cTParam: Ќаверное, более современным способом было бы использовать дженерик здесь.  ласс
+      TValue<T>, и пересоздавать его при смене типа данных. ј как он там будет с пам€тью орудовать - не наша проблема. }
     FData: Pointer;
 
     procedure SetIsNull(const _Value: Boolean);
@@ -100,8 +102,6 @@ type
     procedure SetAsParams(_Value: TParams);
     { ^ Using FData methods ^ }
 
-    constructor Create(const _Name: String; const _PathSeparator: Char = '.');
-
     procedure Clear;
     { ƒл€ передачи без разбора типов }
     procedure AssignValue(_Source: TParam; _ForceAdding: Boolean);
@@ -126,6 +126,10 @@ type
 //    property AsData: TData read GetAsData write SetAsData;
 
     property AsParams: TParams read GetAsParams;
+
+  protected
+
+    constructor Create(const _Name: String; const _PathSeparator: Char = '.'); virtual;
 
   public
 
@@ -330,7 +334,6 @@ type
     procedure SetAsString(const _Path: String; const _Value: String);
     procedure SetAsBLOB(const _Path: String; const _Value: BLOB);
     procedure SetAsData(const _Path: String; const _Value: TData);
-    procedure SetAsParams(const _Path: String; _Value: TParams);
 
     function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
     function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
@@ -343,6 +346,7 @@ type
 
     function ParamClass: TParamClass; virtual;
     function ParamsReaderClass: TParamsReaderClass; virtual;
+    function FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String; virtual;
 
   public
 
@@ -440,6 +444,7 @@ type
     procedure ReadValue; override;
     procedure ReadParams(_CursorShift: Int64); override;
     function IsParamsType: Boolean; override;
+    procedure ParamRead(_Param: TParam); virtual;
 
     property CurrentName: String read FCurrentName;
     property CurrentType: TParamDataType read FCurrentType;
@@ -1900,11 +1905,6 @@ begin
   GetParam(_Path).AsData := _Value;
 end;
 
-procedure TParams.SetAsParams(const _Path: String; _Value: TParams);
-begin
-  GetParam(_Path).SetAsParams(_Value);
-end;
-
 function TParams.FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean;
 var
   Params: TParams;
@@ -2017,6 +2017,27 @@ var
 begin
   Result := FindParam(_Path, dtString, P);
   if Result then _Value := P.AsString;
+end;
+
+function TParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String;
+const
+
+  SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
+  SC_VALUE_TYPED   = '%0:s:%1:s=%2:s%3:s';
+
+var
+  ParamFormat: String;
+  Splitter: String;
+begin
+
+  if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
+  else ParamFormat := SC_VALUE_TYPED;
+
+  if soSingleString in SaveToStringOptions then Splitter := ';'
+  else Splitter := CRLF;
+
+  Result := Format(ParamFormat, [_Name, _Type, _Value, Splitter]);
+
 end;
 
 function TParams.FindBLOB(const _Path: String; var _Value: BLOB): Boolean;
@@ -2178,48 +2199,21 @@ begin
 end;
 
 function TParams.SaveToString: String;
-const
-
-  SC_SINGLE_TYPED_MULTI     = '%0:s: %2:s = %1:s' + CRLF;
-  SC_SINGLE_UNTYPED_MULTI   = '%0:s = %1:s' + CRLF;
-  SC_SINGLE_TYPED_SINGLE    = '%0:s:%2:s=%1:s;';
-  SC_SINGLE_UNTYPED_SINGLE  = '%0:s=%1:s;';
-  SC_NESTED_TYPED_MULTI    = '%0:s: %2:s = (' + CRLF + '%1:s' + ')' + CRLF;
-  SC_NESTED_UNTYPED_MULTI  = '%0:s = (' + CRLF + '%1:s' + ')' + CRLF;
-  SC_NESTED_TYPED_SINGLE   = '%0:s:%2:s=(%1:s);';
-  SC_NESTED_UNTYPED_SINGLE = '%0:s=(%1:s);';
-
-  SA_SingleFormatMap: array[0..7] of String = (
-
-      {                                                } SC_SINGLE_TYPED_MULTI,
-      { soSingleString                                 } SC_SINGLE_TYPED_SINGLE,
-      {                soForceQuoteStrings             } SC_SINGLE_TYPED_MULTI,
-      { soSingleString soForceQuoteStrings             } SC_SINGLE_TYPED_SINGLE,
-      {                                    soTypesFree } SC_SINGLE_UNTYPED_MULTI,
-      { soSingleString                     soTypesFree } SC_SINGLE_UNTYPED_SINGLE,
-      {                soForceQuoteStrings soTypesFree } SC_SINGLE_UNTYPED_MULTI,
-      { soSingleString soForceQuoteStrings soTypesFree } SC_SINGLE_UNTYPED_SINGLE
-
-  );
-
-  SA_NestedFormatMap: array[0..7] of String = (
-
-      {                                                } SC_NESTED_TYPED_MULTI,
-      { soSingleString                                 } SC_NESTED_TYPED_SINGLE,
-      {                soForceQuoteStrings             } SC_NESTED_TYPED_MULTI,
-      { soSingleString soForceQuoteStrings             } SC_NESTED_TYPED_SINGLE,
-      {                                    soTypesFree } SC_NESTED_UNTYPED_MULTI,
-      { soSingleString                     soTypesFree } SC_NESTED_UNTYPED_SINGLE,
-      {                soForceQuoteStrings soTypesFree } SC_NESTED_UNTYPED_MULTI,
-      { soSingleString soForceQuoteStrings soTypesFree } SC_NESTED_UNTYPED_SINGLE
-
-  );
 
   function _GetNested(_Param: TParam): String;
   begin
+
     Result := _Param.AsParams.SaveToString;
-    if not (soSingleString in SaveToStringOptions) then
+
+    if not (soSingleString in SaveToStringOptions) then begin
+
       ShiftText(1, Result);
+      Result := CRLF + Result;
+
+    end;
+
+    Result := Format('(%s)', [Result]);
+
   end;
 
   function _QuoteString(_Param: TParam): String;
@@ -2237,45 +2231,33 @@ const
           (Pos(LF,   Result) > 0) or
           (Pos(';',  Result) > 0) or
           (Pos('=',  Result) > 0) or
-          (Pos(':',  Result) > 0){ or
-          (Pos('(',  Result) > 0) or
-          (Pos(')',  Result) > 0)}
+          (Pos(':',  Result) > 0)
 
       then Result := QuoteStr(Result);
 
   end;
 
 var
-  SingleFormat: String;
-  NestedFormat: String;
   Param: TParam;
+  Value: String;
 begin
 
-  SingleFormat := Matrix<TSaveToStringOptions>.Get(SaveToStringOptions, SA_SingleFormatMap);
-  NestedFormat := Matrix<TSaveToStringOptions>.Get(SaveToStringOptions, SA_NestedFormatMap);
-
   Result := '';
-  for Param in Items do
+  for Param in Items do begin
 
-    if Param.DataType = dtParams then
+    if Param.DataType = dtParams then Value := _GetNested(Param)
+    else Value := _QuoteString(Param);
 
-      Result := Result + Format(NestedFormat, [
+    Result := Result + FormatParam(
 
-          Param.Name,
-          _GetNested(Param),
-          ParamDataTypeToStr(Param.DataType)
+        Param,
+        Param.Name,
+        ParamDataTypeToStr(Param.DataType),
+        Value
 
-      ])
+    );
 
-    else
-
-      Result := Result + Format(SingleFormat, [
-
-          Param.Name,
-          _QuoteString(Param),
-          ParamDataTypeToStr(Param.DataType)
-
-      ]);
+  end;
 
   if soSingleString in SaveToStringOptions then
     CutStr(Result, 1);
@@ -2409,6 +2391,8 @@ begin
 
     end;
 
+    ParamRead(Items[Index]);
+
   end;
 
   FCurrentName := '';
@@ -2455,6 +2439,10 @@ function TParamsReader.IsParamsType: Boolean;
 begin
   CheckPresetType;
   Result := FCurrentType = dtParams;
+end;
+
+procedure TParamsReader.ParamRead(_Param: TParam);
+begin
 end;
 
 end.

@@ -152,9 +152,12 @@ function Power(const Base, Exponent: Single): Single; overload;
 
 type
 
-  Matrix<T> = class abstract
+  { TODO 3 -oVasilyevSM -cuDataUtils: Точно нельзя без класса никак? И еще, не только для строк можно? }
+  Matrix = class abstract
 
-    class function Get(Value: T; const Map: array of String): String;
+  public
+
+    class function Get<T>(Value: T; Map: array of String): String;
 
   end;
 
@@ -917,7 +920,7 @@ end;
 
 { Matrix<T> }
 
-class function Matrix<T>.Get(Value: T; const Map: array of String): String;
+class function Matrix.Get<T>(Value: T; Map: array of String): String;
 var
   B: Byte;
 begin

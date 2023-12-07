@@ -168,6 +168,7 @@ type
     FCursor: Int64;
     FItemStanding: TStanding;
     FItemStart: Int64;
+    FRegionStart: Int64;
 
     FTerminated: Boolean;
     FNestedLevel: Word;
@@ -218,7 +219,7 @@ type
     function Nested: Boolean;
     procedure Move(_Incrementer: Int64 = 1);
     procedure Terminate;
-    function ReadItem(_Trim: Boolean): String;
+    function ReadItem(_Trim: Boolean): String; virtual;
     procedure AddRegion(
 
         const _RegionClass: TRegionClass;
@@ -241,6 +242,7 @@ type
     property Rest: Int64 read GetRest;
     property ItemStanding: TStanding read FItemStanding write FItemStanding;
     property ItemStart: Int64 read FItemStart write FItemStart;
+    property RegionStart: Int64 read FRegionStart write FRegionStart;
     property Terminated: Boolean read FTerminated;
     property Location: TLocation read FLocation write FLocation;
     property KeyWords: TKeyWordList read FKeyWords;
@@ -342,14 +344,29 @@ end;
 
 procedure TRegion.Open(_Parser: TCustomStringParser);
 begin
+
   RegionOpened(_Parser);
-  _Parser.Move(OpeningKey.KeyLength);
+
+  with _Parser do begin
+
+    Move(OpeningKey.KeyLength);
+    RegionStart := _Parser.Cursor;
+
+  end;
+
 end;
 
 procedure TRegion.Close(_Parser: TCustomStringParser);
 begin
-  _Parser.Move(ClosingKey.KeyLength);
-  RegionClosed(_Parser);
+
+  with _Parser do begin
+
+    Move(ClosingKey.KeyLength);
+    RegionClosed(_Parser);
+    RegionStart := 0;
+
+  end;
+
 end;
 
 procedure TRegion.CheckUnterminating;
@@ -487,7 +504,7 @@ destructor TCustomStringParser.Destroy;
 begin
 
   FreeAndNil(FRegions);
-  FreeAndNil(FKeyWords      );
+  FreeAndNil(FKeyWords);
 
   inherited Destroy;
 
