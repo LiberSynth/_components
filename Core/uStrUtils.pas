@@ -97,7 +97,8 @@ function QuoteStr(const Value: String; const Quote: Char = ''''): String;
 function UnquoteStr(const Value: String; const Quote: Char = ''''): String;
 function DoubleStr(const Value: String; const Quote: Char = ''''): String;
 function UndoubleStr(const Value: String; const Quote: Char = ''''): String;
-function CutStr(var Value: String; Count: Integer): Boolean;
+function CutStr(var Value: String; Count: Integer): Boolean; overload;
+function CutStr(Count: Integer; const Value: String): String; overload;
 function SameText(const Value: String; Patterns: TStringArray): Boolean; overload;
 
 function StrMaskMatch(Value, Mask: String): Boolean;
@@ -847,6 +848,12 @@ begin
   L := Length(Value);
   Result := L >= Count;
   if Result then Value := Copy(Value, 1, L - Count);
+end;
+
+function CutStr(Count: Integer; const Value: String): String;
+begin
+  Result := Value;
+  CutStr(Result, Count);
 end;
 
 function SameText(const Value: String; Patterns: TStringArray): Boolean;

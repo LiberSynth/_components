@@ -103,8 +103,6 @@ type
     { ^ Using FData methods ^ }
 
     procedure Clear;
-    { Для передачи без разбора типов }
-    procedure AssignValue(_Source: TParam; _ForceAdding: Boolean);
     class procedure ValidateName(const _Value, _PathSeparator: String);
 
     property DataType: TParamDataType read FDataType;
@@ -130,6 +128,9 @@ type
   protected
 
     constructor Create(const _Name: String; const _PathSeparator: Char = '.'); virtual;
+
+    { Для передачи без разбора типов }
+    procedure AssignValue(_Source: TParam; _ForceAdding: Boolean); virtual;
 
   public
 
@@ -414,6 +415,8 @@ type
 
   end;
 
+  TParamsClass = class of TParams;
+
   { Этот класс нужен только для обращения к здешним объектам без циркулярной ссылки. Также, благодаря этому свойства
     и методы для изменения данных в обход установленного протокола (As... :=) остаются в прайват. }
   TParamsReader = class(TParamsStringParser)
@@ -426,7 +429,7 @@ type
     FCurrentName: String;
     FCurrentType: TParamDataType;
 
-    procedure CheckPresetType;
+    procedure CheckPresetType(_Strict: Boolean);
     function TrimDigital(const _Value: String): String;
     function UndoubleSymbols(const _Value: String): String;
 
@@ -444,7 +447,7 @@ type
     procedure ReadValue; override;
     procedure ReadParams(_CursorShift: Int64); override;
     function IsParamsType: Boolean; override;
-    procedure ParamRead(_Param: TParam); virtual;
+    procedure ParamReadEvent(_Param: TParam); virtual;
 
     property CurrentName: String read FCurrentName;
     property CurrentType: TParamDataType read FCurrentType;
@@ -846,6 +849,8 @@ begin
 end;
 
 procedure TParam.AssignValue(_Source: TParam; _ForceAdding: Boolean);
+var
+  P: TParams;
 begin
 
   if _Source.IsNull then begin
@@ -868,7 +873,15 @@ begin
       dtString:     AsString     := _Source.AsString;
       dtBLOB:       AsBLOB       := _Source.AsBLOB;
       dtData:       AsData       := _Source.AsData;
-      dtParams:     AsParams.Assign(_Source.AsParams, _ForceAdding);
+      dtParams:
+
+        with _Source.AsParams do begin
+
+          P := TParamsClass(ClassType).Create(PathSeparator, SaveToStringOptions);
+          SetAsParams(P);
+          P.Assign(_Source.AsParams, _ForceAdding);
+
+        end
 
     else
       raise EUncompletedMethod.Create;
@@ -2138,14 +2151,7 @@ begin
   if _ForceAdding then Dst := Add(_Name)
   else Dst := GetParam(_Name);
 
-  with Dst do
-
-    if _Source.DataType = dtParams then begin
-
-      SetAsParams(TParams.Create(PathSeparator, SaveToStringOptions));
-      AsParams.Assign(_Source.AsParams, _ForceAdding);
-
-    end else AssignValue(_Source, _ForceAdding);
+  Dst.AssignValue(_Source, _ForceAdding);
 
 end;
 
@@ -2295,7 +2301,7 @@ begin
   FParams := _Params;
 end;
 
-procedure TParamsReader.CheckPresetType;
+procedure TParamsReader.CheckPresetType(_Strict: Boolean);
 var
   P: TParam;
 begin
@@ -2309,7 +2315,7 @@ begin
 
   then FCurrentType := P.DataType;
 
-  if CurrentType = dtUnknown then
+  if _Strict and (CurrentType = dtUnknown) then
     raise EParamsReadException.Create('Unknown param data type');
 
 end;
@@ -2346,7 +2352,7 @@ end;
 procedure TParamsReader.ReadType;
 begin
   FCurrentType := StrToParamDataType(ReadItem(True));
-  CheckPresetType;
+  CheckPresetType(True);
 end;
 
 procedure TParamsReader.ReadValue;
@@ -2358,7 +2364,7 @@ begin
   Value := ReadItem(False);
 
   if PresetTypes then
-    CheckPresetType;
+    CheckPresetType(True);
 
   { Считывание с зарегистрированными типами должно исполнятся в потомках с помощью отдельных свойств (Registered итд). }
   with Params.AddList(CurrentName) do begin
@@ -2391,7 +2397,7 @@ begin
 
     end;
 
-    ParamRead(Items[Index]);
+    ParamReadEvent(Items[Index]);
 
   end;
 
@@ -2409,13 +2415,15 @@ begin
   if PresetTypes and Params.FindParam(CurrentName, dtParams, P) then NestedParams := P.AsParams
   else begin
 
-    NestedParams := TParams.Create(Params.PathSeparator, Params.SaveToStringOptions);
+    NestedParams := TParamsClass(Params.ClassType).Create(Params.PathSeparator, Params.SaveToStringOptions);
     with Params.AddList(CurrentName) do
-      Items[Append].SetAsParams(NestedParams);
+      P := Items[Append];
+
+    P.SetAsParams(NestedParams);
 
   end;
 
-  with TParamsReader.CreateNested(Self, NestedParams) do
+  with TParamsReaderClass(ClassType).CreateNested(Self, NestedParams) do
 
     try
 
@@ -2430,6 +2438,7 @@ begin
 
     end;
 
+  ParamReadEvent(P);
   FCurrentName := '';
   FCurrentType := dtUnknown;
 
@@ -2437,11 +2446,11 @@ end;
 
 function TParamsReader.IsParamsType: Boolean;
 begin
-  CheckPresetType;
+  CheckPresetType(False);
   Result := FCurrentType = dtParams;
 end;
 
-procedure TParamsReader.ParamRead(_Param: TParam);
+procedure TParamsReader.ParamReadEvent(_Param: TParam);
 begin
 end;
 

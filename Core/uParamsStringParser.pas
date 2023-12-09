@@ -118,37 +118,6 @@ type
   end;
 
   { 1 TODO -oVasilyevSM -cTParamsStringParser: В хэлп. }
-  {
-
-    Просто параметры и этот парсер НЕ ДОЛЖНЫ:
-
-      1.  Поддерживать комментарии.
-      2.  Считывать зарегистрированные параметры из нетипизованного источника. Одно из двух, либо записываться в
-          существующий параметр с таким же именем, либо поддерживать многострочные структуры. Это должен уметь потомок с
-          свойством параметра Registered (предопределенный). Это свойство будет указывать, что он зарегистрирован для
-          такого чтения. И тогда раширенный TParams.GetParam должен не жестко добавлять новый, а только если он не
-          Registered.
-      3.  Уметь назначать значения по умолчанию, когда после = ничего не указано.
-      4.  Разбираться с кодировками. На входе должна быть хотя бы UTF-8 с BOM.
-
-    Все эти проблемы должен решать класс-потомок TUserParamsParser.
-
-      1.  Элементы параметров: имя, тип, значение. Тип уже здесь необязательный, но тогда для считывания надо заранее
-          создать параметр с нужным типом. В него считается значение.
-      2.  Указывать тип на следующей строке допустется. Значение после '=' указывать на следующей строке нельзя. Конец
-          строки после "=" так же как  ';' - это конец параметра. И это значение Null для него. Иначе придется слишком
-          сильно потрудиться, чтобы понять, что там в следующей строке, имя следующего параметра или значение текущего.
-      3.  За этим исключением, между параметрами и их элементами допускается любое количество пробелов, табуляций,
-          переходов на следующую строку и комментрариев. Перед значением - только пробелы, табуляция и комментарии.
-      4.  Все что вызывает неадекватное чтение или неадекватную ошибку должно контролироваться в проверке синтаксиса.
-          Настройка синтаксиса - InitParser - FSyntax.Add. Можно?пополнять по мере обнаружения.
-      5.  ; в конце последнего параметра в структуре допустима, но не является предпочтительной формой записи:
-          A:Params=(B:Params=(C:Integer=123;););
-          Перход на следующую строку означает конец элемента, поэтому ; в начале строки не допустима.
-      6.  Пустая вложенная структура допустима
-
-  }
-
   TParamsStringParser = class(TCustomStringParser)
 
   const
@@ -417,7 +386,6 @@ var
   SI: TSyntaxInfo;
 begin
 
-
   inherited CheckSyntax(_KeyWord);
 
   for SI in FExcludingSyntax do
@@ -537,6 +505,7 @@ begin
     {   ItemType  ItemStanding Nested       Keys                                                          }
     Add(itName,   stBefore,    nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                             );
     Add(itName,   stBefore,    nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]            );
+    Add(itName,   stAfter,     nsNoMatter,  [ktSpace, ktLineEnd, ktTypeIdent, ktAssigning]                );
     Add(itValue,  stBefore,    nsNoMatter,  [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]);
     Add(itValue,  stAfter,     nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                 );
     Add(itValue,  stAfter,     nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing, ktSplitter]);
@@ -681,7 +650,7 @@ begin
   with _Parser as TParamsStringParser do begin
 
     Move(OpeningKey.KeyLength);
-    ReadParams({}OpeningKey.KeyLength{});
+    ReadParams(OpeningKey.KeyLength);
 
   end;
 

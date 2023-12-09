@@ -214,6 +214,7 @@ type
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
     procedure MoveEvent; virtual;
     procedure ToggleItem(_KeyWord: TKeyWord); virtual;
+    procedure ItemTerminatedEvent(_KeyWord: TKeyWord); virtual;
 
     { Методы и свойства для управления }
     function Nested: Boolean;
@@ -364,6 +365,7 @@ begin
     Move(ClosingKey.KeyLength);
     RegionClosed(_Parser);
     RegionStart := 0;
+    Location.Remember(Cursor);
 
   end;
 
@@ -449,7 +451,12 @@ end;
 
 procedure TCustomStringParser.CheckSyntax(const _KeyWord: TKeyWord);
 begin
+
+  if _KeyWord.Equal(KWR_EMPTY) then
+    Location.Remember(Cursor);
+
   CheckUnterminated(_KeyWord.KeyType);
+
 end;
 
 procedure TCustomStringParser.CheckUnterminated(_KeyType: TKeyType);
@@ -579,6 +586,10 @@ begin
   Result := False;
 end;
 
+procedure TCustomStringParser.ItemTerminatedEvent(_KeyWord: TKeyWord);
+begin
+end;
+
 function TCustomStringParser.ItemTerminatingKey(_KeyWord: TKeyWord): Boolean;
 begin
   Result := False;
@@ -605,10 +616,10 @@ begin
 
   CheckSyntax(_KeyWord);
 
-  { Имеем четыре события:                              }
-  (*  ItemBefore   ItemInside   ItemAfter    NexItem  *)
-  (*  X____________X____________X____________X        *)
-  (*     spc comm       body       spc comm           *)
+  { Имеем четыре события:                                                }
+  (*  ItemBefore         ItemInside         ItemAfter          NexItem  *)
+  (*  X__________________X__________________X__________________X        *)
+  (*    spaces, comments         body         spaces, comments          *)
 
   { Пустое значение допустимо для некоторых }
   if
@@ -627,7 +638,10 @@ begin
     if ItemStanding < stAfter then
       ProcessItem;
 
-    ToggleItem(_KeyWord);
+    if _KeyWord.KeyType <> ktSourceEnd then
+      ToggleItem(_KeyWord);
+
+    ItemTerminatedEvent(_KeyWord);
 
   end;
 
@@ -740,10 +754,10 @@ var
   CursorKey: TKeyWord;
 begin
 
-  { Имеем четыре события:                              }
-  (*  ItemBefore   ItemInside   ItemAfter    NexItem  *)
-  (*  X____________X____________X____________X        *)
-  (*     spc comm       body       spc comm           *)
+  { Имеем четыре события:                                                }
+  (*  ItemBefore         ItemInside         ItemAfter          NexItem  *)
+  (*  X__________________X__________________X__________________X        *)
+  (*    spaces, comments         body         spaces, comments          *)
 
   try
 

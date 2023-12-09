@@ -6,7 +6,9 @@ uses
   { VCL }
   Generics.Collections, SysUtils,
   { Liber Synth }
-  uConsts, uTypes, uParams, uCustomStringParser, uParamsStringParser;
+  uConsts, uTypes, uStrUtils, uParams, uCustomStringParser, uParamsStringParser;
+
+  { TODO 2 -oVasilyevSM -cTUserParams: //, -- }
 
 type
 
@@ -19,7 +21,11 @@ type
   );
   TKeyTypes = set of TKeyType;
 
-  TCommentAnchor = (caBeforeParam, caBeforeName, caAfterName, caBeforeType, caAfterType, caBeforeValue, caAfterValue);
+  TCommentAnchor = (
+
+      caBeforeParam, caBeforeName, caAfterName, caBeforeType, caAfterType, caBeforeValue, caAfterValue, caAfterParam
+
+  );
 
   TComment = record
 
@@ -43,7 +49,7 @@ type
   private
 
     procedure Add(const _Value: String; _Anchor: TCommentAnchor);
-    function Get(_Anchor: TCommentAnchor): String;
+    function Get(_Anchor: TCommentAnchor; _SingleString: Boolean): String;
 
   end;
 
@@ -60,6 +66,8 @@ type
   protected
 
     constructor Create(const _Name: String; const _PathSeparator: Char = '.'); override;
+
+    procedure AssignValue(_Source: TParam; _ForceAdding: Boolean); override;
 
   public
 
@@ -81,8 +89,12 @@ implementation
 
 const
 
-  KWR_LONG_COMMENT_OPENING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening); StrValue: '{'; KeyLength: Length('{') );
-  KWR_LONG_COMMENT_CLOSING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing); StrValue: '}'; KeyLength: Length('}') );
+  KWR_LONG_COMMENT_OPENING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening); StrValue: '{';  KeyLength: Length('{'));
+  KWR_LONG_COMMENT_CLOSING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing); StrValue: '}';  KeyLength: Length('}'));
+  KWR_LONG_COMMENT_OPENING_KEY_B: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening); StrValue: '(*'; KeyLength: Length('(*'));
+  KWR_LONG_COMMENT_CLOSING_KEY_B: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing); StrValue: '*)'; KeyLength: Length('*)'));
+  KWR_LONG_COMMENT_OPENING_KEY_C: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening); StrValue: '/*'; KeyLength: Length('/*'));
+  KWR_LONG_COMMENT_CLOSING_KEY_C: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing); StrValue: '*/'; KeyLength: Length('*/'));
 
 type
 
@@ -103,6 +115,7 @@ type
 
   end;
 
+  { TODO 3 -oVasilyevSM -cTKeyType: TKeyType -> Integer. Это уже совсем. Платим 1000 чтобы заработать 100. }
   TReadInfoListHelper = class helper for TReadInfoList
 
   public
@@ -133,7 +146,7 @@ type
 
     function ReadComment(_Shift: Byte): String;
     procedure AddComment(const _Value: String);
-    procedure ParamRead(_Param: TParam); override;
+    procedure ParamReadEvent(_Param: TParam); override;
 
     property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
     property CurrentComments: TCommentList read FCurrentComments;
@@ -149,7 +162,7 @@ type
 
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
     function ReadItem(_Trim: Boolean): String; override;
-    procedure ToggleItem(_KeyWord: TKeyWord); override;
+    procedure ItemTerminatedEvent(_KeyWord: TKeyWord); override;
 
   end;
 
@@ -182,34 +195,25 @@ begin
   inherited Add(TComment.Create(_Value, _Anchor));
 end;
 
-function TCommentList.Get(_Anchor: TCommentAnchor): String;
+function TCommentList.Get(_Anchor: TCommentAnchor; _SingleString: Boolean): String;
 var
   Comment: TComment;
+  Splitter: String;
 begin
 
   Result := '';
 
-  { TODO 1 -oVasilyevSM -cTCommentList.Get: Чуть иначе. Идти по значениям Anchor и собирать пачками однотипные. }
+  if not _SingleString and (_Anchor in [caBeforeParam, caAfterParam]) then Splitter := CRLF
+  else Splitter := ' ';
 
   for Comment in Self do
-
     with Comment do
+      if Anchor = _Anchor then
+        if Anchor in [caAfterName, caAfterValue] then Result := Result + Splitter + Value
+        else Result := Result + Value + Splitter;
 
-      if Anchor = _Anchor then begin
-
-        case Anchor of
-
-          caBeforeParam: Result := Result + Value + CRLF;
-          caBeforeName:  Result := Result + Value + ' ';
-          caAfterName:   Result := ' ' + Result + Value;
-          caBeforeType:  Result := ' ' + Result + Value + ' ';
-          caAfterType:   Result := ' ' + Result + Value + ' ';
-          caBeforeValue: Result := ' ' + Result + Value + ' ';
-          caAfterValue:  Result := Result + ' ' + Value;
-
-        end;
-
-      end;
+  if _Anchor in [caBeforeType, caAfterType, caBeforeValue] then
+    Result := ' ' + Result;
 
 end;
 
@@ -218,18 +222,21 @@ end;
 function TUserParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String;
 const
 
-  SC_VALUE_UNTYPED = '%4:s%5:s%0:s%6:s = %9:s%2:s%10:s%3:s';
-  SC_VALUE_TYPED   = '%4:s%5:s%0:s%6:s:%7:s%1:s%8:s=%9:s%2:s%10:s%3:s';
+  SC_VALUE_UNTYPED = '%4:s%5:s%0:s%6:s = %9:s%2:s%10:s%3:s%11:s';
+  SC_VALUE_TYPED   = '%4:s%5:s%0:s%6:s:%7:s%1:s%8:s=%9:s%2:s%10:s%3:s%11:s';
 
 var
   ParamFormat: String;
   Splitter: String;
+  SingleString: Boolean;
 begin
+
+  SingleString := soSingleString in SaveToStringOptions;
 
   if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
   else ParamFormat := SC_VALUE_TYPED;
 
-  if soSingleString in SaveToStringOptions then Splitter := ';'
+  if SingleString then Splitter := ';'
   else Splitter := CRLF;
 
   with _Param as TUserParam do
@@ -240,13 +247,14 @@ begin
         _Type,
         _Value,
         Splitter,
-        Comments.Get(caBeforeParam),
-        Comments.Get(caBeforeName ),
-        Comments.Get(caAfterName  ),
-        Comments.Get(caBeforeType ),
-        Comments.Get(caAfterType  ),
-        Comments.Get(caBeforeValue),
-        Comments.Get(caAfterValue )
+        Comments.Get(caBeforeParam, SingleString),
+        Comments.Get(caBeforeName,  SingleString),
+        Comments.Get(caAfterName,   SingleString),
+        Comments.Get(caBeforeType,  SingleString),
+        Comments.Get(caAfterType,   SingleString),
+        Comments.Get(caBeforeValue, SingleString),
+        Comments.Get(caAfterValue,  SingleString),
+        Comments.Get(caAfterParam,  SingleString)
 
     ]);
 
@@ -263,6 +271,17 @@ begin
 end;
 
 { TUserParam }
+
+procedure TUserParam.AssignValue(_Source: TParam; _ForceAdding: Boolean);
+begin
+
+  inherited AssignValue(_Source, _ForceAdding);
+
+  Comments.Clear;
+  if _Source is TUserParam then
+    Comments.AddRange(TUserParam(_Source).Comments.ToArray);
+
+end;
 
 constructor TUserParam.Create(const _Name: String; const _PathSeparator: Char);
 begin
@@ -359,30 +378,52 @@ begin
 
   end;
 
-  {                RegionClass         OpeningKey                      ClosingKey                      UnterminatedMessage   }
+  {         RegionClass         OpeningKey                      ClosingKey                      UnterminatedMessage   }
   AddRegion(TLongCommentRegion, KWR_LONG_COMMENT_OPENING_KEY_A, KWR_LONG_COMMENT_CLOSING_KEY_A, 'Unterminated comment');
+  AddRegion(TLongCommentRegion, KWR_LONG_COMMENT_OPENING_KEY_B, KWR_LONG_COMMENT_CLOSING_KEY_B, 'Unterminated comment');
+  AddRegion(TLongCommentRegion, KWR_LONG_COMMENT_OPENING_KEY_C, KWR_LONG_COMMENT_CLOSING_KEY_C, 'Unterminated comment');
+
+end;
+
+procedure TUserParamsReader.ItemTerminatedEvent(_KeyWord: TKeyWord);
+begin
+
+  inherited ItemTerminatedEvent(_KeyWord);
+
+  if
+
+      ((ItemType = itName) or (_KeyWord.KeyType = ktSourceEnd)) and
+      Assigned(CurrentParam)
+
+  then
+
+    with CurrentParam do begin
+
+      Comments.Clear;
+      Comments.AddRange(CurrentComments.ToArray);
+      CurrentComments.Clear;
+
+    end;
 
 end;
 
 procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
-  if ItemType = itName then
-
-    case _KeyWord.KeyType of
-
-      ktLineEnd:   CheckBeforeNameComments;
-      ktSourceEnd: SaveLastComments;
-
-    end;
-
   inherited KeyEvent(_KeyWord);
+
+  case _KeyWord.KeyType of
+
+    ktLineEnd:   if ItemType = itName then CheckBeforeNameComments;
+    ktSourceEnd: SaveLastComments;
+
+  end;
 
 end;
 
-procedure TUserParamsReader.ParamRead(_Param: TParam);
+procedure TUserParamsReader.ParamReadEvent(_Param: TParam);
 begin
-  inherited ParamRead(_Param);
+  inherited ParamReadEvent(_Param);
   CurrentParam := _Param as TUserParam;
 end;
 
@@ -403,32 +444,15 @@ var
   i: Integer;
 begin
 
-  for i := 0 to CurrentComments.Count - 1 do
-    with CurrentComments[i] do
-      CurrentComments[i] := TComment.Create(Value, caAfterValue);
+  if Assigned(CurrentParam) then begin
 
-  CurrentParam.Comments.AddRange(CurrentComments.ToArray);
+    for i := 0 to CurrentComments.Count - 1 do
+      with CurrentComments[i] do
+        CurrentComments[i] := TComment.Create(Value, caAfterParam);
 
-end;
+    CurrentParam.Comments.AddRange(CurrentComments.ToArray);
 
-procedure TUserParamsReader.ToggleItem(_KeyWord: TKeyWord);
-var
-  Item: TItemType;
-begin
-
-  Item := ItemType;
-
-  inherited ToggleItem(_KeyWord);
-
-  if (Item = itValue) and (ItemType = itName) then
-
-    with CurrentParam do begin
-
-      Comments.Clear;
-      Comments.AddRange(CurrentComments.ToArray);
-      CurrentComments.Clear;
-
-    end;
+  end;
 
 end;
 
