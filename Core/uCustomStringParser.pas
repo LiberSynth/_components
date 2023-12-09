@@ -35,10 +35,8 @@ uses
 
 type
 
-  { TODO 5 -oVasilyevSM -cTCustomStringParser: Section }
   { TODO 3 -oVasilyevSM -cTCustomStringParser: Block (Nested structure) }
-  // Element (Item)
-  // Region
+  { TODO 5 -oVasilyevSM -cTCustomStringParser: Section }
 
   TStanding = (stBefore, stInside, stAfter);
 
@@ -207,7 +205,6 @@ type
     procedure ElementTerminatedEvent(_KeyWord: TKeyWord); virtual;
 
     { Методы и свойства для управления }
-    function Nested: Boolean;
     procedure Move(_Incrementer: Int64 = 1);
     procedure Terminate;
     function ReadElement(_Trim: Boolean): String; virtual;
@@ -219,6 +216,7 @@ type
         const _Caption: String
 
     );
+    function Nested: Boolean;
 
     (*****************************)
     (*                           *)

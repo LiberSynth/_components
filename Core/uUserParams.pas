@@ -8,14 +8,12 @@ uses
   { Liber Synth }
   uConsts, uTypes, uStrUtils, uParams, uCustomStringParser, uParamsStringParser;
 
-  { TODO 1 -oVasilyevSM -cTUserParams: //, -- }
-
 type
 
   TKeyType = ( { inherits from uParamsStringParser.TKeyType }
 
       ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktNestedOpening,
-      ktNestedClosing, ktLongCommentOpening, ktLongCommentClosing
+      ktNestedClosing, ktLongCommentOpening, ktLongCommentClosing, ktShortCommentOpening
 
   );
   TKeyTypes = set of TKeyType;
@@ -32,14 +30,23 @@ type
 
     FValue: String;
     FAnchor: TCommentAnchor;
+    FShort: Boolean;
 
   private
 
-    constructor Create(const _Value: String; _Anchor: TCommentAnchor);
+    constructor Create(
+
+      const _Value: String; 
+      _Anchor: TCommentAnchor;
+      _Short: Boolean
+
+    );
     procedure SetAnchor(const _Value: TCommentAnchor);
+    procedure SetShort(const _Value: Boolean);
 
     property Value: String read FValue write FValue;
     property Anchor: TCommentAnchor read FAnchor write SetAnchor;
+    property Short: Boolean read FShort write SetShort;
 
   end;
 
@@ -47,7 +54,13 @@ type
 
   private
 
-    procedure Add(const _Value: String; _Anchor: TCommentAnchor);
+    procedure Add(
+
+      const _Value: String; 
+      _Anchor: TCommentAnchor;
+      _Short: Boolean
+
+    );
     function Get(_Anchor: TCommentAnchor; _SingleString: Boolean): String;
 
   end;
@@ -88,12 +101,14 @@ implementation
 
 const
 
-  KWR_LONG_COMMENT_OPENING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening); StrValue: '{';  KeyLength: Length('{'));
-  KWR_LONG_COMMENT_CLOSING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing); StrValue: '}';  KeyLength: Length('}'));
-  KWR_LONG_COMMENT_OPENING_KEY_B: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening); StrValue: '(*'; KeyLength: Length('(*'));
-  KWR_LONG_COMMENT_CLOSING_KEY_B: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing); StrValue: '*)'; KeyLength: Length('*)'));
-  KWR_LONG_COMMENT_OPENING_KEY_C: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening); StrValue: '/*'; KeyLength: Length('/*'));
-  KWR_LONG_COMMENT_CLOSING_KEY_C: TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing); StrValue: '*/'; KeyLength: Length('*/'));
+  KWR_LONG_COMMENT_OPENING_KEY_A:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '{';  KeyLength: Length('{'));
+  KWR_LONG_COMMENT_CLOSING_KEY_A:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '}';  KeyLength: Length('}'));
+  KWR_LONG_COMMENT_OPENING_KEY_B:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '(*'; KeyLength: Length('(*'));
+  KWR_LONG_COMMENT_CLOSING_KEY_B:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '*)'; KeyLength: Length('*)'));
+  KWR_LONG_COMMENT_OPENING_KEY_C:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '/*'; KeyLength: Length('/*'));
+  KWR_LONG_COMMENT_CLOSING_KEY_C:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '*/'; KeyLength: Length('*/'));
+  KWR_SHORT_COMMENT_OPENING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktShortCommentOpening); StrValue: '//'; KeyLength: Length('//'));
+  KWR_SHORT_COMMENT_OPENING_KEY_B: TKeyWord = (KeyTypeInternal: Integer(ktShortCommentOpening); StrValue: '--'; KeyLength: Length('--'));
 
 type
 
@@ -128,7 +143,7 @@ type
   private
 
     function ReadComment(_Shift: Byte): String;
-    procedure AddComment(const _Value: String);
+    procedure AddComment(const _Value: String; _Short: Boolean);
     procedure ParamReadEvent(_Param: TParam); override;
 
     property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
@@ -149,21 +164,44 @@ type
 
   end;
 
-  TLongCommentRegion = class(TRegion)
+  TCustomCommentRegion = class(TRegion)
 
   protected
 
     procedure RegionOpened(_Parser: TCustomStringParser); override;
+
+  end;
+
+  TLongCommentRegion = class(TCustomCommentRegion)
+
+  protected
+
+    procedure RegionClosed(_Parser: TCustomStringParser); override;
+
+  end;
+
+  TShortCommentRegion = class(TCustomCommentRegion)
+
+  strict private
+
+    FTerminator: String;
+
+  protected
+
+    function CanClose(_Parser: TCustomStringParser): Boolean; override;
     procedure RegionClosed(_Parser: TCustomStringParser); override;
 
   end;
 
 { TComment }
 
-constructor TComment.Create(const _Value: String; _Anchor: TCommentAnchor);
+constructor TComment.Create;
 begin
+
   Value  := _Value;
   Anchor := _Anchor;
+  Short  := _Short;
+  
 end;
 
 procedure TComment.SetAnchor(const _Value: TCommentAnchor);
@@ -171,11 +209,16 @@ begin
   FAnchor := _Value;
 end;
 
+procedure TComment.SetShort(const _Value: Boolean);
+begin
+  FShort := _Value;
+end;
+
 { TCommentList }
 
-procedure TCommentList.Add(const _Value: String; _Anchor: TCommentAnchor);
+procedure TCommentList.Add;
 begin
-  inherited Add(TComment.Create(_Value, _Anchor));
+  inherited Add(TComment.Create(_Value, _Anchor, _Short));
 end;
 
 function TCommentList.Get(_Anchor: TCommentAnchor; _SingleString: Boolean): String;
@@ -190,11 +233,18 @@ begin
   else Splitter := ' ';
 
   for Comment in Self do
+
     with Comment do
-      if Anchor = _Anchor then
+
+      if Anchor = _Anchor then begin
+
+        if Short then Splitter := '';
+
         if Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
         else Result := Result + Value + Splitter;
 
+      end;
+      
 end;
 
 { TUserParam }
@@ -249,7 +299,6 @@ begin
   if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
   else ParamFormat := SC_VALUE_TYPED;
 
-  { TODO 1 -oVasilyevSM -cGeneral: В нетипизованной форме лупит лишний пробел перед значением: A =  ;B =  ;C =  ;D = }
   SingleString := soSingleString in SaveToStringOptions;
 
   if SingleString then Splitter := ';'
@@ -318,7 +367,7 @@ begin
   for i := 0 to CurrentComments.Count - 1 do
     with CurrentComments[i] do
       if Anchor = caBeforeName then
-        CurrentComments[i] := TComment.Create(Value, caBeforeParam);
+        CurrentComments[i] := TComment.Create(Value, caBeforeParam, Short);
 
 end;
 
@@ -331,7 +380,7 @@ begin
 
     for i := 0 to CurrentComments.Count - 1 do
       with CurrentComments[i] do
-        CurrentComments[i] := TComment.Create(Value, caAfterParam);
+        CurrentComments[i] := TComment.Create(Value, caAfterParam, Short);
 
     CurrentParam.Comments.AddRange(CurrentComments.ToArray);
 
@@ -344,7 +393,7 @@ begin
   Result := Copy(Source, RegionStart, Cursor - RegionStart - _Shift);
 end;
 
-procedure TUserParamsReader.AddComment(const _Value: String);
+procedure TUserParamsReader.AddComment(const _Value: String; _Short: Boolean);
 var
   Anchor: TCommentAnchor;
 begin
@@ -359,7 +408,7 @@ begin
     raise EParamsReadException.Create('Unexpected content element');
   end;
 
-  CurrentComments.Add(_Value, Anchor);
+  CurrentComments.Add(_Value, Anchor, _Short);
 
 end;
 
@@ -383,10 +432,12 @@ begin
 
   end;
 
-  {         RegionClass         OpeningKey                      ClosingKey                      UnterminatedMessage   }
-  AddRegion(TLongCommentRegion, KWR_LONG_COMMENT_OPENING_KEY_A, KWR_LONG_COMMENT_CLOSING_KEY_A, 'Unterminated comment');
-  AddRegion(TLongCommentRegion, KWR_LONG_COMMENT_OPENING_KEY_B, KWR_LONG_COMMENT_CLOSING_KEY_B, 'Unterminated comment');
-  AddRegion(TLongCommentRegion, KWR_LONG_COMMENT_OPENING_KEY_C, KWR_LONG_COMMENT_CLOSING_KEY_C, 'Unterminated comment');
+  {         RegionClass          OpeningKey                       ClosingKey                      UnterminatedMessage   }
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'Unterminated comment');
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'Unterminated comment');
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'Unterminated comment');
+  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'Unterminated comment');
+  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'Unterminated comment');
 
 end;
 
@@ -433,9 +484,9 @@ begin
 
 end;
 
-{ TLongCommentRegion }
+{ TCustomCommentRegion }
 
-procedure TLongCommentRegion.RegionOpened(_Parser: TCustomStringParser);
+procedure TCustomCommentRegion.RegionOpened(_Parser: TCustomStringParser);
 begin
 
   inherited RegionOpened(_Parser);
@@ -457,6 +508,8 @@ begin
 
 end;
 
+{ TLongCommentRegion }
+
 procedure TLongCommentRegion.RegionClosed(_Parser: TCustomStringParser);
 begin
 
@@ -470,7 +523,62 @@ begin
         ReadComment(ClosingKey.KeyLength),
         ClosingKey.StrValue
 
-    ]));
+    ]), False);
+
+  end;
+
+end;
+
+{ TShortCommentRegion }
+
+function TShortCommentRegion.CanClose(_Parser: TCustomStringParser): Boolean;
+
+  function _Check(const _Value: String): Boolean;
+  begin
+
+    with _Parser do
+      Result := Copy(Source, Cursor, 2) = _Value;
+
+    if Result then FTerminator := _Value;
+      
+  end;
+  
+begin
+  Result := _Check(CRLF) or _Check(CR) or _Check(LF);
+end;
+
+procedure TShortCommentRegion.RegionClosed(_Parser: TCustomStringParser);
+var
+  Prefix, Suffix: String;
+  Short: Boolean;
+begin
+
+  inherited RegionClosed(_Parser);
+
+  with _Parser as TUserParamsReader do begin
+
+    Short := not (soSingleString in Params.SaveToStringOptions);
+    if Short then begin
+
+      Prefix := OpeningKey.StrValue;
+      Suffix := FTerminator;
+        
+    end else begin
+     
+      Prefix := '{';
+      Suffix := '}';
+      
+    end;
+    
+    AddComment(Format('%s%s%s', [
+
+        Prefix,
+        ReadComment(0),
+        Suffix
+
+    ]), Short);
+
+    Move(Length(FTerminator));
 
   end;
 
