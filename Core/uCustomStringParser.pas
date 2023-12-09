@@ -35,7 +35,6 @@ uses
 
 type
 
-  { TODO 3 -oVasilyevSM -cTCustomStringParser: Block (Nested structure) }
   { TODO 5 -oVasilyevSM -cTCustomStringParser: Section }
 
   TStanding = (stBefore, stInside, stAfter);

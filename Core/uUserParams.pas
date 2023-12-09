@@ -79,7 +79,7 @@ type
 
     constructor Create(const _Name: String; const _PathSeparator: Char = '.'); override;
 
-    procedure AssignValue(_Source: TParam; _ForceAdding: Boolean); override;
+    procedure AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean); override;
 
   public
 
@@ -93,7 +93,7 @@ type
 
     function ParamClass: TParamClass; override;
     function ParamsReaderClass: TParamsReaderClass; override;
-    function FormatParam(_Param: TParam; const _Name: String; const _Type: String; const _Value: String; _First: Boolean): String; override;
+    function FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String; override;
 
   end;
 
@@ -261,10 +261,10 @@ begin
   inherited Destroy;
 end;
 
-procedure TUserParam.AssignValue(_Source: TParam; _ForceAdding: Boolean);
+procedure TUserParam.AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean);
 begin
 
-  inherited AssignValue(_Source, _ForceAdding);
+  inherited AssignValue(_Source, _Host, _ForceAdding);
 
   Comments.Clear;
   if _Source is TUserParam then
@@ -284,7 +284,7 @@ begin
   Result := TUserParamsReader;
 end;
 
-function TUserParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String; _First: Boolean): String;
+function TUserParams.FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String;
 const
 
   SC_VALUE_UNTYPED = '%4:s%5:s%0:s%6:s = %9:s%2:s%10:s%3:s%11:s';
@@ -308,8 +308,8 @@ begin
 
     Result := Format(ParamFormat, [
 
-        _Name,
-        _Type,
+        _Param.Name,
+        ParamDataTypeToStr(_Param.DataType),
         _Value,
         Splitter,
         Comments.Get(caBeforeParam, SingleString),
@@ -565,6 +565,7 @@ begin
         
     end else begin
      
+      { TODO 1 -oVasilyevSM -cGeneral:  омментарии надо хранить в исходном виде, а это делать на сохранении в строку }
       Prefix := '{';
       Suffix := '}';
       

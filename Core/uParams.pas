@@ -105,10 +105,7 @@ type
     procedure Clear;
     class procedure ValidateName(const _Value, _PathSeparator: String);
 
-    property DataType: TParamDataType read FDataType;
-    property IsNull: Boolean read FIsNull write SetIsNull;
     property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
-    property Name: String read FName;
 
     { Если хэлпер надоест, чтобы далеко не лазить за этими свойствами. }
 //    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
@@ -130,11 +127,15 @@ type
     constructor Create(const _Name: String; const _PathSeparator: Char = '.'); virtual;
 
     { Для передачи без разбора типов }
-    procedure AssignValue(_Source: TParam; _ForceAdding: Boolean); virtual;
+    procedure AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean); virtual;
 
   public
 
     destructor Destroy; override;
+
+    property Name: String read FName;
+    property DataType: TParamDataType read FDataType;
+    property IsNull: Boolean read FIsNull write SetIsNull;
 
   end;
 
@@ -347,7 +348,7 @@ type
 
     function ParamClass: TParamClass; virtual;
     function ParamsReaderClass: TParamsReaderClass; virtual;
-    function FormatParam(_Param: TParam; const _Name, _Type, _Value: String; _First: Boolean): String; virtual;
+    function FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String; virtual;
 
   public
 
@@ -871,7 +872,7 @@ begin
 
 end;
 
-procedure TParam.AssignValue(_Source: TParam; _ForceAdding: Boolean);
+procedure TParam.AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean);
 var
   P: TParams;
 begin
@@ -898,13 +899,13 @@ begin
       dtData:       AsData       := _Source.AsData;
       dtParams:
 
-        with _Source.AsParams do begin
+        begin
 
-          P := TParamsClass(ClassType).Create(PathSeparator, SaveToStringOptions);
+          P := TParamsClass(_Source.AsParams.ClassType).Create(_Host.PathSeparator, _Host.SaveToStringOptions);
           SetAsParams(P);
           P.Assign(_Source.AsParams, _ForceAdding);
 
-        end
+        end;
 
     else
       raise EUncompletedMethod.Create;
@@ -1960,7 +1961,7 @@ begin
   Result := TParamsReader;
 end;
 
-function TParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String; _First: Boolean): String;
+function TParams.FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String;
 const
 
   SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
@@ -1977,7 +1978,14 @@ begin
   if soSingleString in SaveToStringOptions then Splitter := ';'
   else Splitter := CRLF;
 
-  Result := Format(ParamFormat, [_Name, _Type, _Value, Splitter]);
+  Result := Format(ParamFormat, [
+
+      _Param.Name,
+      ParamDataTypeToStr(_Param.DataType),
+      _Value,
+      Splitter
+
+  ]);
 
 end;
 
@@ -2151,7 +2159,7 @@ begin
   if _ForceAdding then Dst := Add(_Name)
   else Dst := GetParam(_Name);
 
-  Dst.AssignValue(_Source, _ForceAdding);
+  Dst.AssignValue(_Source, Self, _ForceAdding);
 
 end;
 
@@ -2244,25 +2252,19 @@ function TParams.SaveToString: String;
   end;
 
 var
-  i: Integer;
+  Param: TParam;
   Value: String;
+  First: Boolean;
 begin
 
   Result := '';
-  for i := 0 to Items.Count - 1 do begin
+  for Param in Items do begin
 
-    if Items[i].DataType = dtParams then Value := _GetNested(Items[i])
-    else Value := _QuoteString(Items[i]);
+    if Param.DataType = dtParams then Value := _GetNested(Param)
+    else Value := _QuoteString(Param);
 
-    Result := Result + FormatParam(
-
-        Items[i],
-        Items[i].Name,
-        ParamDataTypeToStr(Items[i].DataType),
-        Value,
-        i = 0
-
-    );
+    First := Items.IndexOf(Param) = 0;
+    Result := Result + FormatParam(Param, Value, First);
 
   end;
 
