@@ -89,8 +89,8 @@ type
 
     function CanOpen(_Parser: TCustomStringParser): Boolean; virtual;
     function CanClose(_Parser: TCustomStringParser): Boolean; virtual;
-    procedure RegionOpened(_Parser: TCustomStringParser); virtual;
-    procedure RegionClosed(_Parser: TCustomStringParser); virtual;
+    procedure Opened(_Parser: TCustomStringParser); virtual;
+    procedure Closed(_Parser: TCustomStringParser); virtual;
 
   public
 
@@ -118,6 +118,15 @@ type
 
     property Active: Boolean read FActive;
     property ActiveRegion: TRegion read FActiveRegion;
+
+  end;
+
+  TBlock = class(TRegion)
+
+  protected
+
+    procedure Opened(_Parser: TCustomStringParser); override;
+    procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
 
@@ -324,7 +333,7 @@ end;
 procedure TRegion.Open(_Parser: TCustomStringParser);
 begin
 
-  RegionOpened(_Parser);
+  Opened(_Parser);
 
   with _Parser do begin
 
@@ -341,7 +350,7 @@ begin
   with _Parser do begin
 
     Move(ClosingKey.KeyLength);
-    RegionClosed(_Parser);
+    Closed(_Parser);
     RegionStart := 0;
     Location.Remember(Cursor);
 
@@ -365,11 +374,11 @@ begin
   Result := _Parser.IsCursorKey(ClosingKey);
 end;
 
-procedure TRegion.RegionOpened(_Parser: TCustomStringParser);
+procedure TRegion.Opened(_Parser: TCustomStringParser);
 begin
 end;
 
-procedure TRegion.RegionClosed(_Parser: TCustomStringParser);
+procedure TRegion.Closed(_Parser: TCustomStringParser);
 begin
 end;
 
@@ -424,6 +433,29 @@ procedure TRegionList.CheckUnterminated;
 begin
   if Active then
     FActiveRegion.CheckUnterminating;
+end;
+
+{ TBlock }
+
+procedure TBlock.Opened(_Parser: TCustomStringParser);
+begin
+  inherited Opened(_Parser);
+  _Parser.Move(OpeningKey.KeyLength);
+end;
+
+procedure TBlock.Closed(_Parser: TCustomStringParser);
+begin
+
+  inherited Closed(_Parser);
+
+  with _Parser do begin
+
+    CursorStanding := stAfter;
+    ElementStart := 0;
+    Location.Remember(Cursor + ClosingKey.KeyLength);
+
+  end;
+
 end;
 
 { TCustomStringParser.TLocation }

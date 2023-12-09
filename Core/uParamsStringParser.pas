@@ -208,15 +208,15 @@ type
 
     function CanOpen(_Parser: TCustomStringParser): Boolean; override;
     function CanClose(_Parser: TCustomStringParser): Boolean; override;
-    procedure RegionClosed(_Parser: TCustomStringParser); override;
+    procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
 
-  TNestedParamsRegion = class(TRegion)
+  TNestedParamsBlock = class(TBlock)
 
     function CanOpen(_Parser: TCustomStringParser): Boolean; override;
-    procedure RegionOpened(_Parser: TCustomStringParser); override;
-    procedure RegionClosed(_Parser: TCustomStringParser); override;
+    procedure Opened(_Parser: TCustomStringParser); override;
+    procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
 
@@ -389,7 +389,7 @@ begin
   {         RegionClass          OpeningKey           ClosingKey           Caption     }
   AddRegion(TQoutedStringRegion, KWR_QUOTE_SINGLE,    KWR_QUOTE_SINGLE,    'string'    );
   AddRegion(TQoutedStringRegion, KWR_QUOTE_DOBLE,     KWR_QUOTE_DOBLE,     'string'    );
-  AddRegion(TNestedParamsRegion, KWR_OPENING_BRACKET, KWR_CLOSING_BRACKET, 'parameters');
+  AddRegion(TNestedParamsBlock, KWR_OPENING_BRACKET, KWR_CLOSING_BRACKET, 'parameters');
 
 end;
 
@@ -590,10 +590,10 @@ begin
   Result := inherited and not Doubling(_Parser);
 end;
 
-procedure TQoutedStringRegion.RegionClosed(_Parser: TCustomStringParser);
+procedure TQoutedStringRegion.Closed(_Parser: TCustomStringParser);
 begin
 
-  inherited RegionClosed(_Parser);
+  inherited Closed(_Parser);
 
   with _Parser as TParamsStringParser do begin
 
@@ -618,37 +618,23 @@ begin
 
 end;
 
-{ TNestedParamsRegion }
+{ TNestedParamsBlock }
 
-function TNestedParamsRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
+function TNestedParamsBlock.CanOpen(_Parser: TCustomStringParser): Boolean;
 begin
   Result := inherited and (_Parser as TParamsStringParser).IsParamsType;
 end;
 
-procedure TNestedParamsRegion.RegionOpened(_Parser: TCustomStringParser);
+procedure TNestedParamsBlock.Opened(_Parser: TCustomStringParser);
 begin
-
-  with _Parser as TParamsStringParser do begin
-
-    Move(OpeningKey.KeyLength);
-    ReadParams(OpeningKey.KeyLength);
-
-  end;
-
+  inherited Opened(_Parser);
+  (_Parser as TParamsStringParser).ReadParams(OpeningKey.KeyLength);
 end;
 
-procedure TNestedParamsRegion.RegionClosed(_Parser: TCustomStringParser);
+procedure TNestedParamsBlock.Closed(_Parser: TCustomStringParser);
 begin
-
-  with _Parser as TParamsStringParser do begin
-
-    ElementType := etValue;
-    CursorStanding := stAfter;
-    ElementStart := 0;
-    Location.Remember(Cursor + ClosingKey.KeyLength);
-
-  end;
-
+  (_Parser as TParamsStringParser).ElementType := etValue;
+  inherited Closed(_Parser);
 end;
 
 end.

@@ -168,7 +168,7 @@ type
 
   protected
 
-    procedure RegionOpened(_Parser: TCustomStringParser); override;
+    procedure Opened(_Parser: TCustomStringParser); override;
 
   end;
 
@@ -176,7 +176,7 @@ type
 
   protected
 
-    procedure RegionClosed(_Parser: TCustomStringParser); override;
+    procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
 
@@ -189,7 +189,7 @@ type
   protected
 
     function CanClose(_Parser: TCustomStringParser): Boolean; override;
-    procedure RegionClosed(_Parser: TCustomStringParser); override;
+    procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
 
@@ -486,10 +486,10 @@ end;
 
 { TCustomCommentRegion }
 
-procedure TCustomCommentRegion.RegionOpened(_Parser: TCustomStringParser);
+procedure TCustomCommentRegion.Opened(_Parser: TCustomStringParser);
 begin
 
-  inherited RegionOpened(_Parser);
+  inherited Opened(_Parser);
 
   with _Parser as TUserParamsReader do
 
@@ -510,10 +510,10 @@ end;
 
 { TLongCommentRegion }
 
-procedure TLongCommentRegion.RegionClosed(_Parser: TCustomStringParser);
+procedure TLongCommentRegion.Closed(_Parser: TCustomStringParser);
 begin
 
-  inherited RegionClosed(_Parser);
+  inherited Closed(_Parser);
 
   with _Parser as TUserParamsReader do begin
 
@@ -547,13 +547,13 @@ begin
   Result := _Check(CRLF) or _Check(CR) or _Check(LF);
 end;
 
-procedure TShortCommentRegion.RegionClosed(_Parser: TCustomStringParser);
+procedure TShortCommentRegion.Closed(_Parser: TCustomStringParser);
 var
   Prefix, Suffix: String;
   Short: Boolean;
 begin
 
-  inherited RegionClosed(_Parser);
+  inherited Closed(_Parser);
 
   with _Parser as TUserParamsReader do begin
 
