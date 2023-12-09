@@ -80,7 +80,7 @@ type
 
     function ParamClass: TParamClass; override;
     function ParamsReaderClass: TParamsReaderClass; override;
-    function FormatParam(_Param: TParam; const _Name: String; const _Type: String; const _Value: String): String; override;
+    function FormatParam(_Param: TParam; const _Name: String; const _Type: String; const _Value: String; _First: Boolean): String; override;
 
   end;
 
@@ -192,11 +192,8 @@ begin
   for Comment in Self do
     with Comment do
       if Anchor = _Anchor then
-        if Anchor in [caAfterName, caAfterValue] then Result := Result + Splitter + Value
+        if Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
         else Result := Result + Value + Splitter;
-
-  if _Anchor in [caBeforeType, caAfterType, caBeforeValue] then
-    Result := ' ' + Result;
 
 end;
 
@@ -237,11 +234,11 @@ begin
   Result := TUserParamsReader;
 end;
 
-function TUserParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String;
+function TUserParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String; _First: Boolean): String;
 const
 
   SC_VALUE_UNTYPED = '%4:s%5:s%0:s%6:s = %9:s%2:s%10:s%3:s%11:s';
-  SC_VALUE_TYPED   = '%4:s%5:s%0:s%6:s:%7:s%1:s%8:s=%9:s%2:s%10:s%3:s%11:s';
+  SC_VALUE_TYPED   = '%4:s%5:s%0:s%6:s: %7:s%1:s%8:s = %9:s%2:s%10:s%3:s%11:s';
 
 var
   ParamFormat: String;
@@ -249,11 +246,11 @@ var
   SingleString: Boolean;
 begin
 
-  { TODO -oVasilyevSM -cGeneral: В нетипизованной форме лупит лишний пробел перед значением: A =  ;B =  ;C =  ;D = }
-  SingleString := soSingleString in SaveToStringOptions;
-
   if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
   else ParamFormat := SC_VALUE_TYPED;
+
+  { TODO 1 -oVasilyevSM -cGeneral: В нетипизованной форме лупит лишний пробел перед значением: A =  ;B =  ;C =  ;D = }
+  SingleString := soSingleString in SaveToStringOptions;
 
   if SingleString then Splitter := ';'
   else Splitter := CRLF;
@@ -276,6 +273,9 @@ begin
         Comments.Get(caAfterParam,  SingleString)
 
     ]);
+
+  if SingleString and not _First then
+    Result := ' ' + Result;
 
 end;
 

@@ -347,7 +347,7 @@ type
 
     function ParamClass: TParamClass; virtual;
     function ParamsReaderClass: TParamsReaderClass; virtual;
-    function FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String; virtual;
+    function FormatParam(_Param: TParam; const _Name, _Type, _Value: String; _First: Boolean): String; virtual;
 
   public
 
@@ -1960,7 +1960,7 @@ begin
   Result := TParamsReader;
 end;
 
-function TParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String;
+function TParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String; _First: Boolean): String;
 const
 
   SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
@@ -2244,22 +2244,23 @@ function TParams.SaveToString: String;
   end;
 
 var
-  Param: TParam;
+  i: Integer;
   Value: String;
 begin
 
   Result := '';
-  for Param in Items do begin
+  for i := 0 to Items.Count - 1 do begin
 
-    if Param.DataType = dtParams then Value := _GetNested(Param)
-    else Value := _QuoteString(Param);
+    if Items[i].DataType = dtParams then Value := _GetNested(Items[i])
+    else Value := _QuoteString(Items[i]);
 
     Result := Result + FormatParam(
 
-        Param,
-        Param.Name,
-        ParamDataTypeToStr(Param.DataType),
-        Value
+        Items[i],
+        Items[i].Name,
+        ParamDataTypeToStr(Items[i].DataType),
+        Value,
+        i = 0
 
     );
 
