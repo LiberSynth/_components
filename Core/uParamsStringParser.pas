@@ -37,10 +37,9 @@ uses
 
 type
 
-  TItemType = (itName, itType, itValue);
+  TElementType = (etName, etType, etValue);
 
-  TKeyType = (
-  { inherits from uCustomStringParser.TKeyType }
+  TKeyType = ( { inherits from uCustomStringParser.TKeyType }
 
       ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktNestedOpening,
       ktNestedClosing
@@ -54,14 +53,14 @@ type
   TReadInfo = record
 
     Operation: TOperation;
-    ItemType: TItemType;
+    ElementType: TElementType;
     Nested: TNested;
     KeyTypes: TKeyTypes;
 
     constructor Create(
 
         _Operation: TOperation;
-        _ItemType: TItemType;
+        _ElementType: TElementType;
         _Nested: TNested;
         _KeyTypes: TKeyTypes
 
@@ -76,7 +75,7 @@ type
     procedure Add(
 
         _Operation: TOperation;
-        _ItemType: TItemType;
+        _ElementType: TElementType;
         _Nested: TNested;
         _KeyTypes: TKeyTypes
 
@@ -86,15 +85,15 @@ type
 
   TSyntaxInfo = record
 
-    ItemType: TItemType;
-    ItemStanding: TStanding;
+    ElementType: TElementType;
+    CursorStanding: TStanding;
     Nested: TNested;
     Keys: TKeyTypes;
 
     constructor Create(
 
-        _ItemType: TItemType;
-        _ItemStanding: TStanding;
+        _ElementType: TElementType;
+        _CursorStanding: TStanding;
         _Nested: TNested;
         _Keys: TKeyTypes
 
@@ -108,8 +107,8 @@ type
 
     procedure Add(
 
-        _ItemType: TItemType;
-        _ItemStanding: TStanding;
+        _ElementType: TElementType;
+        _CursorStanding: TStanding;
         _Nested: TNested;
         _Keys: TKeyTypes
 
@@ -117,7 +116,6 @@ type
 
   end;
 
-  { 1 TODO -oVasilyevSM -cTParamsStringParser: ֲ ץ‎כן. }
   TParamsStringParser = class(TCustomStringParser)
 
   const
@@ -126,7 +124,7 @@ type
 
   strict private
 
-    FItemType: TItemType;
+    FElementType: TElementType;
 
     FReading: TReadInfoList;
     FExcludingSyntax: TSyntaxInfoList;
@@ -138,8 +136,8 @@ type
 
     procedure InitParser; override;
 
-    function ItemProcessingKey(_KeyWord: TKeyWord): Boolean; override;
-    function ItemTerminatingKey(_KeyWord: TKeyWord): Boolean; override;
+    function ElementProcessingKey(_KeyWord: TKeyWord): Boolean; override;
+    function ElementTerminatingKey(_KeyWord: TKeyWord): Boolean; override;
     procedure CheckSyntax(const _KeyWord: TKeyWord); override;
     procedure DoAfterKey(_KeyWord: TKeyWord); override;
 
@@ -149,7 +147,7 @@ type
     procedure ReadParams(_CursorShift: Int64); virtual; abstract;
     function IsParamsType: Boolean; virtual; abstract;
 
-    property ItemType: TItemType read FItemType write FItemType;
+    property ElementType: TElementType read FElementType write FElementType;
     property Reading: TReadInfoList read FReading;
     property DoublingChar: Char read FDoublingChar write FDoublingChar;
 
@@ -160,8 +158,8 @@ type
 
     destructor Destroy; override;
 
-    procedure ProcessItem; override;
-    procedure ToggleItem(_KeyWord: TKeyWord); override;
+    procedure ProcessElement; override;
+    procedure ToggleElement(_KeyWord: TKeyWord); override;
 
   end;
 
@@ -171,15 +169,15 @@ implementation
 
 const
 
-  KWR_SPACE:                TKeyWord = (KeyTypeInternal: Integer(ktSpace);            StrValue: ' ';   KeyLength: Length(' ') );
-  KWR_TAB:                  TKeyWord = (KeyTypeInternal: Integer(ktSpace);            StrValue: TAB;   KeyLength: Length(TAB) );
-  KWR_SPLITTER:             TKeyWord = (KeyTypeInternal: Integer(ktSplitter);         StrValue: ';';   KeyLength: Length(';') );
-  KWR_TYPE_IDENT:           TKeyWord = (KeyTypeInternal: Integer(ktTypeIdent);        StrValue: ':';   KeyLength: Length(':') );
-  KWR_ASSIGNING:            TKeyWord = (KeyTypeInternal: Integer(ktAssigning);        StrValue: '=';   KeyLength: Length('=') );
-  KWR_QUOTE_SINGLE:         TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '''';  KeyLength: Length(''''));
-  KWR_QUOTE_DOBLE:          TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);     StrValue: '"';   KeyLength: Length('"') );
-  KWR_OPENING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktNestedOpening);    StrValue: '(';   KeyLength: Length('(') );
-  KWR_CLOSING_BRACKET:      TKeyWord = (KeyTypeInternal: Integer(ktNestedClosing);    StrValue: ')';   KeyLength: Length(')') );
+  KWR_SPACE:           TKeyWord = (KeyTypeInternal: Integer(ktSpace);         StrValue: ' ';  KeyLength: Length(' ' ));
+  KWR_TAB:             TKeyWord = (KeyTypeInternal: Integer(ktSpace);         StrValue: TAB;  KeyLength: Length(TAB ));
+  KWR_SPLITTER:        TKeyWord = (KeyTypeInternal: Integer(ktSplitter);      StrValue: ';';  KeyLength: Length(';' ));
+  KWR_TYPE_IDENT:      TKeyWord = (KeyTypeInternal: Integer(ktTypeIdent);     StrValue: ':';  KeyLength: Length(':' ));
+  KWR_ASSIGNING:       TKeyWord = (KeyTypeInternal: Integer(ktAssigning);     StrValue: '=';  KeyLength: Length('=' ));
+  KWR_QUOTE_SINGLE:    TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);  StrValue: ''''; KeyLength: Length(''''));
+  KWR_QUOTE_DOBLE:     TKeyWord = (KeyTypeInternal: Integer(ktStringBorder);  StrValue: '"';  KeyLength: Length('"' ));
+  KWR_OPENING_BRACKET: TKeyWord = (KeyTypeInternal: Integer(ktNestedOpening); StrValue: '(';  KeyLength: Length('(' ));
+  KWR_CLOSING_BRACKET: TKeyWord = (KeyTypeInternal: Integer(ktNestedClosing); StrValue: ')';  KeyLength: Length(')' ));
 
 type
 
@@ -210,7 +208,6 @@ type
 
     function CanOpen(_Parser: TCustomStringParser): Boolean; override;
     function CanClose(_Parser: TCustomStringParser): Boolean; override;
-    procedure RegionOpened(_Parser: TCustomStringParser); override;
     procedure RegionClosed(_Parser: TCustomStringParser); override;
 
   end;
@@ -263,10 +260,10 @@ end;
 constructor TReadInfo.Create;
 begin
 
-  Operation := _Operation;
-  ItemType  := _ItemType;
-  KeyTypes  := _KeyTypes;
-  Nested    := _Nested;
+  Operation   := _Operation;
+  ElementType := _ElementType;
+  KeyTypes    := _KeyTypes;
+  Nested      := _Nested;
 
 end;
 
@@ -274,7 +271,7 @@ end;
 
 procedure TReadInfoList.Add;
 begin
-  inherited Add(TReadInfo.Create(_Operation, _ItemType, _Nested, _KeyTypes));
+  inherited Add(TReadInfo.Create(_Operation, _ElementType, _Nested, _KeyTypes));
 end;
 
 { TSyntaxInfo }
@@ -282,10 +279,10 @@ end;
 constructor TSyntaxInfo.Create;
 begin
 
-  ItemType     := _ItemType;
-  ItemStanding := _ItemStanding;
-  Nested       := _Nested;
-  Keys         := _Keys;
+  ElementType    := _ElementType;
+  CursorStanding := _CursorStanding;
+  Nested         := _Nested;
+  Keys           := _Keys;
 
 end;
 
@@ -293,7 +290,7 @@ end;
 
 procedure TSyntaxInfoList.Add;
 begin
-  inherited Add(TSyntaxInfo.Create(_ItemType, _ItemStanding, _Nested, _Keys));
+  inherited Add(TSyntaxInfo.Create(_ElementType, _CursorStanding, _Nested, _Keys));
 end;
 
 { TParamsStringParser }
@@ -331,7 +328,72 @@ begin
 
 end;
 
-function TParamsStringParser.ItemProcessingKey(_KeyWord: TKeyWord): Boolean;
+procedure TParamsStringParser.InitParser;
+begin
+
+  inherited InitParser;
+
+  with KeyWords do begin
+
+    Add(KWR_SPACE          );
+    Add(KWR_TAB            );
+    Add(KWR_SPLITTER       );
+    Add(KWR_TYPE_IDENT     );
+    Add(KWR_ASSIGNING      );
+    Add(KWR_QUOTE_SINGLE   );
+    Add(KWR_QUOTE_DOBLE    );
+    Add(KWR_OPENING_BRACKET);
+    Add(KWR_CLOSING_BRACKET);
+
+  end;
+
+  with Reading do begin
+
+    {   Operation      ElementType Nested      KeyTypes                                      }
+    Add(opProcessing,  etName,     nsNoMatter, [ktLineEnd, ktSpace, ktTypeIdent, ktAssigning]);
+    Add(opTerminating, etName,     nsNoMatter, [ktTypeIdent, ktAssigning]                    );
+
+    Add(opProcessing,  etType,     nsNoMatter, [ktLineEnd, ktSpace, ktAssigning]);
+    Add(opTerminating, etType,     nsNoMatter, [ktAssigning]                    );
+
+    Add(opProcessing,  etValue,    nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]);
+    Add(opTerminating, etValue,    nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]);
+
+    Add(opProcessing,  etValue,    nsNested,    [ktLineEnd, ktSplitter, ktSourceEnd, ktNestedClosing]);
+    Add(opTerminating, etValue,    nsNested,    [ktLineEnd, ktSplitter, ktSourceEnd, ktNestedClosing]);
+
+  end;
+
+  with FExcludingSyntax do begin
+
+    {   ElementType  CursorStanding  Nested      Keys         }
+    Add(etName,      stInside,       nsNoMatter, [ktSourceEnd]);
+    Add(etName,      stAfter,        nsNoMatter, [ktSourceEnd]);
+    Add(etType,      stInside,       nsNoMatter, [ktSourceEnd]);
+    Add(etType,      stAfter,        nsNoMatter, [ktSourceEnd]);
+
+  end;
+
+  with FStrictSyntax do begin
+
+    {   ElementType  CursorStanding Nested       Keys                                                          }
+    Add(etName,      stBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                             );
+    Add(etName,      stBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]            );
+    Add(etName,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktTypeIdent, ktAssigning]                );
+    Add(etValue,     stBefore,      nsNoMatter,  [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]);
+    Add(etValue,     stAfter,       nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                 );
+    Add(etValue,     stAfter,       nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing, ktSplitter]);
+
+  end;
+
+  {         RegionClass          OpeningKey           ClosingKey           Caption     }
+  AddRegion(TQoutedStringRegion, KWR_QUOTE_SINGLE,    KWR_QUOTE_SINGLE,    'string'    );
+  AddRegion(TQoutedStringRegion, KWR_QUOTE_DOBLE,     KWR_QUOTE_DOBLE,     'string'    );
+  AddRegion(TNestedParamsRegion, KWR_OPENING_BRACKET, KWR_CLOSING_BRACKET, 'parameters');
+
+end;
+
+function TParamsStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
 var
   RI: TReadInfo;
 begin
@@ -341,7 +403,7 @@ begin
     if
 
         (RI.Operation = opProcessing) and
-        (RI.ItemType  = ItemType) and
+        (RI.ElementType = ElementType) and
         (RI.Nested in [TA_TypedNested[Nested], nsNoMatter]) and
         _KeyWord.TypeInSet(RI.KeyTypes)
 
@@ -351,7 +413,7 @@ begin
 
 end;
 
-function TParamsStringParser.ItemTerminatingKey(_KeyWord: TKeyWord): Boolean;
+function TParamsStringParser.ElementTerminatingKey(_KeyWord: TKeyWord): Boolean;
 var
   RI: TReadInfo;
 begin
@@ -361,7 +423,7 @@ begin
     if
 
         (RI.Operation = opTerminating) and
-        (RI.ItemType  = FItemType) and
+        (RI.ElementType = FElementType) and
         (RI.Nested in [TA_TypedNested[Nested], nsNoMatter]) and
         _KeyWord.TypeInSet(RI.KeyTypes)
 
@@ -392,8 +454,8 @@ begin
 
     if
 
-        (SI.ItemType = ItemType) and
-        (SI.ItemStanding = ItemStanding) and
+        (SI.ElementType = ElementType) and
+        (SI.CursorStanding = CursorStanding) and
         (SI.Nested in [TA_TypedNested[Nested], nsNoMatter]) and
         _KeyWord.TypeInSet(SI.Keys)
 
@@ -407,8 +469,8 @@ begin
 
     if
 
-        (SI.ItemType = ItemType) and
-        (SI.ItemStanding = ItemStanding) and
+        (SI.ElementType = ElementType) and
+        (SI.CursorStanding = CursorStanding) and
         (SI.Nested in [TA_TypedNested[Nested], nsNoMatter]) and
         not _KeyWord.TypeInSet(SI.Keys)
 
@@ -426,111 +488,45 @@ begin
     Terminate;
 end;
 
-procedure TParamsStringParser.ToggleItem(_KeyWord: TKeyWord);
+procedure TParamsStringParser.ProcessElement;
 begin
 
-  case ItemType of
+  case ElementType of
 
-    itName:
+    etName:  ReadName;
+    etType:  ReadType;
+    etValue: ReadValue;
+
+  end;
+
+  inherited ProcessElement;
+
+end;
+
+procedure TParamsStringParser.ToggleElement(_KeyWord: TKeyWord);
+begin
+
+  case ElementType of
+
+    etName:
 
       case _KeyWord.KeyType of
 
-        ktTypeIdent: ItemType := itType;
-        ktAssigning: ItemType := itValue;
+        ktTypeIdent: ElementType := etType;
+        ktAssigning: ElementType := etValue;
 
       else
         Exit;
       end;
 
-    itType:  ItemType := itValue;
-    itValue: ItemType := itName;
+    etType:  ElementType := etValue;
+    etValue: ElementType := etName;
 
   else
     Exit;
   end;
 
-  inherited ToggleItem(_KeyWord);
-
-end;
-
-procedure TParamsStringParser.InitParser;
-begin
-
-  inherited InitParser;
-
-  with KeyWords do begin
-
-    Add(KWR_SPACE          );
-    Add(KWR_TAB            );
-    Add(KWR_SPLITTER       );
-    Add(KWR_TYPE_IDENT     );
-    Add(KWR_ASSIGNING      );
-    Add(KWR_QUOTE_SINGLE   );
-    Add(KWR_QUOTE_DOBLE    );
-    Add(KWR_OPENING_BRACKET);
-    Add(KWR_CLOSING_BRACKET);
-
-  end;
-
-  with Reading do begin
-
-// ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktNestedOpening, ktNestedClosing
-    {   Operation      ItemType  Nested      KeyTypes                                      }
-    Add(opProcessing,  itName,   nsNoMatter, [ktLineEnd, ktSpace, ktTypeIdent, ktAssigning]);
-    Add(opTerminating, itName,   nsNoMatter, [ktTypeIdent, ktAssigning]                    );
-
-    Add(opProcessing,  itType,   nsNoMatter, [ktLineEnd, ktSpace, ktAssigning]);
-    Add(opTerminating, itType,   nsNoMatter, [ktAssigning]                    );
-
-    Add(opProcessing,  itValue,  nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]);
-    Add(opTerminating, itValue,  nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]);
-
-    Add(opProcessing,  itValue,  nsNested,    [ktLineEnd, ktSplitter, ktSourceEnd, ktNestedClosing]);
-    Add(opTerminating, itValue,  nsNested,    [ktLineEnd, ktSplitter, ktSourceEnd, ktNestedClosing]);
-
-  end;
-
-  with FExcludingSyntax do begin
-
-    {   ItemType  ItemStanding  Nested      Keys            }
-    Add(itName,   stInside,     nsNoMatter, [ktSourceEnd]);
-    Add(itName,   stAfter,      nsNoMatter, [ktSourceEnd]);
-    Add(itType,   stInside,     nsNoMatter, [ktSourceEnd]);
-    Add(itType,   stAfter,      nsNoMatter, [ktSourceEnd]);
-
-  end;
-
-  with FStrictSyntax do begin
-
-    {   ItemType  ItemStanding Nested       Keys                                                          }
-    Add(itName,   stBefore,    nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                             );
-    Add(itName,   stBefore,    nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]            );
-    Add(itName,   stAfter,     nsNoMatter,  [ktSpace, ktLineEnd, ktTypeIdent, ktAssigning]                );
-    Add(itValue,  stBefore,    nsNoMatter,  [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]);
-    Add(itValue,  stAfter,     nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                 );
-    Add(itValue,  stAfter,     nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing, ktSplitter]);
-
-  end;
-
-  {         RegionClass          OpeningKey           ClosingKey           Caption }
-  AddRegion(TQoutedStringRegion, KWR_QUOTE_SINGLE,    KWR_QUOTE_SINGLE,    'string'    );
-  AddRegion(TQoutedStringRegion, KWR_QUOTE_DOBLE,     KWR_QUOTE_DOBLE,     'string'    );
-  AddRegion(TNestedParamsRegion, KWR_OPENING_BRACKET, KWR_CLOSING_BRACKET, 'parameters');
-
-end;
-
-procedure TParamsStringParser.ProcessItem;
-begin
-
-  case ItemType of
-
-    itName:  ReadName;
-    itType:  ReadType;
-    itValue: ReadValue;
-
-  end;
-
-  inherited ProcessItem;
+  inherited ToggleElement(_KeyWord);
 
 end;
 
@@ -583,8 +579,8 @@ begin
 
     Result :=
 
-        (ItemType = itValue) and
-        (ItemStanding = stBefore) and
+        (ElementType = etValue) and
+        (CursorStanding = stBefore) and
         inherited;
 
 end;
@@ -592,21 +588,6 @@ end;
 function TQoutedStringRegion.CanClose(_Parser: TCustomStringParser): Boolean;
 begin
   Result := inherited and not Doubling(_Parser);
-end;
-
-procedure TQoutedStringRegion.RegionOpened(_Parser: TCustomStringParser);
-begin
-
-  inherited RegionOpened(_Parser);
-
-//  with _Parser as TParamsStringParser do begin
-//
-//    ItemStanding := stInside;
-//    ItemStart := Cursor;
-//    FLocation.Remember(Cursor);
-//
-//  end;
-
 end;
 
 procedure TQoutedStringRegion.RegionClosed(_Parser: TCustomStringParser);
@@ -622,7 +603,7 @@ begin
     Move(- ClosingKey.KeyLength);
     try
 
-      ProcessItem;
+      ProcessElement;
 
     finally
 
@@ -661,9 +642,9 @@ begin
 
   with _Parser as TParamsStringParser do begin
 
-    ItemType := itValue;
-    ItemStanding := stAfter;
-    ItemStart := 0;
+    ElementType := etValue;
+    CursorStanding := stAfter;
+    ElementStart := 0;
     Location.Remember(Cursor + ClosingKey.KeyLength);
 
   end;

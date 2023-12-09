@@ -138,6 +138,8 @@ type
 
   end;
 
+  TParamClass = class of TParam;
+
   TParamHelper = class helper for TParam
 
   strict private
@@ -263,8 +265,6 @@ type
 
 
   end;
-
-  TParamClass = class of TParam;
 
   TParamsListHolder = class(TObjectList<TMultiParamList>)
 
@@ -848,6 +848,29 @@ begin
 
 end;
 
+class procedure TParam.ValidateName(const _Value, _PathSeparator: String);
+const
+  SC_PARAM_NAME_FORBIDDEN_CHARS = [' '];
+var
+  i: Integer;
+begin
+
+  if Length(_Value) = 0 then
+    raise EParamsReadException.Create('Empty param name');
+
+  for i := 1 to Length(_Value) do
+    if not CharInSet(_Value[i], SC_TYPED_CHARS) then
+      raise EParamsException.CreateFmt('Character #%d in invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
+
+  for i := 1 to Length(_Value) do
+    if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
+      raise EParamsException.CreateFmt('Character ''%s'' in invalid in param name ''%s''', [_Value[i], _Value]);
+
+  if Pos(_PathSeparator, _Value) > 0 then
+    raise EParamsException.CreateFmt('Character ''%s'' is used as a path separator. So it is invalid in param name ''%s''.', [_PathSeparator, _Value]);
+
+end;
+
 procedure TParam.AssignValue(_Source: TParam; _ForceAdding: Boolean);
 var
   P: TParams;
@@ -886,29 +909,6 @@ begin
     else
       raise EUncompletedMethod.Create;
     end;
-
-end;
-
-class procedure TParam.ValidateName(const _Value, _PathSeparator: String);
-const
-  SC_PARAM_NAME_FORBIDDEN_CHARS = [' '];
-var
-  i: Integer;
-begin
-
-  if Length(_Value) = 0 then
-    raise EParamsReadException.Create('Empty param name');
-
-  for i := 1 to Length(_Value) do
-    if not CharInSet(_Value[i], SC_TYPED_CHARS) then
-      raise EParamsException.CreateFmt('Character #%d in invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
-
-  for i := 1 to Length(_Value) do
-    if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
-      raise EParamsException.CreateFmt('Character ''%s'' in invalid in param name ''%s''', [_Value[i], _Value]);
-
-  if Pos(_PathSeparator, _Value) > 0 then
-    raise EParamsException.CreateFmt('Character ''%s'' is used as a path separator. So it is invalid in param name ''%s''.', [_PathSeparator, _Value]);
 
 end;
 
@@ -1696,16 +1696,6 @@ begin
 
 end;
 
-function TParams.ParamClass: TParamClass;
-begin
-  Result := TParam;
-end;
-
-function TParams.CreateNewParam(const _Name: String): TParam;
-begin
-  Result := ParamClass.Create(_Name, PathSeparator);
-end;
-
 function TParams.Add(const _Name: String): TParam;
 begin
   Result := CreateNewParam(_Name);
@@ -1768,11 +1758,6 @@ begin
     raise EParamsException.CreateFmt('Param %s not found', [_Path]);
 end;
 
-function TParams.ParamsReaderClass: TParamsReaderClass;
-begin
-  Result := TParamsReader;
-end;
-
 function TParams.GetList(const _Path: String): TMultiParamList;
 var
   PathRest: String;
@@ -1791,6 +1776,11 @@ end;
 function TParams.GetCount: Integer;
 begin
   Result := Items.Count;
+end;
+
+function TParams.CreateNewParam(const _Name: String): TParam;
+begin
+  Result := ParamClass.Create(_Name, PathSeparator);
 end;
 
 function TParams.GetIsNull(const _Path: String): Boolean;
@@ -1960,6 +1950,37 @@ begin
 
 end;
 
+function TParams.ParamClass: TParamClass;
+begin
+  Result := TParam;
+end;
+
+function TParams.ParamsReaderClass: TParamsReaderClass;
+begin
+  Result := TParamsReader;
+end;
+
+function TParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String;
+const
+
+  SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
+  SC_VALUE_TYPED   = '%0:s:%1:s=%2:s%3:s';
+
+var
+  ParamFormat: String;
+  Splitter: String;
+begin
+
+  if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
+  else ParamFormat := SC_VALUE_TYPED;
+
+  if soSingleString in SaveToStringOptions then Splitter := ';'
+  else Splitter := CRLF;
+
+  Result := Format(ParamFormat, [_Name, _Type, _Value, Splitter]);
+
+end;
+
 function TParams.FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
 var
   P: TParam;
@@ -2030,27 +2051,6 @@ var
 begin
   Result := FindParam(_Path, dtString, P);
   if Result then _Value := P.AsString;
-end;
-
-function TParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String;
-const
-
-  SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
-  SC_VALUE_TYPED   = '%0:s:%1:s=%2:s%3:s';
-
-var
-  ParamFormat: String;
-  Splitter: String;
-begin
-
-  if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
-  else ParamFormat := SC_VALUE_TYPED;
-
-  if soSingleString in SaveToStringOptions then Splitter := ';'
-  else Splitter := CRLF;
-
-  Result := Format(ParamFormat, [_Name, _Type, _Value, Splitter]);
-
 end;
 
 function TParams.FindBLOB(const _Path: String; var _Value: BLOB): Boolean;
@@ -2342,7 +2342,7 @@ var
   Value: String;
 begin
 
-  Value := ReadItem(True);
+  Value := ReadElement(True);
 
   TParam.ValidateName(Value, Params.PathSeparator);
   FCurrentName := Value;
@@ -2351,7 +2351,7 @@ end;
 
 procedure TParamsReader.ReadType;
 begin
-  FCurrentType := StrToParamDataType(ReadItem(True));
+  FCurrentType := StrToParamDataType(ReadElement(True));
   CheckPresetType(True);
 end;
 
@@ -2361,7 +2361,7 @@ var
   Index: Integer;
 begin
 
-  Value := ReadItem(False);
+  Value := ReadElement(False);
 
   if PresetTypes then
     CheckPresetType(True);

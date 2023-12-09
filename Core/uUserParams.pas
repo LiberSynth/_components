@@ -8,12 +8,11 @@ uses
   { Liber Synth }
   uConsts, uTypes, uStrUtils, uParams, uCustomStringParser, uParamsStringParser;
 
-  { TODO 2 -oVasilyevSM -cTUserParams: //, -- }
+  { TODO 1 -oVasilyevSM -cTUserParams: //, -- }
 
 type
 
-  TKeyType = (
-    { inherits from uParamsStringParser.TKeyType }
+  TKeyType = ( { inherits from uParamsStringParser.TKeyType }
 
       ktNone, ktSourceEnd, ktLineEnd, ktSpace, ktSplitter, ktTypeIdent, ktAssigning, ktStringBorder, ktNestedOpening,
       ktNestedClosing, ktLongCommentOpening, ktLongCommentClosing
@@ -115,22 +114,6 @@ type
 
   end;
 
-  { TODO 3 -oVasilyevSM -cTKeyType: TKeyType -> Integer. Ёто уже совсем. ѕлатим 1000 чтобы заработать 100. }
-  TReadInfoListHelper = class helper for TReadInfoList
-
-  public
-
-    procedure Add(
-
-        _Operation: TOperation;
-        _ItemType: TItemType;
-        _Nested: TNested;
-        _KeyTypes: TKeyTypes
-
-    );
-
-  end;
-
   TUserParamsReader = class(TParamsReader)
 
   strict private
@@ -161,8 +144,8 @@ type
     destructor Destroy; override;
 
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
-    function ReadItem(_Trim: Boolean): String; override;
-    procedure ItemTerminatedEvent(_KeyWord: TKeyWord); override;
+    function ReadElement(_Trim: Boolean): String; override;
+    procedure ElementTerminatedEvent(_KeyWord: TKeyWord); override;
 
   end;
 
@@ -219,6 +202,41 @@ end;
 
 { TUserParam }
 
+constructor TUserParam.Create(const _Name: String; const _PathSeparator: Char);
+begin
+  inherited Create(_Name, _PathSeparator);
+  FComments := TCommentList.Create;
+end;
+
+destructor TUserParam.Destroy;
+begin
+  FreeAndNil(FComments);
+  inherited Destroy;
+end;
+
+procedure TUserParam.AssignValue(_Source: TParam; _ForceAdding: Boolean);
+begin
+
+  inherited AssignValue(_Source, _ForceAdding);
+
+  Comments.Clear;
+  if _Source is TUserParam then
+    Comments.AddRange(TUserParam(_Source).Comments.ToArray);
+
+end;
+
+{ TUserParam }
+
+function TUserParams.ParamClass: TParamClass;
+begin
+  Result := TUserParam;
+end;
+
+function TUserParams.ParamsReaderClass: TParamsReaderClass;
+begin
+  Result := TUserParamsReader;
+end;
+
 function TUserParams.FormatParam(_Param: TParam; const _Name, _Type, _Value: String): String;
 const
 
@@ -231,6 +249,7 @@ var
   SingleString: Boolean;
 begin
 
+  { TODO -oVasilyevSM -cGeneral: ¬ нетипизованной форме лупит лишний пробел перед значением: A =  ;B =  ;C =  ;D = }
   SingleString := soSingleString in SaveToStringOptions;
 
   if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
@@ -260,41 +279,6 @@ begin
 
 end;
 
-function TUserParams.ParamClass: TParamClass;
-begin
-  Result := TUserParam;
-end;
-
-function TUserParams.ParamsReaderClass: TParamsReaderClass;
-begin
-  Result := TUserParamsReader;
-end;
-
-{ TUserParam }
-
-procedure TUserParam.AssignValue(_Source: TParam; _ForceAdding: Boolean);
-begin
-
-  inherited AssignValue(_Source, _ForceAdding);
-
-  Comments.Clear;
-  if _Source is TUserParam then
-    Comments.AddRange(TUserParam(_Source).Comments.ToArray);
-
-end;
-
-constructor TUserParam.Create(const _Name: String; const _PathSeparator: Char);
-begin
-  inherited Create(_Name, _PathSeparator);
-  FComments := TCommentList.Create;
-end;
-
-destructor TUserParam.Destroy;
-begin
-  FreeAndNil(FComments);
-  inherited Destroy;
-end;
-
 { TKeyWordHelper }
 
 constructor TKeyWordHelper.Create(_KeyType: TKeyType; const _StrValue: String);
@@ -318,14 +302,13 @@ begin
   Result := KeyType in _Set;
 end;
 
-{ TReadInfoListHelper }
-
-procedure TReadInfoListHelper.Add;
-begin
-  inherited Add(_Operation, _ItemType, _Nested, uParamsStringParser.TKeyTypes(_KeyTypes));
-end;
-
 { TUserParamsReader }
+
+destructor TUserParamsReader.Destroy;
+begin
+  FreeAndNil(FCurrentComments);
+  inherited Destroy;
+end;
 
 procedure TUserParamsReader.CheckBeforeNameComments;
 var
@@ -339,10 +322,26 @@ begin
 
 end;
 
-destructor TUserParamsReader.Destroy;
+procedure TUserParamsReader.SaveLastComments;
+var
+  i: Integer;
 begin
-  FreeAndNil(FCurrentComments);
-  inherited Destroy;
+
+  if Assigned(CurrentParam) then begin
+
+    for i := 0 to CurrentComments.Count - 1 do
+      with CurrentComments[i] do
+        CurrentComments[i] := TComment.Create(Value, caAfterParam);
+
+    CurrentParam.Comments.AddRange(CurrentComments.ToArray);
+
+  end;
+
+end;
+
+function TUserParamsReader.ReadComment(_Shift: Byte): String;
+begin
+  Result := Copy(Source, RegionStart, Cursor - RegionStart - _Shift);
 end;
 
 procedure TUserParamsReader.AddComment(const _Value: String);
@@ -350,18 +349,24 @@ var
   Anchor: TCommentAnchor;
 begin
 
-  case ItemType of
+  case ElementType of
 
-    itName:  if Length(CurrentName) > 0   then Anchor := caAfterName  else Anchor := caBeforeName;
-    itType:  if (CurrentType > dtUnknown) then Anchor := caAfterType  else Anchor := caBeforeType;
-    itValue: if Length(CurrentName) = 0   then Anchor := caAfterValue else Anchor := caBeforeValue;
+    etName:  if Length(CurrentName) > 0   then Anchor := caAfterName  else Anchor := caBeforeName;
+    etType:  if (CurrentType > dtUnknown) then Anchor := caAfterType  else Anchor := caBeforeType;
+    etValue: if Length(CurrentName) = 0   then Anchor := caAfterValue else Anchor := caBeforeValue;
 
   else
-    raise EParamsReadException.Create('Unexpected content ItemType');
+    raise EParamsReadException.Create('Unexpected content element');
   end;
 
   CurrentComments.Add(_Value, Anchor);
 
+end;
+
+procedure TUserParamsReader.ParamReadEvent(_Param: TParam);
+begin
+  inherited ParamReadEvent(_Param);
+  CurrentParam := _Param as TUserParam;
 end;
 
 procedure TUserParamsReader.InitParser;
@@ -385,14 +390,35 @@ begin
 
 end;
 
-procedure TUserParamsReader.ItemTerminatedEvent(_KeyWord: TKeyWord);
+procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
-  inherited ItemTerminatedEvent(_KeyWord);
+  inherited KeyEvent(_KeyWord);
+
+  case _KeyWord.KeyType of
+
+    ktLineEnd:   if ElementType = etName then CheckBeforeNameComments;
+    ktSourceEnd: SaveLastComments;
+
+  end;
+
+end;
+
+function TUserParamsReader.ReadElement(_Trim: Boolean): String;
+begin
+  Result := inherited ReadElement(_Trim);
+  if CommentTerminatedValue then
+    Result := TrimRight(Result);
+end;
+
+procedure TUserParamsReader.ElementTerminatedEvent(_KeyWord: TKeyWord);
+begin
+
+  inherited ElementTerminatedEvent(_KeyWord);
 
   if
 
-      ((ItemType = itName) or (_KeyWord.KeyType = ktSourceEnd)) and
+      ((ElementType = etName) or (_KeyWord.KeyType = ktSourceEnd)) and
       Assigned(CurrentParam)
 
   then
@@ -407,56 +433,29 @@ begin
 
 end;
 
-procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
-begin
-
-  inherited KeyEvent(_KeyWord);
-
-  case _KeyWord.KeyType of
-
-    ktLineEnd:   if ItemType = itName then CheckBeforeNameComments;
-    ktSourceEnd: SaveLastComments;
-
-  end;
-
-end;
-
-procedure TUserParamsReader.ParamReadEvent(_Param: TParam);
-begin
-  inherited ParamReadEvent(_Param);
-  CurrentParam := _Param as TUserParam;
-end;
-
-function TUserParamsReader.ReadComment(_Shift: Byte): String;
-begin
-  Result := Copy(Source, RegionStart, Cursor - RegionStart - _Shift);
-end;
-
-function TUserParamsReader.ReadItem(_Trim: Boolean): String;
-begin
-  Result := inherited ReadItem(_Trim);
-  if CommentTerminatedValue then
-    Result := TrimRight(Result);
-end;
-
-procedure TUserParamsReader.SaveLastComments;
-var
-  i: Integer;
-begin
-
-  if Assigned(CurrentParam) then begin
-
-    for i := 0 to CurrentComments.Count - 1 do
-      with CurrentComments[i] do
-        CurrentComments[i] := TComment.Create(Value, caAfterParam);
-
-    CurrentParam.Comments.AddRange(CurrentComments.ToArray);
-
-  end;
-
-end;
-
 { TLongCommentRegion }
+
+procedure TLongCommentRegion.RegionOpened(_Parser: TCustomStringParser);
+begin
+
+  inherited RegionOpened(_Parser);
+
+  with _Parser as TUserParamsReader do
+
+    if (CursorStanding > stBefore) and (ElementStart > 0) then begin
+
+      CommentTerminatedValue := True;
+      try
+
+        ProcessElement;
+
+      finally
+        CommentTerminatedValue := False;
+      end;
+
+    end;
+
+end;
 
 procedure TLongCommentRegion.RegionClosed(_Parser: TCustomStringParser);
 begin
@@ -474,28 +473,6 @@ begin
     ]));
 
   end;
-
-end;
-
-procedure TLongCommentRegion.RegionOpened(_Parser: TCustomStringParser);
-begin
-
-  inherited RegionOpened(_Parser);
-
-  with _Parser as TUserParamsReader do
-
-    if (ItemStanding > stBefore) and (ItemStart > 0) then begin
-
-      CommentTerminatedValue := True;
-      try
-
-        ProcessItem;
-
-      finally
-        CommentTerminatedValue := False;
-      end;
-
-    end;
 
 end;
 
