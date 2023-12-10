@@ -340,8 +340,7 @@ begin
     Add(KWR_SPLITTER       );
     Add(KWR_TYPE_IDENT     );
     Add(KWR_ASSIGNING      );
-    Add(KWR_QUOTE_SINGLE   );
-    Add(KWR_QUOTE_DOBLE    );
+    { TODO 3 -oVasilyevSM -cHelp: Разобраться, почему ключи для регионов не нужны, а блок без них не работает }
     Add(KWR_OPENING_BRACKET);
     Add(KWR_CLOSING_BRACKET);
 
@@ -389,7 +388,7 @@ begin
   {         RegionClass          OpeningKey           ClosingKey           Caption     }
   AddRegion(TQoutedStringRegion, KWR_QUOTE_SINGLE,    KWR_QUOTE_SINGLE,    'string'    );
   AddRegion(TQoutedStringRegion, KWR_QUOTE_DOBLE,     KWR_QUOTE_DOBLE,     'string'    );
-  AddRegion(TNestedParamsBlock, KWR_OPENING_BRACKET, KWR_CLOSING_BRACKET, 'parameters');
+  AddRegion(TNestedParamsBlock,  KWR_OPENING_BRACKET, KWR_CLOSING_BRACKET, 'parameters');
 
 end;
 

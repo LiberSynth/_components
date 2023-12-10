@@ -186,7 +186,6 @@ type
   private
 
     function IsCursorKey(const _KeyWord: TKeyWord): Boolean;
-    function ProcessRegions: Boolean;
 
     property Regions: TRegionList read FRegions;
 
@@ -194,6 +193,7 @@ type
 
     { События для потомков }
     procedure InitParser; virtual;
+    function ProcessRegions: Boolean;
     function ElementProcessingKey(_KeyWord: TKeyWord): Boolean; virtual;
     function ElementTerminatingKey(_KeyWord: TKeyWord): Boolean; virtual;
     procedure ProcessElement; virtual;
@@ -360,8 +360,7 @@ end;
 
 procedure TRegion.CheckUnterminating;
 begin
-  if not ClosingKey.Equal(KWR_EMPTY) then
-    raise EStringParserException.CreateFmt('Unterminated %s', [Caption]);
+  raise EStringParserException.CreateFmt('Unterminated %s', [Caption]);
 end;
 
 function TRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
@@ -679,7 +678,7 @@ begin
     if CursorStanding < stAfter then
       ProcessElement;
 
-    { Абстрактное переключение типа элемента. }
+    { Переключение абстрактного типа элемента. }
     if _KeyWord.KeyType <> ktSourceEnd then
       ToggleElement(_KeyWord);
 
@@ -764,7 +763,7 @@ begin
 
   try
 
-    while (Cursor <= SrcLen) and not FTerminated do begin
+    while (Rest > 0) and not FTerminated do begin
 
       if not ProcessRegions then
 

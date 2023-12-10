@@ -26,27 +26,21 @@ type
 
   TComment = record
 
-  strict private
-
-    FValue: String;
-    FAnchor: TCommentAnchor;
-    FShort: Boolean;
-
-  private
+    Text: String;
+    Opening: String;
+    Closing: String;
+    Anchor: TCommentAnchor;
+    Short: Boolean;
 
     constructor Create(
 
-      const _Value: String; 
+      const _Text: String;
+      const _Opening: String;
+      const _Closing: String;
       _Anchor: TCommentAnchor;
       _Short: Boolean
 
     );
-    procedure SetAnchor(const _Value: TCommentAnchor);
-    procedure SetShort(const _Value: Boolean);
-
-    property Value: String read FValue write FValue;
-    property Anchor: TCommentAnchor read FAnchor write SetAnchor;
-    property Short: Boolean read FShort write SetShort;
 
   end;
 
@@ -57,6 +51,8 @@ type
     procedure Add(
 
       const _Value: String; 
+      const _Opening: String;
+      const _Closing: String;
       _Anchor: TCommentAnchor;
       _Short: Boolean
 
@@ -143,7 +139,14 @@ type
   private
 
     function ReadComment(_Shift: Byte): String;
-    procedure AddComment(const _Value: String; _Short: Boolean);
+    procedure AddComment(
+
+        const _Value: String;
+        const _Opening: String;
+        const _Closing: String;
+        _Short: Boolean
+
+    );
     procedure ParamReadEvent(_Param: TParam); override;
 
     property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
@@ -198,39 +201,32 @@ type
 constructor TComment.Create;
 begin
 
-  Value  := _Value;
-  Anchor := _Anchor;
-  Short  := _Short;
+  Text    := _Text;
+  Opening := _Opening;
+  Closing := _Closing;
+  Anchor  := _Anchor;
+  Short   := _Short;
   
-end;
-
-procedure TComment.SetAnchor(const _Value: TCommentAnchor);
-begin
-  FAnchor := _Value;
-end;
-
-procedure TComment.SetShort(const _Value: Boolean);
-begin
-  FShort := _Value;
 end;
 
 { TCommentList }
 
 procedure TCommentList.Add;
 begin
-  inherited Add(TComment.Create(_Value, _Anchor, _Short));
+  inherited Add(TComment.Create(_Value, _Opening, _Closing, _Anchor, _Short));
 end;
 
 function TCommentList.Get(_Anchor: TCommentAnchor; _SingleString: Boolean): String;
 var
   Comment: TComment;
   Splitter: String;
+  Value: String;
 begin
 
   Result := '';
 
-  if not _SingleString and (_Anchor in [caBeforeParam, caAfterParam]) then Splitter := CRLF
-  else Splitter := ' ';
+  if _SingleString or not (_Anchor in [caBeforeParam, caAfterParam]) then Splitter := ' '
+  else Splitter := CRLF;
 
   for Comment in Self do
 
@@ -238,13 +234,27 @@ begin
 
       if Anchor = _Anchor then begin
 
-        if Short then Splitter := '';
+        if Short then begin
+
+          if      _SingleString then Value := '(*' + Text + '*)'
+          { AfterValue в параметре - последний из коротких. AfterParams тут не будет. Поэтому не нужен CRLF в конце, его и так добавит вызывющая функция. }
+          else if _Anchor = caAfterValue then Value := Opening + Text
+          else Value := Opening + Text + Closing;
+
+          case _Anchor of
+
+            caBeforeParam, caAfterParam: if not _SingleString then Splitter := '';
+            caAfterName, caAfterType, caAfterValue: Splitter := ' ';
+
+          end;
+
+        end else Value := Opening + Text + Closing;
 
         if Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
         else Result := Result + Value + Splitter;
 
       end;
-      
+
 end;
 
 { TUserParam }
@@ -367,7 +377,7 @@ begin
   for i := 0 to CurrentComments.Count - 1 do
     with CurrentComments[i] do
       if Anchor = caBeforeName then
-        CurrentComments[i] := TComment.Create(Value, caBeforeParam, Short);
+        CurrentComments[i] := TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
 
 end;
 
@@ -380,7 +390,7 @@ begin
 
     for i := 0 to CurrentComments.Count - 1 do
       with CurrentComments[i] do
-        CurrentComments[i] := TComment.Create(Value, caAfterParam, Short);
+        CurrentComments[i] := TComment.Create(Text, Opening, Closing, caAfterParam, Short);
 
     CurrentParam.Comments.AddRange(CurrentComments.ToArray);
 
@@ -393,7 +403,7 @@ begin
   Result := Copy(Source, RegionStart, Cursor - RegionStart - _Shift);
 end;
 
-procedure TUserParamsReader.AddComment(const _Value: String; _Short: Boolean);
+procedure TUserParamsReader.AddComment;
 var
   Anchor: TCommentAnchor;
 begin
@@ -408,7 +418,7 @@ begin
     raise EParamsReadException.Create('Unexpected content element');
   end;
 
-  CurrentComments.Add(_Value, Anchor, _Short);
+  CurrentComments.Add(_Value, _Opening, _Closing, Anchor, _Short);
 
 end;
 
@@ -425,26 +435,20 @@ begin
 
   FCurrentComments := TCommentList.Create;
 
-  with KeyWords do begin
-
-    Add(KWR_LONG_COMMENT_OPENING_KEY_A);
-    Add(KWR_LONG_COMMENT_CLOSING_KEY_A);
-
-  end;
-
-  {         RegionClass          OpeningKey                       ClosingKey                      UnterminatedMessage   }
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'Unterminated comment');
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'Unterminated comment');
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'Unterminated comment');
-  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'Unterminated comment');
-  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'Unterminated comment');
+  {         RegionClass          OpeningKey                       ClosingKey                      Caption  }
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'comment');
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'comment');
+  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'comment');
+  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'comment');
 
 end;
 
 procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
-  inherited KeyEvent(_KeyWord);
+  if (_KeyWord.KeyType <> ktSourceEnd) or not ProcessRegions then
+    inherited KeyEvent(_KeyWord);
 
   case _KeyWord.KeyType of
 
@@ -517,13 +521,14 @@ begin
 
   with _Parser as TUserParamsReader do begin
 
-    AddComment(Format('%s%s%s', [
+    AddComment(
 
-        OpeningKey.StrValue,
         ReadComment(ClosingKey.KeyLength),
-        ClosingKey.StrValue
+        OpeningKey.StrValue,
+        ClosingKey.StrValue,
+        False
 
-    ]), False);
+    );
 
   end;
 
@@ -533,53 +538,45 @@ end;
 
 function TShortCommentRegion.CanClose(_Parser: TCustomStringParser): Boolean;
 
-  function _Check(const _Value: String): Boolean;
+  function _CheckEnd: Boolean;
+  begin
+
+    Result := _Parser.Rest = 0;
+
+    if Result then
+      FTerminator := CRLF; // Весьма условно, конечно. В строке это может быть просто CR или LF.
+
+  end;
+
+  function _CheckLine(const _Value: String): Boolean;
   begin
 
     with _Parser do
       Result := Copy(Source, Cursor, 2) = _Value;
 
     if Result then FTerminator := _Value;
-      
+
   end;
-  
+
 begin
-  Result := _Check(CRLF) or _Check(CR) or _Check(LF);
+  Result := _CheckEnd or _CheckLine(CRLF) or _CheckLine(CR) or _CheckLine(LF);
 end;
 
 procedure TShortCommentRegion.Closed(_Parser: TCustomStringParser);
-var
-  Prefix, Suffix: String;
-  Short: Boolean;
 begin
 
   inherited Closed(_Parser);
 
   with _Parser as TUserParamsReader do begin
 
-    Short := not (soSingleString in Params.SaveToStringOptions);
-    if Short then begin
+    AddComment(
 
-      Prefix := OpeningKey.StrValue;
-      Suffix := FTerminator;
-        
-    end else begin
-     
-      { TODO 1 -oVasilyevSM -cGeneral: Комментарии надо хранить в исходном виде, а это делать на сохранении в строку }
-      Prefix := '{';
-      Suffix := '}';
-      
-    end;
-    
-    AddComment(Format('%s%s%s', [
-
-        Prefix,
         ReadComment(0),
-        Suffix
+        OpeningKey.StrValue,
+        FTerminator,
+        True
 
-    ]), Short);
-
-    Move(Length(FTerminator));
+    );
 
   end;
 

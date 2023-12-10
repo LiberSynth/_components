@@ -896,6 +896,7 @@ var
   ESize: Integer;
 begin
 
+  { TODO 5 -oVasilyevSM -cFileUtils: Ёто плохо, что он тихо ничего не возвращает без опций. “ак можно долго думать, что произошло. }
   if FileExists(FileName) then
 
     with TFileStream.Create(FileName, fmOpenRead) do
