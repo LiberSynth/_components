@@ -188,107 +188,111 @@ type
   TSaveToStringOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
   TSaveToStringOptions = set of TSaveToStringOption;
 
-  TMultiParamList = class
-
-  strict private
-
-    FName: String;
-    FParams: TParams;
-
-    function CreateNewParam: TParam;
-
-    function GetCount: Integer;
-    function GetItems(_Index: Integer): TParam;
-
-    function GetDataType(_Index: Integer): TParamDataType;
-    function GetIsNull(_Index: Integer): Boolean;
-
-    function GetAsBoolean(_Index: Integer): Boolean;
-    function GetAsInteger(_Index: Integer): Integer;
-    function GetAsBigInt(_Index: Integer): Int64;
-    function GetAsFloat(_Index: Integer): Double;
-    function GetAsExtended(_Index: Integer): Extended;
-    function GetAsDateTime(_Index: Integer): TDateTime;
-    function GetAsGUID(_Index: Integer): TGUID;
-    function GetAsAnsiString(_Index: Integer): AnsiString;
-    function GetAsString(_Index: Integer): String;
-    function GetAsBLOB(_Index: Integer): BLOB;
-    function GetAsData(_Index: Integer): TData;
-
-    procedure SetIsNull(_Index: Integer; const _Value: Boolean);
-
-    procedure SetAsBoolean(_Index: Integer; const _Value: Boolean);
-    procedure SetAsInteger(_Index: Integer; const _Value: Integer);
-    procedure SetAsBigInt(_Index: Integer; const _Value: Int64);
-    procedure SetAsFloat(_Index: Integer; const _Value: Double);
-    procedure SetAsExtended(_Index: Integer; const _Value: Extended);
-    procedure SetAsDateTime(_Index: Integer; const _Value: TDateTime);
-    procedure SetAsGUID(_Index: Integer; const _Value: TGUID);
-    procedure SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
-    procedure SetAsString(_Index: Integer; const _Value: String);
-    procedure SetAsBLOB(_Index: Integer; const _Value: BLOB);
-    procedure SetAsData(_Index: Integer; const _Value: TData);
-
-    function InternalIndex(_Index: Integer): Integer;
-    function ExternalIndex(_InternalIndex: Integer): Integer;
-
-  private
-
-    constructor Create(const _Name: String; _Params: TParams);
-
-    procedure SetDataType(_Index: Integer; const _Value: TParamDataType);
-
-    property Name: String read FName;
-    property Items[_Index: Integer]: TParam read GetItems; default;
-
-  public
-
-    function Insert(_Index: Integer): Integer;
-    function Append: Integer;
-    procedure Delete(_Index: Integer);
-
-    property Count: Integer read GetCount;
-
-    property DataType[_Index: Integer]: TParamDataType read GetDataType;
-    property IsNull[_Index: Integer]: Boolean read GetIsNull write SetIsNull;
-
-    property AsBoolean[_Index: Integer]: Boolean read GetAsBoolean write SetAsBoolean;
-    property AsInteger[_Index: Integer]: Integer read GetAsInteger write SetAsInteger;
-    property AsBigInt[_Index: Integer]: Int64 read GetAsBigInt write SetAsBigInt;
-    property AsFloat[_Index: Integer]: Double read GetAsFloat write SetAsFloat;
-    property AsExtended[_Index: Integer]: Extended read GetAsExtended write SetAsExtended;
-    property AsDateTime[_Index: Integer]: TDateTime read GetAsDateTime write SetAsDateTime;
-    property AsGUID[_Index: Integer]: TGUID read GetAsGUID write SetAsGUID;
-    property AsAnsiString[_Index: Integer]: AnsiString read GetAsAnsiString write SetAsAnsiString;
-    property AsString[_Index: Integer]: String read GetAsString write SetAsString;
-    property AsBLOB[_Index: Integer]: BLOB read GetAsBLOB write SetAsBLOB;
-    property AsData[_Index: Integer]: TData read GetAsData write SetAsData;
-
-
-  end;
-
-  TParamsListHolder = class(TObjectList<TMultiParamList>)
-
-  private
-
-    function Find(const _Name: String; var _ParamList: TMultiParamList): Boolean;
-    function Add(const _Name: String; _Params: TParams): TMultiParamList;
-    function Get(const _Name: String; _Params: TParams): TMultiParamList;
-
-  end;
-
-  TParamList = class(TObjectList<TParam>)
-
-  protected
-
-    procedure Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification); override;
-
-  end;
-
   TParamsReader = class;
   TParamsReaderClass = class of TParamsReader;
 
   TParams = class
+
+  strict private
+
+  type
+
+    TMultiParamList = class
+
+    strict private
+
+      FName: String;
+      FParams: TParams;
+
+      function CreateNewParam: TParam;
+
+      function GetCount: Integer;
+      function GetItems(_Index: Integer): TParam;
+
+      function GetDataType(_Index: Integer): TParamDataType;
+      function GetIsNull(_Index: Integer): Boolean;
+
+      function GetAsBoolean(_Index: Integer): Boolean;
+      function GetAsInteger(_Index: Integer): Integer;
+      function GetAsBigInt(_Index: Integer): Int64;
+      function GetAsFloat(_Index: Integer): Double;
+      function GetAsExtended(_Index: Integer): Extended;
+      function GetAsDateTime(_Index: Integer): TDateTime;
+      function GetAsGUID(_Index: Integer): TGUID;
+      function GetAsAnsiString(_Index: Integer): AnsiString;
+      function GetAsString(_Index: Integer): String;
+      function GetAsBLOB(_Index: Integer): BLOB;
+      function GetAsData(_Index: Integer): TData;
+
+      procedure SetIsNull(_Index: Integer; const _Value: Boolean);
+
+      procedure SetAsBoolean(_Index: Integer; const _Value: Boolean);
+      procedure SetAsInteger(_Index: Integer; const _Value: Integer);
+      procedure SetAsBigInt(_Index: Integer; const _Value: Int64);
+      procedure SetAsFloat(_Index: Integer; const _Value: Double);
+      procedure SetAsExtended(_Index: Integer; const _Value: Extended);
+      procedure SetAsDateTime(_Index: Integer; const _Value: TDateTime);
+      procedure SetAsGUID(_Index: Integer; const _Value: TGUID);
+      procedure SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
+      procedure SetAsString(_Index: Integer; const _Value: String);
+      procedure SetAsBLOB(_Index: Integer; const _Value: BLOB);
+      procedure SetAsData(_Index: Integer; const _Value: TData);
+
+      function InternalIndex(_Index: Integer): Integer;
+      function ExternalIndex(_InternalIndex: Integer): Integer;
+
+    private
+
+      constructor Create(const _Name: String; _Params: TParams);
+
+      procedure SetDataType(_Index: Integer; const _Value: TParamDataType);
+
+      property Name: String read FName;
+      property Items[_Index: Integer]: TParam read GetItems; default;
+
+    public
+
+      function Insert(_Index: Integer): Integer;
+      function Append: Integer;
+      procedure Delete(_Index: Integer);
+
+      property Count: Integer read GetCount;
+
+      property DataType[_Index: Integer]: TParamDataType read GetDataType;
+      property IsNull[_Index: Integer]: Boolean read GetIsNull write SetIsNull;
+
+      property AsBoolean[_Index: Integer]: Boolean read GetAsBoolean write SetAsBoolean;
+      property AsInteger[_Index: Integer]: Integer read GetAsInteger write SetAsInteger;
+      property AsBigInt[_Index: Integer]: Int64 read GetAsBigInt write SetAsBigInt;
+      property AsFloat[_Index: Integer]: Double read GetAsFloat write SetAsFloat;
+      property AsExtended[_Index: Integer]: Extended read GetAsExtended write SetAsExtended;
+      property AsDateTime[_Index: Integer]: TDateTime read GetAsDateTime write SetAsDateTime;
+      property AsGUID[_Index: Integer]: TGUID read GetAsGUID write SetAsGUID;
+      property AsAnsiString[_Index: Integer]: AnsiString read GetAsAnsiString write SetAsAnsiString;
+      property AsString[_Index: Integer]: String read GetAsString write SetAsString;
+      property AsBLOB[_Index: Integer]: BLOB read GetAsBLOB write SetAsBLOB;
+      property AsData[_Index: Integer]: TData read GetAsData write SetAsData;
+
+
+    end;
+
+    TParamsListHolder = class(TObjectList<TMultiParamList>)
+
+    private
+
+      function Find(const _Name: String; var _ParamList: TMultiParamList): Boolean;
+      function Add(const _Name: String; _Params: TParams): TMultiParamList;
+      function Get(const _Name: String; _Params: TParams): TMultiParamList;
+
+    end;
+
+    TParamList = class(TObjectList<TParam>)
+
+    protected
+
+      procedure Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification); override;
+
+    end;
 
   strict private
 
@@ -1414,9 +1418,9 @@ begin
 
 end;
 
-{ TMultiParamList }
+{ TParams.TMultiParamList }
 
-constructor TMultiParamList.Create;
+constructor TParams.TMultiParamList.Create;
 begin
 
   inherited Create;
@@ -1426,12 +1430,12 @@ begin
 
 end;
 
-function TMultiParamList.CreateNewParam: TParam;
+function TParams.TMultiParamList.CreateNewParam: TParam;
 begin
   Result := FParams.CreateNewParam(FName);
 end;
 
-function TMultiParamList.GetCount: Integer;
+function TParams.TMultiParamList.GetCount: Integer;
 var
   Param: TParam;
 begin
@@ -1444,137 +1448,137 @@ begin
 
 end;
 
-function TMultiParamList.GetItems(_Index: Integer): TParam;
+function TParams.TMultiParamList.GetItems(_Index: Integer): TParam;
 begin
   Result := FParams.Items[InternalIndex(_Index)];
 end;
 
-function TMultiParamList.GetDataType(_Index: Integer): TParamDataType;
+function TParams.TMultiParamList.GetDataType(_Index: Integer): TParamDataType;
 begin
   Result := Items[_Index].DataType;
 end;
 
-function TMultiParamList.GetIsNull(_Index: Integer): Boolean;
+function TParams.TMultiParamList.GetIsNull(_Index: Integer): Boolean;
 begin
   Result := Items[_Index].IsNull;
 end;
 
-function TMultiParamList.GetAsBoolean(_Index: Integer): Boolean;
+function TParams.TMultiParamList.GetAsBoolean(_Index: Integer): Boolean;
 begin
   Result := Items[_Index].AsBoolean;
 end;
 
-function TMultiParamList.GetAsInteger(_Index: Integer): Integer;
+function TParams.TMultiParamList.GetAsInteger(_Index: Integer): Integer;
 begin
   Result := Items[_Index].AsInteger;
 end;
 
-function TMultiParamList.GetAsBigInt(_Index: Integer): Int64;
+function TParams.TMultiParamList.GetAsBigInt(_Index: Integer): Int64;
 begin
   Result := Items[_Index].AsBigInt;
 end;
 
-function TMultiParamList.GetAsFloat(_Index: Integer): Double;
+function TParams.TMultiParamList.GetAsFloat(_Index: Integer): Double;
 begin
   Result := Items[_Index].AsFloat;
 end;
 
-function TMultiParamList.GetAsExtended(_Index: Integer): Extended;
+function TParams.TMultiParamList.GetAsExtended(_Index: Integer): Extended;
 begin
   Result := Items[_Index].AsExtended;
 end;
 
-function TMultiParamList.GetAsDateTime(_Index: Integer): TDateTime;
+function TParams.TMultiParamList.GetAsDateTime(_Index: Integer): TDateTime;
 begin
   Result := Items[_Index].AsDateTime;
 end;
 
-function TMultiParamList.GetAsGUID(_Index: Integer): TGUID;
+function TParams.TMultiParamList.GetAsGUID(_Index: Integer): TGUID;
 begin
   Result := Items[_Index].AsGUID;
 end;
 
-function TMultiParamList.GetAsAnsiString(_Index: Integer): AnsiString;
+function TParams.TMultiParamList.GetAsAnsiString(_Index: Integer): AnsiString;
 begin
   Result := Items[_Index].AsAnsiString;
 end;
 
-function TMultiParamList.GetAsString(_Index: Integer): String;
+function TParams.TMultiParamList.GetAsString(_Index: Integer): String;
 begin
   Result := Items[_Index].AsString;
 end;
 
-function TMultiParamList.GetAsBLOB(_Index: Integer): BLOB;
+function TParams.TMultiParamList.GetAsBLOB(_Index: Integer): BLOB;
 begin
   Result := Items[_Index].AsBLOB;
 end;
 
-function TMultiParamList.GetAsData(_Index: Integer): TData;
+function TParams.TMultiParamList.GetAsData(_Index: Integer): TData;
 begin
   Result := Items[_Index].AsData;
 end;
 
-procedure TMultiParamList.SetIsNull(_Index: Integer; const _Value: Boolean);
+procedure TParams.TMultiParamList.SetIsNull(_Index: Integer; const _Value: Boolean);
 begin
   Items[_Index].IsNull := _Value;
 end;
 
-procedure TMultiParamList.SetAsBoolean(_Index: Integer; const _Value: Boolean);
+procedure TParams.TMultiParamList.SetAsBoolean(_Index: Integer; const _Value: Boolean);
 begin
   Items[_Index].AsBoolean := _Value;
 end;
 
-procedure TMultiParamList.SetAsInteger(_Index: Integer; const _Value: Integer);
+procedure TParams.TMultiParamList.SetAsInteger(_Index: Integer; const _Value: Integer);
 begin
   Items[_Index].AsInteger := _Value;
 end;
 
-procedure TMultiParamList.SetAsBigInt(_Index: Integer; const _Value: Int64);
+procedure TParams.TMultiParamList.SetAsBigInt(_Index: Integer; const _Value: Int64);
 begin
   Items[_Index].AsBigInt := _Value;
 end;
 
-procedure TMultiParamList.SetAsFloat(_Index: Integer; const _Value: Double);
+procedure TParams.TMultiParamList.SetAsFloat(_Index: Integer; const _Value: Double);
 begin
   Items[_Index].AsFloat := _Value;
 end;
 
-procedure TMultiParamList.SetAsExtended(_Index: Integer; const _Value: Extended);
+procedure TParams.TMultiParamList.SetAsExtended(_Index: Integer; const _Value: Extended);
 begin
   Items[_Index].AsExtended := _Value;
 end;
 
-procedure TMultiParamList.SetAsDateTime(_Index: Integer; const _Value: TDateTime);
+procedure TParams.TMultiParamList.SetAsDateTime(_Index: Integer; const _Value: TDateTime);
 begin
   Items[_Index].AsDateTime := _Value;
 end;
 
-procedure TMultiParamList.SetAsGUID(_Index: Integer; const _Value: TGUID);
+procedure TParams.TMultiParamList.SetAsGUID(_Index: Integer; const _Value: TGUID);
 begin
   Items[_Index].AsGUID := _Value;
 end;
 
-procedure TMultiParamList.SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
+procedure TParams.TMultiParamList.SetAsAnsiString(_Index: Integer; const _Value: AnsiString);
 begin
   Items[_Index].AsAnsiString := _Value;
 end;
 
-procedure TMultiParamList.SetAsString(_Index: Integer; const _Value: String);
+procedure TParams.TMultiParamList.SetAsString(_Index: Integer; const _Value: String);
 begin
   Items[_Index].AsString := _Value;
 end;
 
-procedure TMultiParamList.SetAsBLOB(_Index: Integer; const _Value: BLOB);
+procedure TParams.TMultiParamList.SetAsBLOB(_Index: Integer; const _Value: BLOB);
 begin
   Items[_Index].AsBLOB := _Value;
 end;
 
-procedure TMultiParamList.SetAsData(_Index: Integer; const _Value: TData);
+procedure TParams.TMultiParamList.SetAsData(_Index: Integer; const _Value: TData);
 begin
   Items[_Index].AsData := _Value;
 end;
 
-function TMultiParamList.InternalIndex(_Index: Integer): Integer;
+function TParams.TMultiParamList.InternalIndex(_Index: Integer): Integer;
 var
   i: Integer;
 begin
@@ -1594,7 +1598,7 @@ begin
 
 end;
 
-function TMultiParamList.ExternalIndex(_InternalIndex: Integer): Integer;
+function TParams.TMultiParamList.ExternalIndex(_InternalIndex: Integer): Integer;
 var
   i: Integer;
 begin
@@ -1607,30 +1611,30 @@ begin
 
 end;
 
-procedure TMultiParamList.SetDataType(_Index: Integer; const _Value: TParamDataType);
+procedure TParams.TMultiParamList.SetDataType(_Index: Integer; const _Value: TParamDataType);
 begin
   Items[_Index].SetDataType(_Value);
 end;
 
-function TMultiParamList.Insert(_Index: Integer): Integer;
+function TParams.TMultiParamList.Insert(_Index: Integer): Integer;
 begin
   FParams.Items.Insert(InternalIndex(_Index), CreateNewParam);
   Result := _Index;
 end;
 
-function TMultiParamList.Append: Integer;
+function TParams.TMultiParamList.Append: Integer;
 begin
   Result := ExternalIndex(FParams.Items.Add(CreateNewParam));
 end;
 
-procedure TMultiParamList.Delete(_Index: Integer);
+procedure TParams.TMultiParamList.Delete(_Index: Integer);
 begin
   FParams.Items.Delete(InternalIndex(_Index));
 end;
 
-{ TParamsListHolder }
+{ TParams.TParamsListHolder }
 
-function TParamsListHolder.Find(const _Name: String; var _ParamList: TMultiParamList): Boolean;
+function TParams.TParamsListHolder.Find(const _Name: String; var _ParamList: TMultiParamList): Boolean;
 var
   Item: TMultiParamList;
 begin
@@ -1648,21 +1652,21 @@ begin
 
 end;
 
-function TParamsListHolder.Add(const _Name: String; _Params: TParams): TMultiParamList;
+function TParams.TParamsListHolder.Add(const _Name: String; _Params: TParams): TMultiParamList;
 begin
   Result := TMultiParamList.Create(_Name, _Params);
   inherited Add(Result);
 end;
 
-function TParamsListHolder.Get(const _Name: String; _Params: TParams): TMultiParamList;
+function TParams.TParamsListHolder.Get(const _Name: String; _Params: TParams): TMultiParamList;
 begin
   if not Find(_Name, Result) then
     raise EParamsException.CreateFmt('Param list ''%s'' not found', [_Name]);
 end;
 
-{ TParamList }
+{ TParams.TParamList }
 
-procedure TParamList.Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification);
+procedure TParams.TParamList.Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification);
 begin
   if (_Action = cnRemoved) and (_Item.DataType = dtParams) then
     _Item.Clear;
@@ -1967,7 +1971,7 @@ function TParams.FormatParam(_Param: TParam; _Value: String; _First, _Last: Bool
 const
 
   SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
-  SC_VALUE_TYPED   = '%0:s:%1:s=%2:s%3:s';
+  SC_VALUE_TYPED   = '%0:s: %1:s = %2:s%3:s';
 
 var
   ParamFormat: String;
@@ -2226,7 +2230,7 @@ function TParams.SaveToString: String;
     if not (soSingleString in SaveToStringOptions) then begin
 
       ShiftText(1, Result);
-      Result := CRLF + Result;
+      Result := CRLF + Result + CRLF;
 
     end;
 

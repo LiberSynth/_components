@@ -51,44 +51,48 @@ type
 
   );
 
-  TComment = record
-
-    Text: String;
-    Opening: String;
-    Closing: String;
-    Anchor: TCommentAnchor;
-    Short: Boolean;
-
-    constructor Create(
-
-      const _Text: String;
-      const _Opening: String;
-      const _Closing: String;
-      _Anchor: TCommentAnchor;
-      _Short: Boolean
-
-    );
-
-  end;
-
-  TCommentList = class(TList<TComment>)
+  TUserParam = class(TParam)
 
   private
 
-    procedure Add(
+  type
 
-      const _Value: String; 
-      const _Opening: String;
-      const _Closing: String;
-      _Anchor: TCommentAnchor;
-      _Short: Boolean
+    TComment = record
 
-    );
-    function Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
+      Text: String;
+      Opening: String;
+      Closing: String;
+      Anchor: TCommentAnchor;
+      Short: Boolean;
 
-  end;
+      constructor Create(
 
-  TUserParam = class(TParam)
+        const _Text: String;
+        const _Opening: String;
+        const _Closing: String;
+        _Anchor: TCommentAnchor;
+        _Short: Boolean
+
+      );
+
+    end;
+
+    TCommentList = class(TList<TComment>)
+
+    private
+
+      procedure Add(
+
+        const _Value: String;
+        const _Opening: String;
+        const _Closing: String;
+        _Anchor: TCommentAnchor;
+        _Short: Boolean
+
+      );
+      function Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
+
+    end;
 
   strict private
 
@@ -157,7 +161,7 @@ type
   strict private
 
     FCurrentParam: TUserParam;
-    FCurrentComments: TCommentList;
+    FCurrentComments: TUserParam.TCommentList;
     FCommentTerminatedValue: Boolean;
 
     procedure CheckBeforeNameComments;
@@ -179,7 +183,7 @@ type
     procedure AfterReadParams(_Param: TParam); override;
 
     property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
-    property CurrentComments: TCommentList read FCurrentComments;
+    property CurrentComments: TUserParam.TCommentList read FCurrentComments;
     property CommentTerminatedValue: Boolean read FCommentTerminatedValue write FCommentTerminatedValue;
 
   protected
@@ -225,9 +229,9 @@ type
 
   end;
 
-{ TComment }
+{ TUserParam.TComment }
 
-constructor TComment.Create;
+constructor TUserParam.TComment.Create;
 begin
 
   Text    := _Text;
@@ -238,14 +242,14 @@ begin
   
 end;
 
-{ TCommentList }
+{ TUserParam.TCommentList }
 
-procedure TCommentList.Add;
+procedure TUserParam.TCommentList.Add;
 begin
   inherited Add(TComment.Create(_Value, _Opening, _Closing, _Anchor, _Short));
 end;
 
-function TCommentList.Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
+function TUserParam.TCommentList.Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
 var
   Comment: TComment;
   Splitter: String;
@@ -474,7 +478,7 @@ begin
   for i := 0 to CurrentComments.Count - 1 do
     with CurrentComments[i] do
       if Anchor = caBeforeName then
-        CurrentComments[i] := TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
+        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
 
 end;
 
@@ -487,7 +491,7 @@ begin
 
     for i := 0 to CurrentComments.Count - 1 do
       with CurrentComments[i] do
-        CurrentComments[i] := TComment.Create(Text, Opening, Closing, caAfterParam, Short);
+        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caAfterParam, Short);
 
     CurrentParam.Comments.AddRange(CurrentComments.ToArray);
     CurrentComments.Clear;
@@ -535,7 +539,7 @@ end;
 procedure TUserParamsReader.AfterReadParams(_Param: TParam);
 var
   i: Integer;
-  ParamComments: TCommentList;
+  ParamComments: TUserParam.TCommentList;
 begin
 
   inherited AfterReadParams(_Param);
@@ -555,7 +559,7 @@ begin
 
   inherited InitParser;
 
-  FCurrentComments := TCommentList.Create;
+  FCurrentComments := TUserParam.TCommentList.Create;
 
   {         RegionClass          OpeningKey                       ClosingKey                      Caption  }
   AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');

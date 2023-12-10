@@ -48,73 +48,77 @@ type
   TOperation = (opProcessing, opTerminating);
   TNested    = (nsNested, nsNotNested, nsNoMatter);
 
-  TReadInfo = record
-
-    Operation: TOperation;
-    ElementType: TElementType;
-    Nested: TNested;
-    KeyTypes: TKeyTypes;
-
-    constructor Create(
-
-        _Operation: TOperation;
-        _ElementType: TElementType;
-        _Nested: TNested;
-        _KeyTypes: TKeyTypes
-
-    );
-
-  end;
-
-  TReadInfoList = class(TList<TReadInfo>)
-
-  public
-
-    procedure Add(
-
-        _Operation: TOperation;
-        _ElementType: TElementType;
-        _Nested: TNested;
-        _KeyTypes: TKeyTypes
-
-    );
-
-  end;
-
-  TSyntaxInfo = record
-
-    ElementType: TElementType;
-    CursorStanding: TStanding;
-    Nested: TNested;
-    Keys: TKeyTypes;
-
-    constructor Create(
-
-        _ElementType: TElementType;
-        _CursorStanding: TStanding;
-        _Nested: TNested;
-        _Keys: TKeyTypes
-
-    );
-
-  end;
-
-  TSyntaxInfoList = class(TList<TSyntaxInfo>)
-
-  private
-
-    procedure Add(
-
-        _ElementType: TElementType;
-        _CursorStanding: TStanding;
-        _Nested: TNested;
-        _Keys: TKeyTypes
-
-    );
-
-  end;
-
   TParamsStringParser = class(TCustomStringParser)
+
+  strict private
+
+  type
+
+    TReadInfo = record
+
+      Operation: TOperation;
+      ElementType: TElementType;
+      Nested: TNested;
+      KeyTypes: TKeyTypes;
+
+      constructor Create(
+
+          _Operation: TOperation;
+          _ElementType: TElementType;
+          _Nested: TNested;
+          _KeyTypes: TKeyTypes
+
+      );
+
+    end;
+
+    TReadInfoList = class(TList<TReadInfo>)
+
+    public
+
+      procedure Add(
+
+          _Operation: TOperation;
+          _ElementType: TElementType;
+          _Nested: TNested;
+          _KeyTypes: TKeyTypes
+
+      );
+
+    end;
+
+    TSyntaxInfo = record
+
+      ElementType: TElementType;
+      CursorStanding: TStanding;
+      Nested: TNested;
+      Keys: TKeyTypes;
+
+      constructor Create(
+
+          _ElementType: TElementType;
+          _CursorStanding: TStanding;
+          _Nested: TNested;
+          _Keys: TKeyTypes
+
+      );
+
+    end;
+
+    TSyntaxInfoList = class(TList<TSyntaxInfo>)
+
+    private
+
+      procedure Add(
+
+          _ElementType: TElementType;
+          _CursorStanding: TStanding;
+          _Nested: TNested;
+          _Keys: TKeyTypes
+
+      );
+
+    end;
 
   const
 
@@ -253,9 +257,9 @@ begin
 
 end;
 
-{ TReadInfo }
+{ TParamsStringParser.TReadInfo }
 
-constructor TReadInfo.Create;
+constructor TParamsStringParser.TReadInfo.Create;
 begin
 
   Operation   := _Operation;
@@ -265,16 +269,16 @@ begin
 
 end;
 
-{ TReadInfoList }
+{ TParamsStringParser.TReadInfoList }
 
-procedure TReadInfoList.Add;
+procedure TParamsStringParser.TReadInfoList.Add;
 begin
   inherited Add(TReadInfo.Create(_Operation, _ElementType, _Nested, _KeyTypes));
 end;
 
-{ TSyntaxInfo }
+{ TParamsStringParser.TSyntaxInfo }
 
-constructor TSyntaxInfo.Create;
+constructor TParamsStringParser.TSyntaxInfo.Create;
 begin
 
   ElementType    := _ElementType;
@@ -284,9 +288,9 @@ begin
 
 end;
 
-{ TSyntaxInfoList }
+{ TParamsStringParser.TSyntaxInfoList }
 
-procedure TSyntaxInfoList.Add;
+procedure TParamsStringParser.TSyntaxInfoList.Add;
 begin
   inherited Add(TSyntaxInfo.Create(_ElementType, _CursorStanding, _Nested, _Keys));
 end;
@@ -338,8 +342,8 @@ begin
     Add(KWR_SPLITTER       );
     Add(KWR_TYPE_IDENT     );
     Add(KWR_ASSIGNING      );
-    { TODO 3 -oVasilyevSM -cHelp: –азобратьс€, почему ключи дл€ регионов не нужны, а блок без них не работает }
-    Add(KWR_OPENING_BRACKET);
+    { ¬от тут как раз нужен только закрывающий ключ, который укажет вложенному ридеру, что надо завершать текущее
+      (последнее во вложенной структуре) значение. ј дл€ внешнего блока вообще ключи здесь не нужны.}
     Add(KWR_CLOSING_BRACKET);
 
   end;
