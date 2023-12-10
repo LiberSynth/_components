@@ -47,7 +47,7 @@ type
 
   TCommentAnchor = (
 
-      caBeforeParam, caBeforeName, caAfterName, caBeforeType, caAfterType, caBeforeValue, caAfterValue, caAfterParam
+      caBeforeParam, caBeforeName, caAfterName, caBeforeType, caAfterType, caBeforeValue, caAfterValue, caAfterParam, caInsideParams
 
   );
 
@@ -116,7 +116,7 @@ type
 
     function ParamClass: TParamClass; override;
     function ParamsReaderClass: TParamsReaderClass; override;
-    function FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String; override;
+    function FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String; override;
 
   end;
 
@@ -174,7 +174,9 @@ type
         _Short: Boolean
 
     );
-    procedure ParamReadEvent(_Param: TParam); override;
+    procedure BeforeReadParam(_Param: TParam); override;
+    procedure AfterReadParam(_Param: TParam); override;
+    procedure AfterReadParams(_Param: TParam); override;
 
     property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
     property CurrentComments: TCommentList read FCurrentComments;
@@ -251,6 +253,7 @@ var
   LastWasLong: Boolean;
 begin
 
+  { TODO 2 -oVasilyevSM -cFormatParam: Комментарий обрезать по краям тримом и оборачивать в пробелы. }
   Result := '';
   LastWasLong := True;
   Splitter := ' ';
@@ -266,6 +269,7 @@ begin
             { Short SingleString }
 
             Value := '(*' + Text + '*)';
+            if _Anchor = caInsideParams then Splitter := '';
 
             if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
             else Result := Result + Value + Splitter;
@@ -275,6 +279,7 @@ begin
             { Long SingleString }
 
             Value := Opening + Text + Closing;
+            if _Anchor = caInsideParams then Splitter := '';
 
             if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
             else Result := Result + Value + Splitter;
@@ -293,12 +298,17 @@ begin
 
             { Short MultiString }
 
-            if _Anchor = caAfterValue then Value := Opening + Text
+            if _Anchor in [caAfterValue, caInsideParams] then Value := Opening + Text
             else Value := Opening + Text + Closing;
-            if not (_Anchor in [caAfterName, caAfterType, caAfterValue]) then
-              Splitter := '';
+            if not (_Anchor in [caAfterName, caAfterType, caAfterValue]) then Splitter := '';
+            if _Anchor = caInsideParams then begin
 
-            if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
+              Splitter := CRLF;
+              ShiftText(1, Value);
+
+            end;
+
+            if _Anchor in [caAfterName, caAfterType, caAfterValue, caInsideParams] then Result := Result + Splitter + Value
             else Result := Result + Value + Splitter;
 
             LastWasLong := False;
@@ -307,11 +317,13 @@ begin
 
             { Long MultiString }
 
-            if _Anchor in [caBeforeParam, caAfterParam] then Splitter := CRLF;
+            if _Anchor in [caBeforeParam, caAfterParam, caInsideParams] then Splitter := CRLF;
 
             Value := Opening + Text + Closing;
 
-            if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
+            if _Anchor = caInsideParams then ShiftText(1, Value);
+
+            if _Anchor in [caAfterName, caAfterType, caAfterValue, caInsideParams] then Result := Result + Splitter + Value
             else Result := Result + Value + Splitter;
 
           end;
@@ -360,11 +372,23 @@ begin
   Result := TUserParamsReader;
 end;
 
-function TUserParams.FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String;
+function TUserParams.FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
 const
 
   SC_VALUE_UNTYPED = '%4:s%5:s%0:s%6:s= %9:s%2:s%10:s%3:s%11:s';
   SC_VALUE_TYPED   = '%4:s%5:s%0:s%6:s: %7:s%1:s%8:s= %9:s%2:s%10:s%3:s%11:s';
+
+  procedure _InjectParamsComments(const _Comments: String);
+  var
+    p: Integer;
+  begin
+
+    p := Pos('(', _Value);
+
+    if p > 0 then
+      _Value := Copy(_Value, 1, p) + _Comments + Copy(_Value, p + 1, Length(_Value));
+
+  end;
 
 var
   ParamFormat: String;
@@ -378,10 +402,14 @@ begin
   if Typed then ParamFormat := SC_VALUE_TYPED
   else ParamFormat := SC_VALUE_UNTYPED;
 
-  if SingleString then Splitter := ';'
+  if _Last then Splitter := ''
+  else if SingleString then Splitter := ';'
   else Splitter := CRLF;
 
-  with _Param as TUserParam do
+  with _Param as TUserParam do begin
+
+    if DataType = dtParams then
+      _InjectParamsComments(Comments.Get(caInsideParams, SingleString, Typed));
 
     Result := Format(ParamFormat, [
 
@@ -389,16 +417,18 @@ begin
         ParamDataTypeToStr(_Param.DataType),
         _Value,
         Splitter,
-        Comments.Get(caBeforeParam, SingleString, Typed),
-        Comments.Get(caBeforeName,  SingleString, Typed),
-        Comments.Get(caAfterName,   SingleString, Typed),
-        Comments.Get(caBeforeType,  SingleString, Typed),
-        Comments.Get(caAfterType,   SingleString, Typed),
-        Comments.Get(caBeforeValue, SingleString, Typed),
-        Comments.Get(caAfterValue,  SingleString, Typed),
-        Comments.Get(caAfterParam,  SingleString, Typed)
+        Comments.Get(caBeforeParam,  SingleString, Typed),
+        Comments.Get(caBeforeName,   SingleString, Typed),
+        Comments.Get(caAfterName,    SingleString, Typed),
+        Comments.Get(caBeforeType,   SingleString, Typed),
+        Comments.Get(caAfterType,    SingleString, Typed),
+        Comments.Get(caBeforeValue,  SingleString, Typed),
+        Comments.Get(caAfterValue,   SingleString, Typed),
+        Comments.Get(caAfterParam,   SingleString, Typed)
 
     ]);
+
+  end;
 
   if SingleString and not _First then
     Result := ' ' + Result;
@@ -460,6 +490,7 @@ begin
         CurrentComments[i] := TComment.Create(Text, Opening, Closing, caAfterParam, Short);
 
     CurrentParam.Comments.AddRange(CurrentComments.ToArray);
+    CurrentComments.Clear;
 
   end;
 
@@ -489,10 +520,34 @@ begin
 
 end;
 
-procedure TUserParamsReader.ParamReadEvent(_Param: TParam);
+procedure TUserParamsReader.BeforeReadParam(_Param: TParam);
 begin
-  inherited ParamReadEvent(_Param);
+  inherited BeforeReadParam(_Param);
+  (_Param as TUserParam).Comments.Clear;
+end;
+
+procedure TUserParamsReader.AfterReadParam(_Param: TParam);
+begin
+  inherited AfterReadParam(_Param);
   CurrentParam := _Param as TUserParam;
+end;
+
+procedure TUserParamsReader.AfterReadParams(_Param: TParam);
+var
+  i: Integer;
+  ParamComments: TCommentList;
+begin
+
+  inherited AfterReadParams(_Param);
+
+  ParamComments := (_Param as TUserParam).Comments;
+
+  for i := 0 to CurrentComments.Count - 1 do
+    with CurrentComments[i] do
+      ParamComments.Add(Text, Opening, Closing, caInsideParams, Short);
+
+  CurrentComments.Clear;
+
 end;
 
 procedure TUserParamsReader.InitParser;
@@ -547,7 +602,6 @@ begin
 
     with CurrentParam do begin
 
-      Comments.Clear;
       Comments.AddRange(CurrentComments.ToArray);
       CurrentComments.Clear;
 
@@ -611,7 +665,7 @@ function TShortCommentRegion.CanClose(_Parser: TCustomStringParser): Boolean;
     Result := _Parser.Rest = 0;
 
     if Result then
-      FTerminator := CRLF; // Сохраняем всегда с CRLF, не с CR и не с LF.
+      FTerminator := '';
 
   end;
 

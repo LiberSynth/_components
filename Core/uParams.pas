@@ -348,7 +348,7 @@ type
 
     function ParamClass: TParamClass; virtual;
     function ParamsReaderClass: TParamsReaderClass; virtual;
-    function FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String; virtual;
+    function FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String; virtual;
 
   public
 
@@ -448,7 +448,9 @@ type
     procedure ReadValue; override;
     procedure ReadParams(_CursorShift: Int64); override;
     function IsParamsType: Boolean; override;
-    procedure ParamReadEvent(_Param: TParam); virtual;
+    procedure BeforeReadParam(_Param: TParam); virtual;
+    procedure AfterReadParam(_Param: TParam); virtual;
+    procedure AfterReadParams(_Param: TParam); virtual;
 
     property CurrentName: String read FCurrentName;
     property CurrentType: TParamDataType read FCurrentType;
@@ -1961,7 +1963,7 @@ begin
   Result := TParamsReader;
 end;
 
-function TParams.FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String;
+function TParams.FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
 const
 
   SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
@@ -1975,8 +1977,10 @@ begin
   if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
   else ParamFormat := SC_VALUE_TYPED;
 
-  if soSingleString in SaveToStringOptions then Splitter := ';'
+  if _Last then Splitter := ''
+  else if soSingleString in SaveToStringOptions then Splitter := ';'
   else Splitter := CRLF;
+
 
   Result := Format(ParamFormat, [
 
@@ -2254,7 +2258,8 @@ function TParams.SaveToString: String;
 var
   Param: TParam;
   Value: String;
-  First: Boolean;
+  Index: Integer;
+  First, Last: Boolean;
 begin
 
   Result := '';
@@ -2263,13 +2268,12 @@ begin
     if Param.DataType = dtParams then Value := _GetNested(Param)
     else Value := _QuoteString(Param);
 
-    First := Items.IndexOf(Param) = 0;
-    Result := Result + FormatParam(Param, Value, First);
+    Index := Items.IndexOf(Param);
+    First := Index = 0;
+    Last  := Index = Items.Count - 1;
+    Result := Result + FormatParam(Param, Value, First, Last);
 
   end;
-
-  if soSingleString in SaveToStringOptions then CutStr(Result, 1)
-  else CutStr(Result, 2);
 
 end;
 
@@ -2373,6 +2377,8 @@ begin
     if PresetTypes and (Count > 0) then Index := 0
     else Index := Append;
 
+    BeforeReadParam(Items[Index]);
+
     if Length(Value) > 0 then
 
       case CurrentType of
@@ -2398,7 +2404,7 @@ begin
 
     end;
 
-    ParamReadEvent(Items[Index]);
+    AfterReadParam(Items[Index]);
 
   end;
 
@@ -2420,6 +2426,8 @@ begin
     with Params.AddList(CurrentName) do
       P := Items[Append];
 
+    BeforeReadParam(P);
+
     P.SetAsParams(NestedParams);
 
   end;
@@ -2429,17 +2437,15 @@ begin
     try
 
       Read;
-
-    finally
-
+      AfterReadParams(P);
       Self.Move(Cursor - _CursorShift - Self.Cursor);
       Self.Location := Location;
 
+    finally
       Free;
-
     end;
 
-  ParamReadEvent(P);
+  AfterReadParam(P);
   FCurrentName := '';
   FCurrentType := dtUnknown;
 
@@ -2451,7 +2457,15 @@ begin
   Result := FCurrentType = dtParams;
 end;
 
-procedure TParamsReader.ParamReadEvent(_Param: TParam);
+procedure TParamsReader.BeforeReadParam(_Param: TParam);
+begin
+end;
+
+procedure TParamsReader.AfterReadParam(_Param: TParam);
+begin
+end;
+
+procedure TParamsReader.AfterReadParams(_Param: TParam);
 begin
 end;
 

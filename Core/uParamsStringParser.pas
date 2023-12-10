@@ -33,8 +33,6 @@ uses
   { LiberSynth }
   uConsts, uTypes, uCustomStringParser, uStrUtils;
 
-{ TODO 2 -oVasilyevSM -cTParamsReader:  ак потом будут читатьс€ пустые вложенные A:Params = () }
-
 type
 
   TElementType = (etName, etType, etValue);
