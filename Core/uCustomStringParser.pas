@@ -35,6 +35,7 @@ uses
 
 type
 
+  { TODO 2 -oVasilyevSM -cParsers: Ненужные в паблике классы убрать в классы, их использующие }
   { TODO 5 -oVasilyevSM -cTCustomStringParser: Section }
 
   TStanding = (stBefore, stInside, stAfter);
@@ -638,7 +639,7 @@ begin
 
   CursorStanding := stAfter;
   ElementStart   := 0;
-  FLocation.Remember(Cursor);
+  Location.Remember(Cursor);
 
 end;
 
@@ -698,7 +699,7 @@ begin
 
       CursorStanding := stInside;
       ElementStart := Cursor;
-      FLocation.Remember(Cursor);
+      Location.Remember(Cursor);
 
     end;
 
@@ -765,21 +766,20 @@ begin
 
     while (Cursor <= SrcLen) and not FTerminated do begin
 
-      if ProcessRegions then
-        Continue;
+      if not ProcessRegions then
 
-      if not RegionActive and GetCursorKey(CursorKey) then begin
+        if not RegionActive and GetCursorKey(CursorKey) then begin
 
-        KeyEvent(CursorKey);
-        DoAfterKey(CursorKey);
-        Move(CursorKey.KeyLength);
+          KeyEvent(CursorKey);
+          DoAfterKey(CursorKey);
+          Move(CursorKey.KeyLength);
 
-      end else begin
+        end else begin
 
-        MoveEvent;
-        Move;
+          MoveEvent;
+          Move;
 
-      end;
+        end;
 
       UpdateLocation;
 
