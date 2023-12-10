@@ -1,5 +1,32 @@
 unit uUserParams;
 
+(*******************************************************************************************)
+(*            _____          _____          _____          _____          _____            *)
+(*           /\    \        /\    \        /\    \        /\    \        /\    \           *)
+(*          /::\____\      /::\    \      /::\    \      /::\    \      /::\    \          *)
+(*         /:::/    /      \:::\    \    /::::\    \    /::::\    \    /::::\    \         *)
+(*        /:::/    /        \:::\    \  /::::::\    \  /::::::\    \  /::::::\    \        *)
+(*       /:::/    /          \:::\    \ :::/\:::\    \ :::/\:::\    \ :::/\:::\    \       *)
+(*      /:::/    /            \:::\    \ :/__\:::\    \ :/__\:::\    \ :/__\:::\    \      *)
+(*     /:::/    /             /::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \     *)
+(*    /:::/    /     _____   /::::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \    *)
+(*   /:::/    /     /\    \ /:::/\:::\    \ \   \:::\ ___\ \   \:::\    \ \   \:::\____\   *)
+(*  /:::/____/     /::\    /:::/  \:::\____\ \   \:::|    | \   \:::\____\ \   \:::|    |  *)
+(*  \:::\    \     \:::\  /:::/    \::/    / :\  /:::|____| :\   \::/    / :\  /:::|____|  *)
+(*   \:::\    \     \:::\/:::/    / \/____/ :::\/:::/    / :::\   \/____/ :::\/:::/    /   *)
+(*    \:::\    \     \::::::/    /  \:::\   \::::::/    /  \:::\    \  |:::::::::/    /    *)
+(*     \:::\    \     \::::/____/    \:::\   \::::/    /    \:::\____\ |::|\::::/    /     *)
+(*      \:::\    \     \:::\    \     \:::\  /:::/    / :\   \::/    / |::| \::/____/      *)
+(*       \:::\    \     \:::\    \     \:::\/:::/    / :::\   \/____/  |::|  ~|            *)
+(*        \:::\    \     \:::\    \     \::::::/    /  \:::\    \      |::|   |            *)
+(*         \:::\____\     \:::\____\     \::::/    /    \:::\____\     \::|   |            *)
+(*          \::/    /      \::/    /      \::/____/      \::/    /      \:|   |            *)
+(*           \/____/        \/____/        ~~             \/____/        \|___|            *)
+(*                                                                                         *)
+(*******************************************************************************************)
+
+{ TODO 5 -oVasilyevSM -cUserFormatParams: Параметры, сохраняющие исходное форматирование. Все что между элементами запоминать и потом выбрасывать в строку. }
+
 interface
 
 uses
@@ -57,7 +84,7 @@ type
       _Short: Boolean
 
     );
-    function Get(_Anchor: TCommentAnchor; _SingleString: Boolean): String;
+    function Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
 
   end;
 
@@ -216,44 +243,83 @@ begin
   inherited Add(TComment.Create(_Value, _Opening, _Closing, _Anchor, _Short));
 end;
 
-function TCommentList.Get(_Anchor: TCommentAnchor; _SingleString: Boolean): String;
+function TCommentList.Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
 var
   Comment: TComment;
   Splitter: String;
   Value: String;
+  LastWasLong: Boolean;
 begin
 
   Result := '';
+  LastWasLong := True;
+  Splitter := ' ';
 
-  if _SingleString or not (_Anchor in [caBeforeParam, caAfterParam]) then Splitter := ' '
-  else Splitter := CRLF;
+  if _SingleString then
 
-  for Comment in Self do
+    for Comment in Self do
+      with Comment do
+        if Anchor = _Anchor then
 
-    with Comment do
+          if Short then begin
 
-      if Anchor = _Anchor then begin
+            { Short SingleString }
 
-        if Short then begin
+            Value := '(*' + Text + '*)';
 
-          if      _SingleString then Value := '(*' + Text + '*)'
-          { AfterValue в параметре - последний из коротких. AfterParams тут не будет. Поэтому не нужен CRLF в конце, его и так добавит вызывющая функция. }
-          else if _Anchor = caAfterValue then Value := Opening + Text
-          else Value := Opening + Text + Closing;
+            if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
+            else Result := Result + Value + Splitter;
 
-          case _Anchor of
+          end else begin
 
-            caBeforeParam, caAfterParam: if not _SingleString then Splitter := '';
-            caAfterName, caAfterType, caAfterValue: Splitter := ' ';
+            { Long SingleString }
+
+            Value := Opening + Text + Closing;
+
+            if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
+            else Result := Result + Value + Splitter;
+
+          end
+
+        else
+
+  else
+
+    for Comment in Self do
+      with Comment do
+        if Anchor = _Anchor then
+
+          if Short then begin
+
+            { Short MultiString }
+
+            if _Anchor = caAfterValue then Value := Opening + Text
+            else Value := Opening + Text + Closing;
+            if not (_Anchor in [caAfterName, caAfterType, caAfterValue]) then
+              Splitter := '';
+
+            if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
+            else Result := Result + Value + Splitter;
+
+            LastWasLong := False;
+
+          end else begin
+
+            { Long MultiString }
+
+            if _Anchor in [caBeforeParam, caAfterParam] then Splitter := CRLF;
+
+            Value := Opening + Text + Closing;
+
+            if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
+            else Result := Result + Value + Splitter;
 
           end;
 
-        end else Value := Opening + Text + Closing;
-
-        if Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
-        else Result := Result + Value + Splitter;
-
-      end;
+  { Если перед '=' был короткий комментарий, то это = оказывается на следующей строке. Поэтому только в этом случае
+    перед = пробел не нужен. И это два варианта, для выгрузки с типами - после типа, без типов - после имени. }
+  if LastWasLong and ((_Typed and (_Anchor = caAfterType)) or (not _Typed and (_Anchor = caAfterName))) then
+    Result := Result + ' ';
 
 end;
 
@@ -297,19 +363,20 @@ end;
 function TUserParams.FormatParam(_Param: TParam; const _Value: String; _First: Boolean): String;
 const
 
-  SC_VALUE_UNTYPED = '%4:s%5:s%0:s%6:s = %9:s%2:s%10:s%3:s%11:s';
-  SC_VALUE_TYPED   = '%4:s%5:s%0:s%6:s: %7:s%1:s%8:s = %9:s%2:s%10:s%3:s%11:s';
+  SC_VALUE_UNTYPED = '%4:s%5:s%0:s%6:s= %9:s%2:s%10:s%3:s%11:s';
+  SC_VALUE_TYPED   = '%4:s%5:s%0:s%6:s: %7:s%1:s%8:s= %9:s%2:s%10:s%3:s%11:s';
 
 var
   ParamFormat: String;
   Splitter: String;
-  SingleString: Boolean;
+  SingleString, Typed: Boolean;
 begin
 
-  if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
-  else ParamFormat := SC_VALUE_TYPED;
-
+  Typed := not (soTypesFree in SaveToStringOptions);
   SingleString := soSingleString in SaveToStringOptions;
+
+  if Typed then ParamFormat := SC_VALUE_TYPED
+  else ParamFormat := SC_VALUE_UNTYPED;
 
   if SingleString then Splitter := ';'
   else Splitter := CRLF;
@@ -322,14 +389,14 @@ begin
         ParamDataTypeToStr(_Param.DataType),
         _Value,
         Splitter,
-        Comments.Get(caBeforeParam, SingleString),
-        Comments.Get(caBeforeName,  SingleString),
-        Comments.Get(caAfterName,   SingleString),
-        Comments.Get(caBeforeType,  SingleString),
-        Comments.Get(caAfterType,   SingleString),
-        Comments.Get(caBeforeValue, SingleString),
-        Comments.Get(caAfterValue,  SingleString),
-        Comments.Get(caAfterParam,  SingleString)
+        Comments.Get(caBeforeParam, SingleString, Typed),
+        Comments.Get(caBeforeName,  SingleString, Typed),
+        Comments.Get(caAfterName,   SingleString, Typed),
+        Comments.Get(caBeforeType,  SingleString, Typed),
+        Comments.Get(caAfterType,   SingleString, Typed),
+        Comments.Get(caBeforeValue, SingleString, Typed),
+        Comments.Get(caAfterValue,  SingleString, Typed),
+        Comments.Get(caAfterParam,  SingleString, Typed)
 
     ]);
 
@@ -544,7 +611,7 @@ function TShortCommentRegion.CanClose(_Parser: TCustomStringParser): Boolean;
     Result := _Parser.Rest = 0;
 
     if Result then
-      FTerminator := CRLF; // Весьма условно, конечно. В строке это может быть просто CR или LF.
+      FTerminator := CRLF; // Сохраняем всегда с CRLF, не с CR и не с LF.
 
   end;
 

@@ -2268,10 +2268,8 @@ begin
 
   end;
 
-  if soSingleString in SaveToStringOptions then
-    CutStr(Result, 1);
-
-  { TODO 2 -oVasilyevSM -cTParams.SaveToString: Кто-то добавляет лишний CRLF в конце }
+  if soSingleString in SaveToStringOptions then CutStr(Result, 1)
+  else CutStr(Result, 2);
 
 end;
 
