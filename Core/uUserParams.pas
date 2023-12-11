@@ -47,7 +47,7 @@ type
 
   TCommentAnchor = (
 
-      caBeforeParam, caBeforeName, caAfterName, caBeforeType, caAfterType, caBeforeValue, caAfterValue, caAfterParam, caInsideParams
+      caBeforeParam, caBeforeName, caAfterName, caBeforeType, caAfterType, caBeforeValue, caAfterValue, caAfterParam, caInsideEmptyParams
 
   );
 
@@ -254,13 +254,13 @@ var
   Comment: TComment;
   Splitter: String;
   Value: String;
-  LastWasLong: Boolean;
+  Index: Word;
 begin
 
   { TODO 2 -oVasilyevSM -cFormatParam: Комментарий обрезать по краям тримом и оборачивать в пробелы. }
   Result := '';
-  LastWasLong := True;
   Splitter := ' ';
+  Index := 0;
 
   if _SingleString then
 
@@ -272,8 +272,7 @@ begin
 
             { Short SingleString }
 
-            Value := '(*' + Text + '*)';
-            if _Anchor = caInsideParams then Splitter := '';
+            Value := '(* ' + Text + ' *)';
 
             if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
             else Result := Result + Value + Splitter;
@@ -282,8 +281,7 @@ begin
 
             { Long SingleString }
 
-            Value := Opening + Text + Closing;
-            if _Anchor = caInsideParams then Splitter := '';
+            Value := Opening + ' ' + Text + ' ' + Closing;
 
             if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
             else Result := Result + Value + Splitter;
@@ -302,40 +300,27 @@ begin
 
             { Short MultiString }
 
-            if _Anchor in [caAfterValue, caInsideParams] then Value := Opening + Text
-            else Value := Opening + Text + Closing;
-            if not (_Anchor in [caAfterName, caAfterType, caAfterValue]) then Splitter := '';
-            if _Anchor = caInsideParams then begin
+            if _Anchor in [caAfterParam] then Value := Opening + ' ' + Text
+            else Value := Opening + ' ' + Text + Closing;
 
-              Splitter := CRLF;
-              ShiftText(1, Value);
+            if (Index > 0) or (_Anchor in [caBeforeParam, caBeforeType, caAfterParam, caInsideEmptyParams]) then
+              Splitter := '';
+            Inc(Index);
 
-            end;
-
-            if _Anchor in [caAfterName, caAfterType, caAfterValue, caInsideParams] then Result := Result + Splitter + Value
-            else Result := Result + Value + Splitter;
-
-            LastWasLong := False;
+            Result := Result + Splitter + Value
 
           end else begin
 
             { Long MultiString }
 
-            if _Anchor in [caBeforeParam, caAfterParam, caInsideParams] then Splitter := CRLF;
+            if _Anchor in [caBeforeParam, caAfterParam, caInsideEmptyParams] then Splitter := CRLF;
 
-            Value := Opening + Text + Closing;
+            Value := Opening + ' ' + Text + ' ' + Closing;
 
-            if _Anchor = caInsideParams then ShiftText(1, Value);
-
-            if _Anchor in [caAfterName, caAfterType, caAfterValue, caInsideParams] then Result := Result + Splitter + Value
+            if _Anchor in [caAfterName, caAfterType, caAfterValue, caAfterParam] then Result := Result + Splitter + Value
             else Result := Result + Value + Splitter;
 
           end;
-
-  { Если перед '=' был короткий комментарий, то это = оказывается на следующей строке. Поэтому только в этом случае
-    перед = пробел не нужен. И это два варианта, для выгрузки с типами - после типа, без типов - после имени. }
-  if LastWasLong and ((_Typed and (_Anchor = caAfterType)) or (not _Typed and (_Anchor = caAfterName))) then
-    Result := Result + ' ';
 
 end;
 
@@ -379,10 +364,11 @@ end;
 function TUserParams.FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
 const
 
-  SC_VALUE_UNTYPED = '%4:s%5:s%0:s%6:s= %9:s%2:s%10:s%3:s%11:s';
-  SC_VALUE_TYPED   = '%4:s%5:s%0:s%6:s: %7:s%1:s%8:s= %9:s%2:s%10:s%3:s%11:s';
+  SC_VALUE_TYPED   = '%5:s%6:s%0:s%7:s: %8:s%1:s%9:s%3:s= %10:s%2:s%11:s%4:s%12:s';
+  SC_VALUE_UNTYPED = '%5:s%6:s%0:s%7:s%3:s= %10:s%2:s%11:s%4:s%12:s';
 
   procedure _InjectParamsComments(const _Comments: String);
+  { TODO 2 -oVasilyevSM -cTUserParams.FormatParam: Колоться вредно. }
   var
     p: Integer;
   begin
@@ -396,8 +382,10 @@ const
 
 var
   ParamFormat: String;
-  Splitter: String;
+  BeforeParam, BeforeName, AfterName, BeforeType, AfterType, BeforeValue, AfterValue, AfterParam, InsideEmptyParams: String;
+  Splitter, BeforeAssigningSpace: String;
   SingleString, Typed: Boolean;
+  L: Integer;
 begin
 
   Typed := not (soTypesFree in SaveToStringOptions);
@@ -406,29 +394,78 @@ begin
   if Typed then ParamFormat := SC_VALUE_TYPED
   else ParamFormat := SC_VALUE_UNTYPED;
 
-  if _Last then Splitter := ''
-  else if SingleString then Splitter := ';'
-  else Splitter := CRLF;
+  if SingleString then
+    if _Last then Splitter := ' '
+    else Splitter := ';'
+  else
+    if _Last then Splitter := ''
+    else Splitter := CRLF;
 
   with _Param as TUserParam do begin
 
-    if DataType = dtParams then
-      _InjectParamsComments(Comments.Get(caInsideParams, SingleString, Typed));
+    BeforeParam       := Comments.Get(caBeforeParam,       SingleString, Typed);
+    BeforeName        := Comments.Get(caBeforeName,        SingleString, Typed);
+    AfterName         := Comments.Get(caAfterName,         SingleString, Typed);
+    BeforeType        := Comments.Get(caBeforeType,        SingleString, Typed);
+    AfterType         := Comments.Get(caAfterType,         SingleString, Typed);
+    BeforeValue       := Comments.Get(caBeforeValue,       SingleString, Typed);
+    AfterValue        := Comments.Get(caAfterValue,        SingleString, Typed);
+    AfterParam        := Comments.Get(caAfterParam,        SingleString, Typed);
+    InsideEmptyParams := Comments.Get(caInsideEmptyParams, SingleString, Typed);
+
+    { Если перед '=' был короткий комментарий, то это '=' оказывается на следующей строке. Поэтому только в этом случае
+      перед '=' пробел не нужен. И это два варианта, для выгрузки с типами - после типа, без типов - после имени. }
+    if Typed then begin
+
+      L := Length(AfterType);
+      if (L >= 2) and (Copy(AfterType, L - 1, 2) = CRLF) then BeforeAssigningSpace := ''
+      else BeforeAssigningSpace := ' ';
+
+    end else begin
+
+      L := Length(AfterName);
+      if (L >= 2) and (Copy(AfterName, L - 1, 2) = CRLF) then BeforeAssigningSpace := ''
+      else BeforeAssigningSpace := ' ';
+
+    end;
+
+    if DataType = dtParams then begin
+
+      if Length(_Value) = 0 then _Value := InsideEmptyParams
+      else if not SingleString then _Value := _Value + CRLF;
+
+      if SingleString then
+
+        if Length(_Value) = 0  then _Value := '()'
+        else _Value := Format('( %s)', [_Value])
+
+      else begin
+
+        _Value := Format('(%s%s)', [CRLF, ShiftText(_Value, 1)]);
+
+        L := Length(AfterValue);
+        if (L >= 2) and (Copy(AfterValue, L - 1, 2) = CRLF) then
+          AfterValue := Copy(AfterValue, 1, L - 2);
+
+      end;
+
+    end;
 
     Result := Format(ParamFormat, [
 
-        _Param.Name,
-        ParamDataTypeToStr(_Param.DataType),
-        _Value,
-        Splitter,
-        Comments.Get(caBeforeParam,  SingleString, Typed),
-        Comments.Get(caBeforeName,   SingleString, Typed),
-        Comments.Get(caAfterName,    SingleString, Typed),
-        Comments.Get(caBeforeType,   SingleString, Typed),
-        Comments.Get(caAfterType,    SingleString, Typed),
-        Comments.Get(caBeforeValue,  SingleString, Typed),
-        Comments.Get(caAfterValue,   SingleString, Typed),
-        Comments.Get(caAfterParam,   SingleString, Typed)
+        {  0 } Name,
+        {  1 } ParamDataTypeToStr(DataType),
+        {  2 } _Value,
+        {  3 } BeforeAssigningSpace,
+        {  4 } Splitter,
+        {  5 } BeforeParam,
+        {  6 } BeforeName,
+        {  7 } AfterName,
+        {  8 } BeforeType,
+        {  9 } AfterType,
+        { 10 } BeforeValue,
+        { 11 } AfterValue,
+        { 12 } AfterParam
 
     ]);
 
@@ -502,7 +539,7 @@ end;
 
 function TUserParamsReader.ReadComment(_Shift: Byte): String;
 begin
-  Result := Copy(Source, RegionStart, Cursor - RegionStart - _Shift);
+  Result := Trim(Copy(Source, RegionStart, Cursor - RegionStart - _Shift));
 end;
 
 procedure TUserParamsReader.AddComment;
@@ -548,7 +585,7 @@ begin
 
   for i := 0 to CurrentComments.Count - 1 do
     with CurrentComments[i] do
-      ParamComments.Add(Text, Opening, Closing, caInsideParams, Short);
+      ParamComments.Add(Text, Opening, Closing, caInsideEmptyParams, Short);
 
   CurrentComments.Clear;
 

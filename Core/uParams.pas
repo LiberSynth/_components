@@ -2222,22 +2222,6 @@ end;
 
 function TParams.SaveToString: String;
 
-  function _GetNested(_Param: TParam): String;
-  begin
-
-    Result := _Param.AsParams.SaveToString;
-
-    if not (soSingleString in SaveToStringOptions) then begin
-
-      ShiftText(1, Result);
-      Result := CRLF + Result + CRLF;
-
-    end;
-
-    Result := Format('(%s)', [Result]);
-
-  end;
-
   function _QuoteString(_Param: TParam): String;
   begin
 
@@ -2269,12 +2253,13 @@ begin
   Result := '';
   for Param in Items do begin
 
-    if Param.DataType = dtParams then Value := _GetNested(Param)
+    if Param.DataType = dtParams then Value := Param.AsParams.SaveToString
     else Value := _QuoteString(Param);
 
     Index := Items.IndexOf(Param);
     First := Index = 0;
     Last  := Index = Items.Count - 1;
+
     Result := Result + FormatParam(Param, Value, First, Last);
 
   end;
