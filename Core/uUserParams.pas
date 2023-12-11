@@ -114,6 +114,8 @@ type
 
   end;
 
+  { Этот класс НЕ никому должен: уметь быстро обрабатывать большие хранилища. Если формат LSNI используется как
+    мини-база, не нужно там держать комментарии никому. }
   TUserParams = class(TParams)
 
   protected
@@ -257,7 +259,6 @@ var
   Index: Word;
 begin
 
-  { TODO 2 -oVasilyevSM -cFormatParam: Комментарий обрезать по краям тримом и оборачивать в пробелы. }
   Result := '';
   Splitter := ' ';
   Index := 0;
@@ -367,19 +368,6 @@ const
   SC_VALUE_TYPED   = '%5:s%6:s%0:s%7:s: %8:s%1:s%9:s%3:s= %10:s%2:s%11:s%4:s%12:s';
   SC_VALUE_UNTYPED = '%5:s%6:s%0:s%7:s%3:s= %10:s%2:s%11:s%4:s%12:s';
 
-  procedure _InjectParamsComments(const _Comments: String);
-  { TODO 2 -oVasilyevSM -cTUserParams.FormatParam: Колоться вредно. }
-  var
-    p: Integer;
-  begin
-
-    p := Pos('(', _Value);
-
-    if p > 0 then
-      _Value := Copy(_Value, 1, p) + _Comments + Copy(_Value, p + 1, Length(_Value));
-
-  end;
-
 var
   ParamFormat: String;
   BeforeParam, BeforeName, AfterName, BeforeType, AfterType, BeforeValue, AfterValue, AfterParam, InsideEmptyParams: String;
@@ -387,6 +375,8 @@ var
   SingleString, Typed: Boolean;
   L: Integer;
 begin
+
+  { TODO 5 -oVasilyevSM -cTUserParams.FormatParam: Ошибка: A: Params = ( B: Integer = 0; C: String = 'asd' ); }
 
   Typed := not (soTypesFree in SaveToStringOptions);
   SingleString := soSingleString in SaveToStringOptions;

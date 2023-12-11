@@ -35,7 +35,6 @@ uses
 
 type
 
-  { TODO 2 -oVasilyevSM -cParsers: Ненужные в паблике классы убрать в классы, их использующие }
   { TODO 5 -oVasilyevSM -cTCustomStringParser: Section }
 
   TStanding = (stBefore, stInside, stAfter);
@@ -692,19 +691,16 @@ end;
 procedure TCustomStringParser.MoveEvent;
 begin
 
-  if not RegionActive then begin
+  if CursorStanding = stBefore then begin
 
-    if CursorStanding = stBefore then begin
-
-      CursorStanding := stInside;
-      ElementStart := Cursor;
-      Location.Remember(Cursor);
-
-    end;
-
-    CheckSyntax(KWR_EMPTY);
+    CursorStanding := stInside;
+    ElementStart := Cursor;
+    Location.Remember(Cursor);
 
   end;
+
+  if not RegionActive then
+    CheckSyntax(KWR_EMPTY);
 
 end;
 

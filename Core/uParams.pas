@@ -345,7 +345,7 @@ type
     function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
     function GetParam(_Path: String): TParam;
 
-    property Items: TParamList read FItems;
+    property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cTParams: —делать бы default, а то бесит это Items повсюду. }
     property ListHolder: TParamsListHolder read FListHolder;
 
   protected
@@ -907,7 +907,7 @@ begin
 
         begin
 
-          P := TParamsClass(_Source.AsParams.ClassType).Create(_Host.PathSeparator, _Host.SaveToStringOptions);
+          P := TParamsClass(_Host.ClassType).Create(_Host.PathSeparator, _Host.SaveToStringOptions);
           SetAsParams(P);
           P.Assign(_Source.AsParams, _ForceAdding);
 
@@ -1978,13 +1978,27 @@ var
   Splitter: String;
 begin
 
+  if _Param.DataType = dtParams then begin
+
+    if soSingleString in SaveToStringOptions then
+
+      _Value := Format('(%s)', [_Value])
+
+    else begin
+
+      if Length(_Value) > 0 then _Value := _Value + CRLF;
+      _Value := Format('(%s%s)', [CRLF, ShiftText(_Value, 1)]);
+
+    end;
+
+  end;
+
   if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
   else ParamFormat := SC_VALUE_TYPED;
 
   if _Last then Splitter := ''
   else if soSingleString in SaveToStringOptions then Splitter := ';'
   else Splitter := CRLF;
-
 
   Result := Format(ParamFormat, [
 
