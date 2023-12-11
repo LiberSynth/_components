@@ -129,7 +129,7 @@ type
 
   end;
 
-  TCustomStringParser = class
+  TCustomStringParser = class abstract
 
   strict private
 
@@ -159,8 +159,8 @@ type
   strict private
 
     FSource: String;
-    FSrcLen: Int64;
     FCursor: Int64;
+    FSrcLen: Int64;
     FCursorStanding: TStanding;
     FElementStart: Int64;
     FRegionStart: Int64;
@@ -234,8 +234,8 @@ type
     procedure Read;
 
     property Source: String read FSource;
-    property SrcLen: Int64 read FSrcLen;
     property Cursor: Int64 read FCursor;
+    property SrcLen: Int64 read FSrcLen;
     property Rest: Int64 read GetRest;
     property CursorStanding: TStanding read FCursorStanding write FCursorStanding;
     property ElementStart: Int64 read FElementStart write FElementStart;
@@ -789,6 +789,9 @@ begin
       if Nested then raise
       else
 
+        { TODO 3 -oVasilyevSM -cTCustomStringParser: Перегенерация на выбор, Native/Parametrized. Это Native, а тип
+          Parametrized должен генерировать исключение другого класса с параметрами: ссылка на класс исходного
+          исключения, его Message и набор локации, Line, Column, Position. }
         raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Column: %d, Position: %d', [
 
             E.Message,
