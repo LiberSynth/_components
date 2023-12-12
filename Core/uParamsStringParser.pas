@@ -210,6 +210,7 @@ type
 
     function CanOpen(_Parser: TCustomStringParser): Boolean; override;
     function CanClose(_Parser: TCustomStringParser): Boolean; override;
+    procedure Opened(_Parser: TCustomStringParser); override;
     procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
@@ -419,7 +420,7 @@ var
   RI: TReadInfo;
 begin
 
-  for RI in FReading do
+  for RI in Reading do
 
     if
 
@@ -591,6 +592,21 @@ begin
   Result := inherited and not Doubling(_Parser);
 end;
 
+procedure TQoutedStringRegion.Opened(_Parser: TCustomStringParser);
+begin
+
+  inherited Opened(_Parser);
+
+  with _Parser do begin
+
+    CursorStanding := stInside;
+    { TODO 5 -oVasilyevSM -cTCustomStringParser: Че за костыли? Почему еще не подвинуто? }
+    ElementStart := Cursor + OpeningKey.KeyLength;
+
+  end;
+
+end;
+
 procedure TQoutedStringRegion.Closed(_Parser: TCustomStringParser);
 begin
 
@@ -623,18 +639,36 @@ end;
 
 function TNestedParamsBlock.CanOpen(_Parser: TCustomStringParser): Boolean;
 begin
-  Result := inherited and (_Parser as TParamsStringParser).IsParamsType;
+
+  with _Parser as TParamsStringParser do
+
+    Result :=
+
+        (ElementType = etValue) and
+        (CursorStanding = stBefore) and
+        inherited and
+        IsParamsType;
+
 end;
 
 procedure TNestedParamsBlock.Opened(_Parser: TCustomStringParser);
 begin
+
   inherited Opened(_Parser);
-  (_Parser as TParamsStringParser).ReadParams(OpeningKey.KeyLength);
+
+  with _Parser as TParamsStringParser do begin
+
+    CursorStanding := stInside;
+    ElementStart   := Cursor;
+    ReadParams(OpeningKey.KeyLength);
+
+  end;
+
 end;
 
 procedure TNestedParamsBlock.Closed(_Parser: TCustomStringParser);
 begin
-  (_Parser as TParamsStringParser).ElementType := etValue;
+  (_Parser as TParamsStringParser).ElementType := etValue; { TODO 1 -oVasilyevSM -cGeneral: Он и так value здесь }
   inherited Closed(_Parser);
 end;
 

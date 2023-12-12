@@ -135,7 +135,7 @@ type
 
   type
 
-    { TODO -oVasilyevSM -cGeneral: Вытащить локацию в класс-наследник TLocatingStringParser, чтобы можно было без этой
+    { TODO 2 -oVasilyevSM -cGeneral: Вытащить локацию в класс-наследник TLocatingStringParser, чтобы можно было без этой
       нагрузки парсить, когда локация не нужна. }
     TLocation = record
 
@@ -174,11 +174,11 @@ type
 
     FLocation: TLocation;
 
-    function GetCursorKey(var _Value: TKeyWord): Boolean; inline;
+    function GetCursorKey(var _Value: TKeyWord): Boolean;
     function RegionActive: Boolean; inline;
 
     procedure CheckUnterminated(_KeyType: TKeyType);
-    procedure UpdateLocation; inline;
+    procedure UpdateLocation;
 
     function GetRest: Int64; inline;
 
@@ -186,7 +186,7 @@ type
 
   private
 
-    function IsCursorKey(const _KeyWord: TKeyWord): Boolean; inline;
+    function IsCursorKey(const _KeyWord: TKeyWord): Boolean;
 
     property Regions: TRegionList read FRegions;
 
@@ -458,7 +458,8 @@ begin
 
     CursorStanding := stAfter;
     ElementStart := 0;
-    { TODO -oVasilyevSM -cTBlock: Разобраться, почему тут курсор не двигается }
+    { TODO 5 -oVasilyevSM -cTBlock: Разобраться, почему тут курсор не двигается. Просто странно, что понадобилась поправка
+      на ветер здесь. }
     Location.Remember(Cursor + ClosingKey.KeyLength);
 
   end;
@@ -543,7 +544,7 @@ var
   KeyWord: TKeyWord;
 begin
 
-  for KeyWord in FKeyWords do
+  for KeyWord in KeyWords do
 
     if IsCursorKey(KeyWord) then begin
 
@@ -701,11 +702,10 @@ end;
 procedure TCustomStringParser.MoveEvent;
 begin
 
-  if CursorStanding = stBefore then begin
+  if not RegionActive and (CursorStanding = stBefore) then begin
 
     { TODO 1 -oVasilyevSM -cTCustomStringParser: Ошибка.
-      Строковый регион ДОЛЖЕН переклюать Standing в Inside. И то, если это Value, а не что-то другое (проверить надо,
-      отрабатывает ли синтаксис на кавычку в имени или типе).
+      Строковый регион ДОЛЖЕН переклюать Standing в Inside.
       Комментарий - не должен. Параметр - тоже понять надо, должени или нет. Нужно свойство региона, что он - body. }
     CursorStanding := stInside;
     ElementStart := Cursor;
@@ -753,8 +753,8 @@ begin
   if ElementStart > 0 then
 
     if _Trim then
-      { TODO -oVasilyevSM -cTCustomStringParser: Разобрать, я вроде видел, что очищаются не только пробелы, но и табы, и
-        что-то еще. Но как? SysUtils.Trim по коду только на пробел значение проверяет. }
+      { TODO 5 -oVasilyevSM -cTCustomStringParser: Разобрать, я вроде видел, что очищаются не только пробелы, но и табы,
+        и что-то еще. Но как? SysUtils.Trim по коду только на пробел значение проверяет. }
       Result := Trim(Copy(Source, ElementStart, Cursor - ElementStart))
     else
       Result := Copy(Source, ElementStart, Cursor - ElementStart)
@@ -792,6 +792,8 @@ begin
 
         end;
 
+      { Уж если здесь писать событие AfterStep, то в нем всю логику по локации и исполнить. И не надо будет столько
+        вызовов Location.Remember. }
       UpdateLocation;
 
     end;

@@ -57,7 +57,7 @@ type
     FIsNull: Boolean;
     FPathSeparator: Char;
     FStrictDataType: Boolean;
-    { TODO -oVasilyevSM -cTParam: Ќаверное, более современным способом было бы использовать дженерик здесь.  ласс
+    { TODO 5 -oVasilyevSM -cTParam: Ќаверное, более современным способом было бы использовать дженерик здесь.  ласс
       TValue<T>, и пересоздавать его при смене типа данных. ј как он там будет с пам€тью орудовать - не наша проблема. }
     FData: Pointer;
 
