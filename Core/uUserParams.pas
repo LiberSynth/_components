@@ -254,14 +254,31 @@ end;
 function TUserParam.TCommentList.Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
 var
   Comment: TComment;
-  Splitter: String;
   Value: String;
+  Splitter: String;
   Index: Word;
 begin
 
   Result := '';
   Splitter := ' ';
   Index := 0;
+
+  { TODO 1 -oVasilyevSM -cFormatParam: Нужен метод Search***(StartAt, Anchor), которым можно пробежать по списку с учетом
+    признака Anchor. Будет удобнее здесь орудовать. Цикл может быть какой-нибудь while и тогда еще можно будет First и
+    Last контролировать.
+
+    Нужно избавиться от смены порядка Value + Splitter / Splitter + Value. Постараться управлять начальным и конечным
+    разделителем после обработки цикла.
+
+    Splitter сбрасывается один раз, в Short SingleString. И там он, получается, играет роль отступа. Именно поэтому там
+    не меняется порядок Splitter + Value, причем, он обратный. Следовательно, в остальных обработках он играет двойную
+    роль, разделителя и отступа одновременно. В этом-то вся и проблема. Трудно форматировать по шаблону снаружи, не
+    зная, что вернется изнутри. Должен быть отдельный Offset и добавляться перед перед циклом всегда и после цикла
+    только в режиме SingleString. А сплиттер - только в конце и в не SingleString - кроме последнего. В режиме
+    MultiString Short просто использовать Closing для отделения кмментариев друг от друга. Похоже, придется в
+    некоторых случаях делать Cut после цикла, чтобы сбросить последний сплиттер. *** - и тогда Search не нужен, а только
+    функция GetAll(Anchor), которая вернет их правильно разделенными без указания отсюда. Сама разберется, Short - нет,
+    Long - да. А здесь только Offset в конце надо умно добавить и то не факт. Возможно, это дело функции Format. }
 
   if _SingleString then
 
@@ -308,7 +325,7 @@ begin
               Splitter := '';
             Inc(Index);
 
-            Result := Result + Splitter + Value
+            Result := Result + Splitter + Value;
 
           end else begin
 
@@ -600,6 +617,7 @@ end;
 procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
+  { TODO 5 -oVasilyevSM -cTUserParamsReader: Костыль. Получается двойной вызов ProcessRegions почти всегда. }
   if (_KeyWord.KeyType <> ktSourceEnd) or not ProcessRegions then
     inherited KeyEvent(_KeyWord);
 

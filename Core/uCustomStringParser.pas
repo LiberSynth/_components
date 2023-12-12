@@ -39,7 +39,7 @@ type
 
   TStanding = (stBefore, stInside, stAfter);
 
-  TKeyType = (ktNone, ktSourceEnd, ktLineEnd);
+  TKeyType = (ktNone, ktSourceEnd, { TODO 3 -oVasilyevSM -cTCustomStringPaarser: Этот ключ не используется -> } ktLineEnd);
   TKeyTypes = set of TKeyType;
 
   TKeyWord = record
@@ -135,6 +135,8 @@ type
 
   type
 
+    { TODO -oVasilyevSM -cGeneral: Вытащить локацию в класс-наследник TLocatingStringParser, чтобы можно было без этой
+      нагрузки парсить, когда локация не нужна. }
     TLocation = record
 
       CurrentLine: Int64;
@@ -172,19 +174,19 @@ type
 
     FLocation: TLocation;
 
-    function GetCursorKey(var _Value: TKeyWord): Boolean;
-    function RegionActive: Boolean;
+    function GetCursorKey(var _Value: TKeyWord): Boolean; inline;
+    function RegionActive: Boolean; inline;
 
     procedure CheckUnterminated(_KeyType: TKeyType);
-    procedure UpdateLocation;
+    procedure UpdateLocation; inline;
 
-    function GetRest: Int64;
+    function GetRest: Int64; inline;
 
     property NestedLevel: Word read FNestedLevel;
 
   private
 
-    function IsCursorKey(const _KeyWord: TKeyWord): Boolean;
+    function IsCursorKey(const _KeyWord: TKeyWord): Boolean; inline;
 
     property Regions: TRegionList read FRegions;
 
@@ -192,7 +194,7 @@ type
 
     { События для потомков }
     procedure InitParser; virtual;
-    function ProcessRegions: Boolean;
+    function ProcessRegions: Boolean; { TODO 5 -oVasilyevSM -cTCustomStringParser: -> strict private }
     function ElementProcessingKey(_KeyWord: TKeyWord): Boolean; virtual;
     function ElementTerminatingKey(_KeyWord: TKeyWord): Boolean; virtual;
     procedure ProcessElement; virtual;
@@ -213,11 +215,11 @@ type
     procedure ElementTerminatedEvent(_KeyWord: TKeyWord); virtual;
 
     { Методы и свойства для управления }
-    procedure Move(_Incrementer: Int64 = 1);
+    procedure Move(_Incrementer: Int64 = 1); inline; { TODO 5 -oVasilyevSM -cGeneral: _Incrementer должен быть Unsigned для запрета движения назад. }
     procedure Terminate;
     function ReadElement(_Trim: Boolean): String; virtual;
-    procedure AddRegion(
-
+    procedure AddRegion( { TODO 4 -oVasilyevSM -cTCustomStringParser : Может, добавить клон AddBlock для красоты? И для
+      логичности. И занести в хэлп сразу. }
         const _RegionClass: TRegionClass;
         const _OpeningKey: TKeyWord;
         const _ClosingKey: TKeyWord;
@@ -237,12 +239,16 @@ type
     property Cursor: Int64 read FCursor;
     property SrcLen: Int64 read FSrcLen;
     property Rest: Int64 read GetRest;
+    property KeyWords: TKeyWordList read FKeyWords;
+    { TODO 5 -oVasilyevSM -cTCustomStringParser: Теоретически, сочетание CursorStanding = csInside несовместимо с
+      ElementStart = 0. Надо эксперимент поставить и, возможно, генерировать исключение в этом случае, чтобы не написать
+      фигню в потомках. То же самое для RegionStart, если он открыт, то не 0 и наоборот. }
     property CursorStanding: TStanding read FCursorStanding write FCursorStanding;
     property ElementStart: Int64 read FElementStart write FElementStart;
     property RegionStart: Int64 read FRegionStart write FRegionStart;
     property Terminated: Boolean read FTerminated;
-    property Location: TLocation read FLocation write FLocation;
-    property KeyWords: TKeyWordList read FKeyWords;
+
+    {}property Location: TLocation read FLocation write FLocation;{}
 
   end;
 
@@ -252,6 +258,7 @@ const
 
   KWR_EMPTY:         TKeyWord = (KeyTypeInternal: Integer(ktNone);      StrValue: '';   KeyLength: 0           );
   KWR_SOURCE_END:    TKeyWord = (KeyTypeInternal: Integer(ktSourceEnd); StrValue: '';   KeyLength: 0           );
+  { TODO 3 -oVasilyevSM -cTCustomStringPaarser: Вообще-то эти ключи не используются, можно их убрать отсюда. }
   KWR_LINE_END_CR:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CR;   KeyLength: Length(CR)  );
   KWR_LINE_END_LF:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: LF;   KeyLength: Length(LF)  );
   KWR_LINE_END_CRLF: TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CRLF; KeyLength: Length(CRLF));
@@ -274,6 +281,7 @@ type
   end;
 
 {$IFDEF DEBUG}
+{ TODO 4 -oVasilyevSM -cTCustomStringParser: Добавить еще одну проверку, что эти ключи не пересекаются с обычными. }
 procedure CheckRegions(_Regions: TRegionList);
 var
   SSA, SSB: TRegion;
@@ -450,6 +458,7 @@ begin
 
     CursorStanding := stAfter;
     ElementStart := 0;
+    { TODO -oVasilyevSM -cTBlock: Разобраться, почему тут курсор не двигается }
     Location.Remember(Cursor + ClosingKey.KeyLength);
 
   end;
@@ -602,8 +611,8 @@ end;
 
 function TCustomStringParser.ProcessRegions: Boolean;
 begin
-  with Regions do 
-    Result := TryClose(Self) or TryOpen(Self);    
+  with Regions do
+    Result := TryClose(Self) or TryOpen(Self);
 end;
 
 procedure TCustomStringParser.InitParser;
@@ -614,6 +623,7 @@ begin
 
   with KeyWords do begin
 
+    { TODO 3 -oVasilyevSM -cTCustomStringPaarser: Вообще-то эти ключи не используются, можно их убрать отсюда. }
     Add(KWR_LINE_END_CRLF);
     Add(KWR_LINE_END_LF  );
     Add(KWR_LINE_END_CR  );
@@ -693,6 +703,10 @@ begin
 
   if CursorStanding = stBefore then begin
 
+    { TODO 1 -oVasilyevSM -cTCustomStringParser: Ошибка.
+      Строковый регион ДОЛЖЕН переклюать Standing в Inside. И то, если это Value, а не что-то другое (проверить надо,
+      отрабатывает ли синтаксис на кавычку в имени или типе).
+      Комментарий - не должен. Параметр - тоже понять надо, должени или нет. Нужно свойство региона, что он - body. }
     CursorStanding := stInside;
     ElementStart := Cursor;
     Location.Remember(Cursor);
@@ -739,6 +753,8 @@ begin
   if ElementStart > 0 then
 
     if _Trim then
+      { TODO -oVasilyevSM -cTCustomStringParser: Разобрать, я вроде видел, что очищаются не только пробелы, но и табы, и
+        что-то еще. Но как? SysUtils.Trim по коду только на пробел значение проверяет. }
       Result := Trim(Copy(Source, ElementStart, Cursor - ElementStart))
     else
       Result := Copy(Source, ElementStart, Cursor - ElementStart)
@@ -766,7 +782,7 @@ begin
         if not RegionActive and GetCursorKey(CursorKey) then begin
 
           KeyEvent(CursorKey);
-          DoAfterKey(CursorKey);
+          DoAfterKey(CursorKey); { TODO 3 -oVasilyevSM -cTCustomStringParser: Этот метод не нужен, все можно сделать в перекрытии после inherited. }
           Move(CursorKey.KeyLength);
 
         end else begin
@@ -789,9 +805,9 @@ begin
       if Nested then raise
       else
 
-        { TODO 3 -oVasilyevSM -cTCustomStringParser: Перегенерация на выбор, Native/Parametrized. Это Native, а тип
-          Parametrized должен генерировать исключение другого класса с параметрами: ссылка на класс исходного
-          исключения, его Message и набор локации, Line, Column, Position. }
+        { TODO 3 -oVasilyevSM -cTCustomStringParser: Нет, просто надо убрать это в потомок. /*Перегенерация на выбор,
+          Native/Parametrized. Это Native, а тип Parametrized должен генерировать исключение другого класса с
+          параметрами: ссылка на класс исходного исключения, его Message и набор локации, Line, Column, Position. }
         raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Column: %d, Position: %d', [
 
             E.Message,
