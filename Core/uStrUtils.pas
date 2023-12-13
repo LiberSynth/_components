@@ -86,7 +86,7 @@ function ByteAnsiStrToData(const Value: AnsiString): TData; //
 { v Для парсинга и автоскриптов v }
 function PosOf(Patterns: String; const Value: String; Start: Integer = 1): Integer; overload;
 function PosOf(const Patterns: TStringArray; const Value: String): Integer; overload;
-function ReadStrTo(var S: String; const Pattern: String; WithPattern: Boolean = False): String;
+function ReadStrTo(var Value: String; const Pattern: String; WithPattern: Boolean = False): String;
 function LastPos(const Pattern, Value: String): Integer;
 function StringReplicate(const Pattern: String; Count: Cardinal): String;
 function SpaceReplicate(Count: Cardinal): String;
@@ -122,11 +122,30 @@ function FormatNowSorted(Milliseconds: Boolean = False; EmptyZero: Boolean = Tru
 function FormatNowToFileName(EmptyZero: Boolean = True): String;
 { ^ Стандартное форматирование дат ^ }
 
-function StrToArray(S: String; const Delim: String = ';'; DelimBehind: Boolean = True): TStringArray;
-function ArrayToStr(const SA: TStringArray; const Delim: String = ';'; DelimBehind: Boolean = False): String; overload;
-function ArrayToStr(const IA: TIntegerArray; const Delim: String = ';'; DelimBehind: Boolean = False): String; overload;
-function ExistsInArray(const SA: TStringArray; const Value: String): Boolean;
-procedure AddToStringArray(var SA: TStringArray; const Value: String; IgnoreEmpty: Boolean = False; Distinct: Boolean = False);
+{ TODO 4 -oVasilyevSM -cuStrUtils: Можно ускорить эти функции }
+function StrToArray(Value: String; const Delimiter: String = ';'; DelimBehind: Boolean = True): TStringArray;
+function ArrayToStr(const StrArray: TStringArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String; overload;
+function ArrayToStr(const IntArray: TIntegerArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String; overload;
+function ExistsInArray(const Value: String; const StrArray: TStringArray): Boolean;
+procedure AddToStrArray(
+
+    var StrArray: TStringArray;
+    const Value: String;
+    IgnoreEmpty: Boolean = False;
+    Distinct: Boolean = False;
+    Sorted: Boolean = False
+    { TODO 4 -oVasilyevSM -cuStrUtils: CaseSensitive + сделать оверлоды с меньшим количеством параметров }
+
+);
+{ TODO 4 -oVasilyevSM -cuStrUtils: Distinct, CaseSensitive + сделать оверлоды с меньшим количеством параметров }
+function IntersectStrArrays(const ArrayA, ArrayB: TStringArray): TStringArray;
+function ExcludeFromStrArray(const ArrayFrom, ArrayToExclude: TStringArray): TStringArray;
+function ConcatStrArrays(const ArrayA, ArrayB: TStringArray; Distinct: Boolean = False; Sorted: Boolean = False): TStringArray;
+function SortStrArray(const Value: TStringArray): TStringArray;
+procedure DelimStrToArray(var StrArray: TStringArray; Value: String; const Delimiter: String = ';'; Sorted: Boolean = False); overload;
+function DelimStrToArray(const Value: String; const Delimiter: String = ';'; Sorted: Boolean = False): TStringArray; overload;
+
+function ArrayToDelimStr(const StrArray: TStringArray; const Delimiter: String = ';'): String;
 
 procedure CleanUpAnsiString(var Value: AnsiString);
 procedure CleanUpString(var Value: String);
@@ -715,23 +734,23 @@ begin
 
 end;
 
-function ReadStrTo(var S: String; const Pattern: String; WithPattern: Boolean): String;
+function ReadStrTo(var Value: String; const Pattern: String; WithPattern: Boolean): String;
 var
   p: Integer;
 begin
 
-  p := Pos(Pattern, S);
+  p := Pos(Pattern, Value);
   if p = 0 then begin
 
-    Result := S;
-    S := '';
+    Result := Value;
+    Value := '';
 
   end else begin
 
-    if WithPattern then Result := Copy(S, 1, p + Length(Pattern) - 1)
-    else Result := Copy(S, 1, p - 1);
+    if WithPattern then Result := Copy(Value, 1, p + Length(Pattern) - 1)
+    else Result := Copy(Value, 1, p - 1);
     p := p + Length(Pattern);
-    S := Copy(S, p, Length(S));
+    Value := Copy(Value, p, Length(Value));
 
   end;
 
@@ -1082,60 +1101,60 @@ begin
   Result := FormatDateTimeToFileName(Now, EmptyZero);
 end;
 
-function StrToArray(S: String; const Delim: String; DelimBehind: Boolean): TStringArray;
+function StrToArray(Value: String; const Delimiter: String; DelimBehind: Boolean): TStringArray;
 var
   i, L: Integer;
 begin
 
-  L := StrCount(S, Delim);
+  L := StrCount(Value, Delimiter);
   if DelimBehind then Inc(L)
-  else ReadStrTo(S, Delim);
+  else ReadStrTo(Value, Delimiter);
   SetLength(Result, L);
   i := 0;
 
-  while Length(S) > 0 do begin
+  while Length(Value) > 0 do begin
 
-    Result[i] := ReadStrTo(S, Delim);
+    Result[i] := ReadStrTo(Value, Delimiter);
     Inc(i);
 
   end;
 
 end;
 
-function ArrayToStr(const SA: TStringArray; const Delim: String; DelimBehind: Boolean): String;
+function ArrayToStr(const StrArray: TStringArray; const Delimiter: String; DelimBehind: Boolean): String;
 var
   S: String;
 begin
 
   Result := '';
-  for S in SA do
-    Result := Format('%s%s%s', [Result, S, Delim]);
+  for S in StrArray do
+    Result := Format('%s%s%s', [Result, S, Delimiter]);
 
   if not DelimBehind then
-    CutStr(Result, Length(Delim));
+    CutStr(Result, Length(Delimiter));
 
 end;
 
-function ArrayToStr(const IA: TIntegerArray; const Delim: String = ';'; DelimBehind: Boolean = False): String;
+function ArrayToStr(const IntArray: TIntegerArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String;
 var
   i: Integer;
 begin
 
   Result := '';
-  for i in IA do
-    Result := Format('%s%d%s', [Result, i, Delim]);
+  for i in IntArray do
+    Result := Format('%s%d%s', [Result, i, Delimiter]);
 
   if not DelimBehind then
-    CutStr(Result, Length(Delim));
+    CutStr(Result, Length(Delimiter));
 
 end;
 
-function ExistsInArray(const SA: TStringArray; const Value: String): Boolean;
+function ExistsInArray(const Value: String; const StrArray: TStringArray): Boolean;
 var
   S: String;
 begin
 
-  for S in SA do
+  for S in StrArray do
     if SameText(S, Value) then
       Exit(True);
 
@@ -1143,20 +1162,131 @@ begin
 
 end;
 
-procedure AddToStringArray(var SA: TStringArray; const Value: String; IgnoreEmpty: Boolean; Distinct: Boolean);
+procedure AddToStrArray(var StrArray: TStringArray; const Value: String; IgnoreEmpty, Distinct, Sorted: Boolean);
+var
+  L, i, Index: Integer;
 begin
 
   if
 
       (not IgnoreEmpty or (Length(Value) > 0)) and
-      (not Distinct or not ExistsInArray(SA, Value))
+      (not Distinct or not ExistsInArray(Value, StrArray))
 
   then begin
 
-    SetLength(SA, Length(SA) + 1);
-    SA[High(SA)] := Value;
+    L := Length(StrArray);
+
+    if Sorted then begin
+
+      Index := -1;
+
+      for i := Low(StrArray) to High(StrArray) do
+
+        if CompareText(StrArray[i], Value) > 0 then begin
+
+          Index := i;
+          Break;
+
+        end;
+
+      if Index = -1 then Index := L;
+
+      SetLength(StrArray, L + 1);
+
+      for i := High(StrArray) downto Index + 1 do
+        StrArray[i] := StrArray[i - 1];
+
+      StrArray[Index] := Value;
+
+    end else begin
+
+      SetLength(StrArray, L + 1);
+      StrArray[L] := Value;
+
+    end;
 
   end;
+
+end;
+
+function IntersectStrArrays(const ArrayA, ArrayB: TStringArray): TStringArray;
+var
+  S: String;
+begin
+
+  SetLength(Result, 0);
+
+  for S in ArrayA do
+    if ExistsInArray(S, ArrayB) then
+      AddToStrArray(Result, S);
+
+end;
+
+function ExcludeFromStrArray(const ArrayFrom, ArrayToExclude: TStringArray): TStringArray;
+var
+  S: String;
+begin
+
+  SetLength(Result, 0);
+
+  for S in ArrayFrom do
+    if not ExistsInArray(S, ArrayToExclude) then
+      AddToStrArray(Result, S);
+
+end;
+
+function ConcatStrArrays(const ArrayA, ArrayB: TStringArray; Distinct, Sorted: Boolean): TStringArray;
+var
+  S: String;
+begin
+
+  SetLength(Result, 0);
+  for S in ArrayA do
+    if not Distinct or not ExistsInArray(S, Result) then
+      AddToStrArray(Result, S, Sorted);
+
+end;
+
+function SortStrArray(const Value: TStringArray): TStringArray;
+var
+  S: String;
+begin
+
+  SetLength(Result, 0);
+
+  for S in Value do
+    AddToStrArray(Result, S, True);
+
+end;
+
+procedure DelimStrToArray(var StrArray: TStringArray; Value: String; const Delimiter: String; Sorted: Boolean);
+begin
+
+  SetLength(StrArray, 0);
+
+  repeat
+
+    AddToStrArray(StrArray, ReadStrTo(Value, Delimiter));
+
+  until Length(Value) = 0;
+
+end;
+
+function DelimStrToArray(const Value: String; const Delimiter: String; Sorted: Boolean): TStringArray;
+begin
+  DelimStrToArray(Result, Value, Delimiter, Sorted);
+end;
+
+function ArrayToDelimStr(const StrArray: TStringArray; const Delimiter: String): String;
+var
+  S: String;
+begin
+
+  Result := '';
+  for S in StrArray do
+    Result := Result + S + Delimiter;
+
+  CutStr(Result, Length(Delimiter));
 
 end;
 
