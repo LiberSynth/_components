@@ -382,6 +382,7 @@ begin
     Add(etName,      stBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                             );
     Add(etName,      stBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]            );
     Add(etName,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktTypeIdent, ktAssigning]                );
+    Add(etType,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktAssigning]                             );
     Add(etValue,     stBefore,      nsNoMatter,  [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]);
     Add(etValue,     stAfter,       nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                 );
     Add(etValue,     stAfter,       nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing, ktSplitter]);
@@ -627,7 +628,6 @@ begin
       Move(ClosingKey.KeyLength);
       DoublingChar := #0;
       Location.Remember(Cursor);
-
 
     end;
 
