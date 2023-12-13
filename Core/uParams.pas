@@ -450,9 +450,9 @@ type
     procedure ReadName; override;
     procedure ReadType; override;
     procedure ReadValue; override;
-    { TODO 5 -oVasilyevSM -cTCustomStringParser: Надо бы распутать этот шифт. Он не должен быть нужен. Почему блок
-      запускается до движения мастера на открывающий ключ? По идее, это должно сбивать с толку блок. Похоже, это
-      обходится. Костыль. }
+    { TODO 1 -oVasilyevSM -cTCustomStringParser: Базовый функционал: Надо бы распутать этот шифт. Он не должен быть
+      нужен. Почему блок запускается до движения мастера на открывающий ключ? По идее, это должно сбивать с толку блок.
+      Похоже, это обходится. Костыль. }
     procedure ReadParams(_CursorShift: Int64); override;
     function IsParamsType: Boolean; override;
     procedure BeforeReadParam(_Param: TParam); virtual;
@@ -2445,7 +2445,7 @@ begin
       Read;
       AfterReadParams(P);
       { Возврат управления от помощника к мастеру }
-      { TODO 5 -oVasilyevSM -cTCustomStringParser: Не очень, что передача управления исполнена в конструкторе
+      { TODO 2 -oVasilyevSM -cTCustomStringParser: Не очень, что передача управления исполнена в конструкторе
         абстрактного класса, а возврат - локально в потомках. Лучше это делать там же, где и передавалось, в деструкторе
         абстрактного класса. А то так и забыть можно. }
       Self.Move(Cursor - _CursorShift - Self.Cursor); // Self.Location := Location;

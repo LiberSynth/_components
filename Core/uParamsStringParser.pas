@@ -601,7 +601,7 @@ begin
   with _Parser do begin
 
     CursorStanding := stInside;
-    { TODO 5 -oVasilyevSM -cTCustomStringParser: Че за костыли? Почему еще не подвинуто? }
+    { TODO 1 -oVasilyevSM -cTCustomStringParser: Базовый функционал: Че за костыли? Почему еще не подвинуто? }
     ElementStart := Cursor + OpeningKey.KeyLength;
 
   end;
@@ -667,7 +667,8 @@ end;
 
 procedure TNestedParamsBlock.Closed(_Parser: TCustomStringParser);
 begin
-  (_Parser as TParamsStringParser).ElementType := etValue; { TODO 1 -oVasilyevSM -cGeneral: Он и так value здесь }
+  { TODO 1 -oVasilyevSM -cGeneral: Базовый функционал: Автопереключение регионом. Он и так должен быть value здесь. }
+  (_Parser as TParamsStringParser).ElementType := etValue;
   inherited Closed(_Parser);
 end;
 

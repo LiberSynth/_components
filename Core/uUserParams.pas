@@ -25,7 +25,8 @@ unit uUserParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 5 -oVasilyevSM -cUserFormatParams: Параметры, сохраняющие исходное форматирование. Все что между элементами запоминать и потом выбрасывать в строку. }
+{ TODO 5 -oVasilyevSM -cTUserFormatParams: Нужны параметры, хранящие исходное форматирование. Всю строку между элементами
+  запоминать там и потом выбрасывать в строку. }
 
 interface
 
@@ -263,7 +264,7 @@ begin
   Splitter := ' ';
   Index := 0;
 
-  { TODO 2 -oVasilyevSM -cFormatParam: Нужен метод Search***(StartAt, Anchor), которым можно пробежать по списку с учетом
+  { TODO 3 -oVasilyevSM -cFormatParam: Нужен метод Search***(StartAt, Anchor), которым можно пробежать по списку с учетом
     признака Anchor. Будет удобнее здесь орудовать. Цикл может быть какой-нибудь while и тогда еще можно будет First и
     Last контролировать.
 
@@ -282,7 +283,7 @@ begin
 
     И есть еще одно. В режиме Untyped комментарии типа должны складываться в BeforeValue... }
 
-    { TODO 2 -oVasilyevSM -cFormatParam: После значения иногда добавляет лишний CRLF в короткий комментарий:
+    { TODO 3 -oVasilyevSM -cFormatParam: После значения иногда добавляет лишний CRLF в короткий комментарий:
       = 'asd' -- 13.1
 
       -- 13.2
@@ -400,7 +401,7 @@ var
   L: Integer;
 begin
 
-  { TODO 5 -oVasilyevSM -cTUserParams.FormatParam: Ошибка: A: Params = ( B: Integer = 0; C: String = 'asd' ); }
+  { TODO 2 -oVasilyevSM -cTUserParams.FormatParam: Ошибка: A: Params = ( B: Integer = 0; C: String = 'asd' ); }
 
   Typed := not (soTypesFree in SaveToStringOptions);
   SingleString := soSingleString in SaveToStringOptions;
@@ -624,7 +625,7 @@ end;
 procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
-  { TODO 5 -oVasilyevSM -cTUserParamsReader: Костыль. Получается двойной вызов ProcessRegions почти всегда. }
+  { TODO 1 -oVasilyevSM -cTUserParamsReader: Костыль. Получается двойной вызов ProcessRegions почти всегда. }
   if (_KeyWord.KeyType <> ktSourceEnd) or not ProcessRegions then
     inherited KeyEvent(_KeyWord);
 

@@ -39,7 +39,7 @@ type
 
   TStanding = (stBefore, stInside, stAfter);
 
-  TKeyType = (ktNone, ktSourceEnd, { TODO 3 -oVasilyevSM -cTCustomStringPaarser: Этот ключ не используется -> } ktLineEnd);
+  TKeyType = (ktNone, ktSourceEnd, ktLineEnd);
   TKeyTypes = set of TKeyType;
 
   TKeyWord = record
@@ -186,10 +186,12 @@ type
     procedure ElementTerminatedEvent(_KeyWord: TKeyWord); virtual;
 
     { Методы и свойства для управления }
-    procedure Move(_Incrementer: Int64 = 1); inline; { TODO 5 -oVasilyevSM -cGeneral: _Incrementer должен быть Unsigned для запрета движения назад. }
+    { TODO 1 -oVasilyevSM -cGeneral: _Incrementer должен быть Unsigned для запрета движения назад. Случай в
+      TQoutedStringRegion.Closed - результат неправильной организации в базовом функционале, должно уйти. }
+    procedure Move(_Incrementer: Int64 = 1); inline;
     procedure Terminate;
     function ReadElement(_Trim: Boolean): String; virtual;
-    procedure AddRegion( { TODO 4 -oVasilyevSM -cTCustomStringParser : Может, добавить клон AddBlock для красоты? И для
+    procedure AddRegion( { TODO 2 -oVasilyevSM -cTCustomStringParser : Может, добавить клон AddBlock для красоты? И для
       логичности. И занести в хэлп сразу. }
         const _RegionClass: TRegionClass;
         const _OpeningKey: TKeyWord;
@@ -211,7 +213,7 @@ type
     property SrcLen: Int64 read FSrcLen;
     property Rest: Int64 read GetRest;
     property KeyWords: TKeyWordList read FKeyWords;
-    { TODO 5 -oVasilyevSM -cTCustomStringParser: Теоретически, сочетание CursorStanding = csInside несовместимо с
+    { TODO 2 -oVasilyevSM -cTCustomStringParser: Теоретически, сочетание CursorStanding = csInside несовместимо с
       ElementStart = 0. Надо эксперимент поставить и, возможно, генерировать исключение в этом случае, чтобы не написать
       фигню в потомках. То же самое для RegionStart, если он открыт, то не 0 и наоборот. }
     property CursorStanding: TStanding read FCursorStanding write FCursorStanding;
@@ -227,8 +229,6 @@ type
 
   type
 
-    { TODO 1 -oVasilyevSM -cGeneral: Вытащить локацию в класс-наследник TLocatingStringParser, чтобы можно было без этой
-      нагрузки парсить, когда локация не нужна. }
     TLocation = record
 
       CurrentLine: Int64;
@@ -300,11 +300,12 @@ type
   end;
 
 {$IFDEF DEBUG}
-{ TODO 4 -oVasilyevSM -cTCustomStringParser: Добавить еще одну проверку, что эти ключи не пересекаются с обычными. }
 procedure CheckRegions(_Regions: TRegionList);
 var
   SSA, SSB: TRegion;
 begin
+
+  { TODO 4 -oVasilyevSM -cTCustomStringParser: Добавить еще одну проверку, что эти ключи не пересекаются с обычными. }
 
   for SSA in _Regions do
     for SSB in _Regions do
@@ -665,9 +666,7 @@ begin
 
   if not RegionActive and (CursorStanding = stBefore) then begin
 
-    { TODO 1 -oVasilyevSM -cTCustomStringParser: Ошибка.
-      Строковый регион ДОЛЖЕН переклюать Standing в Inside.
-      Комментарий - не должен. Параметр - тоже понять надо, должени или нет. Нужно свойство региона, что он - body. }
+    { TODO 1 -oVasilyevSM -cTCustomStringParser: Базовый функционал: Автопереключение регионом. }
     CursorStanding := stInside;
     ElementStart := Cursor;
 
@@ -737,7 +736,9 @@ begin
       if not RegionActive and GetCursorKey(CursorKey) then begin
 
         KeyEvent(CursorKey);
-        DoAfterKey(CursorKey); { TODO 3 -oVasilyevSM -cTCustomStringParser: Этот метод не нужен, все можно сделать в перекрытии после inherited. }
+        { TODO 1 -oVasilyevSM -cTCustomStringParser: Базовый функционал:Этот метод не нужен, все можно сделать в
+          перекрытии после inherited. }
+        DoAfterKey(CursorKey);
         Move(CursorKey.KeyLength);
 
       end else begin
@@ -809,9 +810,9 @@ begin
       if Nested then raise
       else
 
-        { TODO 3 -oVasilyevSM -cTCustomStringParser: Нет, просто надо убрать это в потомок. /*Перегенерация на выбор,
-          Native/Parametrized. Это Native, а тип Parametrized должен генерировать исключение другого класса с
-          параметрами: ссылка на класс исходного исключения, его Message и набор локации, Line, Column, Position. }
+        { TODO 4 -oVasilyevSM -cTLocatingStringParser: Перегенерация на выбор, Native/Parametrized. Это Native, а тип
+          Parametrized должен генерировать исключение другого класса с параметрами: ссылка на класс исходного
+          исключения, его Message и набор локации, Line, Column, Position. }
         raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Column: %d, Position: %d', [
 
             E.Message,
