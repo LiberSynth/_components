@@ -133,33 +133,6 @@ type
 
   strict private
 
-  type
-
-    { TODO 2 -oVasilyevSM -cGeneral: ¬ытащить локацию в класс-наследник TLocatingStringParser, чтобы можно было без этой
-      нагрузки парсить, когда локаци€ не нужна. }
-    TLocation = record
-
-      CurrentLine: Int64;
-      CurrentLineStart: Int64;
-
-      LastElementLine: Int64;
-      LastElementStart: Int64;
-      LastLineStart: Int64;
-
-      procedure Remember(_Cursor: Int64);
-
-      function Line: Int64;
-      function Column: Int64;
-      function Position: Int64;
-
-    end;
-
-  const
-
-    LOC_INITIAL: TLocation = (CurrentLine: 1; CurrentLineStart: 1; LastElementLine: 1; LastElementStart: 1; LastLineStart: 1);
-
-  strict private
-
     FSource: String;
     FCursor: Int64;
     FSrcLen: Int64;
@@ -172,13 +145,10 @@ type
     FKeyWords: TKeyWordList;
     FRegions: TRegionList;
 
-    FLocation: TLocation;
-
     function GetCursorKey(var _Value: TKeyWord): Boolean;
     function RegionActive: Boolean; inline;
 
     procedure CheckUnterminated(_KeyType: TKeyType);
-    procedure UpdateLocation;
 
     function GetRest: Int64; inline;
 
@@ -194,6 +164,7 @@ type
 
     { —обыти€ дл€ потомков }
     procedure InitParser; virtual;
+    procedure AfterStepEvent; virtual; { TODO 5 -oVasilyevSM -cTCustomStringParser:  название не очень +help }
     function ProcessRegions: Boolean; { TODO 5 -oVasilyevSM -cTCustomStringParser: -> strict private }
     function ElementProcessingKey(_KeyWord: TKeyWord): Boolean; virtual;
     function ElementTerminatingKey(_KeyWord: TKeyWord): Boolean; virtual;
@@ -203,8 +174,8 @@ type
 
   public
 
-    constructor Create(const _Source: String);
-    constructor CreateNested(_Master: TCustomStringParser);
+    constructor Create(const _Source: String); virtual;
+    constructor CreateNested(_Master: TCustomStringParser); virtual;
 
     destructor Destroy; override;
 
@@ -233,7 +204,7 @@ type
     (*   √лавный рабочий метод   *)
     (*                           *)
     (*****************************)
-    procedure Read;
+    procedure Read; virtual;
 
     property Source: String read FSource;
     property Cursor: Int64 read FCursor;
@@ -248,7 +219,55 @@ type
     property RegionStart: Int64 read FRegionStart write FRegionStart;
     property Terminated: Boolean read FTerminated;
 
-    {}property Location: TLocation read FLocation write FLocation;{}
+  end;
+
+  TLocatingStringParser = class abstract(TCustomStringParser)
+
+  strict private
+
+  type
+
+    { TODO 1 -oVasilyevSM -cGeneral: ¬ытащить локацию в класс-наследник TLocatingStringParser, чтобы можно было без этой
+      нагрузки парсить, когда локаци€ не нужна. }
+    TLocation = record
+
+      CurrentLine: Int64;
+      CurrentLineStart: Int64;
+
+      LastElementLine: Int64;
+      LastElementStart: Int64;
+      LastLineStart: Int64;
+
+      procedure Remember(_Cursor: Int64);
+
+      function Line: Int64;
+      function Column: Int64;
+      function Position: Int64;
+
+    end;
+
+  const
+
+    LOC_INITIAL: TLocation = (CurrentLine: 1; CurrentLineStart: 1; LastElementLine: 1; LastElementStart: 1; LastLineStart: 1);
+
+  strict private
+
+    FLocation: TLocation;
+
+    procedure RefreshLocation;
+
+    property Location: TLocation read FLocation write FLocation;
+
+  protected
+
+    procedure AfterStepEvent; override;
+
+  public
+
+    constructor Create(const _Source: String); override;
+    constructor CreateNested(_Master: TCustomStringParser); override;
+
+    procedure Read; override;
 
   end;
 
@@ -359,7 +378,6 @@ begin
     Move(ClosingKey.KeyLength);
     Closed(_Parser);
     RegionStart := 0;
-    Location.Remember(Cursor);
 
   end;
 
@@ -458,38 +476,9 @@ begin
 
     CursorStanding := stAfter;
     ElementStart := 0;
-    { TODO 5 -oVasilyevSM -cTBlock: –азобратьс€, почему тут курсор не двигаетс€. ѕросто странно, что понадобилась поправка
-      на ветер здесь. }
-    Location.Remember(Cursor + ClosingKey.KeyLength);
 
   end;
 
-end;
-
-{ TCustomStringParser.TLocation }
-
-procedure TCustomStringParser.TLocation.Remember(_Cursor: Int64);
-begin
-
-  LastElementLine  := CurrentLine;
-  LastLineStart    := CurrentLineStart;
-  LastElementStart := _Cursor;
-
-end;
-
-function TCustomStringParser.TLocation.Line: Int64;
-begin
-  Result := LastElementLine;
-end;
-
-function TCustomStringParser.TLocation.Column: Int64;
-begin
-  Result := LastElementStart - LastLineStart + 1;
-end;
-
-function TCustomStringParser.TLocation.Position: Int64;
-begin
-  Result := LastElementStart;
 end;
 
 { TCustomStringParser }
@@ -503,7 +492,6 @@ begin
   FSrcLen := Length(_Source);
 
   FCursor   := 1;
-  FLocation := LOC_INITIAL;
 
   InitParser;
 
@@ -522,7 +510,6 @@ begin
   FSrcLen := Length(Source);
 
   FCursor      := _Master.Cursor;
-  FLocation    := _Master.Location;
   FNestedLevel := _Master.NestedLevel + 1;
 
   InitParser;
@@ -567,35 +554,11 @@ begin
 
   if (_KeyType = ktSourceEnd) then begin
 
-    // Sections.CheckUnterminated;
-    // Blocks.CheckUnterminated;
+    { Sections.CheckUnterminated; }
+    { Blocks.CheckUnterminated;   }
     Regions.CheckUnterminated;
 
   end;
-
-end;
-
-procedure TCustomStringParser.UpdateLocation;
-begin
-
-  if
-
-      (Copy(Source, Cursor - 1, 2) <> CRLF) and (
-
-        (Copy(Source, Cursor - 2, 2) = CRLF) or
-        CharInSet(Source[Cursor - 1], [CR, LF])
-
-      )
-
-  then begin
-
-    Inc(FLocation.CurrentLine);
-    FLocation.CurrentLineStart := Cursor;
-
-  end;
-
-  if CursorStanding = stBefore then
-    Location.Remember(Cursor);
 
 end;
 
@@ -608,6 +571,10 @@ function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
 begin
   with _KeyWord do
     Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
+end;
+
+procedure TCustomStringParser.AfterStepEvent;
+begin
 end;
 
 function TCustomStringParser.ProcessRegions: Boolean;
@@ -648,18 +615,12 @@ begin
 
   CursorStanding := stAfter;
   ElementStart   := 0;
-  Location.Remember(Cursor);
 
 end;
 
 procedure TCustomStringParser.CheckSyntax(const _KeyWord: TKeyWord);
 begin
-
-  if _KeyWord.Equal(KWR_EMPTY) then
-    Location.Remember(Cursor);
-
   CheckUnterminated(_KeyWord.KeyType);
-
 end;
 
 procedure TCustomStringParser.DoAfterKey(_KeyWord: TKeyWord);
@@ -709,7 +670,6 @@ begin
        омментарий - не должен. ѕараметр - тоже пон€ть надо, должени или нет. Ќужно свойство региона, что он - body. }
     CursorStanding := stInside;
     ElementStart := Cursor;
-    Location.Remember(Cursor);
 
   end;
 
@@ -720,11 +680,8 @@ end;
 
 procedure TCustomStringParser.ToggleElement(_KeyWord: TKeyWord);
 begin
-
   CursorStanding := stBefore;
   ElementStart   := 0;
-  Location.Remember(Cursor + _KeyWord.KeyLength);
-
 end;
 
 procedure TCustomStringParser.ElementTerminatedEvent(_KeyWord: TKeyWord);
@@ -773,32 +730,77 @@ var
   CursorKey: TKeyWord;
 begin
 
+  while (Rest > 0) and not FTerminated do begin
+
+    if not ProcessRegions then
+
+      if not RegionActive and GetCursorKey(CursorKey) then begin
+
+        KeyEvent(CursorKey);
+        DoAfterKey(CursorKey); { TODO 3 -oVasilyevSM -cTCustomStringParser: Ётот метод не нужен, все можно сделать в перекрытии после inherited. }
+        Move(CursorKey.KeyLength);
+
+      end else begin
+
+        MoveEvent;
+        Move;
+
+      end;
+
+    AfterStepEvent;
+
+  end;
+
+  KeyEvent(KWR_SOURCE_END);
+
+end;
+
+{ TLocatingStringParser.TLocation }
+
+procedure TLocatingStringParser.TLocation.Remember(_Cursor: Int64);
+begin
+
+  LastElementLine  := CurrentLine;
+  LastLineStart    := CurrentLineStart;
+  LastElementStart := _Cursor;
+
+end;
+
+function TLocatingStringParser.TLocation.Line: Int64;
+begin
+  Result := LastElementLine;
+end;
+
+function TLocatingStringParser.TLocation.Column: Int64;
+begin
+  Result := LastElementStart - LastLineStart + 1;
+end;
+
+function TLocatingStringParser.TLocation.Position: Int64;
+begin
+  Result := LastElementStart;
+end;
+
+{ TLocatingStringParser }
+
+constructor TLocatingStringParser.Create(const _Source: String);
+begin
+  inherited Create(_Source);
+  FLocation := LOC_INITIAL;
+end;
+
+constructor TLocatingStringParser.CreateNested(_Master: TCustomStringParser);
+begin
+  inherited CreateNested(_Master);
+  FLocation := (_Master as TLocatingStringParser).Location;
+end;
+
+procedure TLocatingStringParser.Read;
+begin
+
   try
 
-    while (Rest > 0) and not FTerminated do begin
-
-      if not ProcessRegions then
-
-        if not RegionActive and GetCursorKey(CursorKey) then begin
-
-          KeyEvent(CursorKey);
-          DoAfterKey(CursorKey); { TODO 3 -oVasilyevSM -cTCustomStringParser: Ётот метод не нужен, все можно сделать в перекрытии после inherited. }
-          Move(CursorKey.KeyLength);
-
-        end else begin
-
-          MoveEvent;
-          Move;
-
-        end;
-
-      { ”ж если здесь писать событие AfterStep, то в нем всю логику по локации и исполнить. » не надо будет столько
-        вызовов Location.Remember. }
-      UpdateLocation;
-
-    end;
-
-    KeyEvent(KWR_SOURCE_END);
+    inherited Read;
 
   except
 
@@ -822,6 +824,35 @@ begin
 
   end;
 
+end;
+
+procedure TLocatingStringParser.RefreshLocation;
+begin
+
+  if
+
+      (Copy(Source, Cursor - 1, 2) <> CRLF) and (
+
+        (Copy(Source, Cursor - 2, 2) = CRLF) or
+        CharInSet(Source[Cursor - 1], [CR, LF])
+
+      )
+
+  then begin
+
+    Inc(FLocation.CurrentLine);
+    FLocation.CurrentLineStart := Cursor;
+
+  end;
+
+  if CursorStanding = stBefore then
+    Location.Remember(Cursor);
+
+end;
+
+procedure TLocatingStringParser.AfterStepEvent;
+begin
+  RefreshLocation;
 end;
 
 { TKeyWordHelper }

@@ -442,8 +442,8 @@ type
 
   private
 
-    constructor Create(const _Source: String; _Params: TParams);
-    constructor CreateNested(_MasterParser: TParamsReader; _Params: TParams);
+    constructor Create(const _Source: String; _Params: TParams); reintroduce;
+    constructor CreateNested(_MasterParser: TParamsReader; _Params: TParams); reintroduce;
 
   protected
 
@@ -2444,12 +2444,11 @@ begin
 
       Read;
       AfterReadParams(P);
-      { Возврат управлени от помощника к мастеру }
+      { Возврат управления от помощника к мастеру }
       { TODO 5 -oVasilyevSM -cTCustomStringParser: Не очень, что передача управления исполнена в конструкторе
         абстрактного класса, а возврат - локально в потомках. Лучше это делать там же, где и передавалось, в деструкторе
         абстрактного класса. А то так и забыть можно. }
-      Self.Move(Cursor - _CursorShift - Self.Cursor);
-      Self.Location := Location;
+      Self.Move(Cursor - _CursorShift - Self.Cursor); // Self.Location := Location;
 
     finally
       Free;

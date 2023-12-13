@@ -155,8 +155,8 @@ type
 
   public
 
-    constructor Create(const _Source: String);
-    constructor CreateNested(_Master: TCustomStringParser);
+    constructor Create(const _Source: String); override;
+    constructor CreateNested(_Master: TCustomStringParser); override;
 
     destructor Destroy; override;
 
@@ -627,7 +627,6 @@ begin
 
       Move(ClosingKey.KeyLength);
       DoublingChar := #0;
-      Location.Remember(Cursor);
 
     end;
 
