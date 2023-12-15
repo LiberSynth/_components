@@ -28,6 +28,19 @@ unit uUserParams;
 { TODO 5 -oVasilyevSM -cTUserFormatParams: Нужны параметры, хранящие исходное форматирование. Всю строку между элементами
   запоминать там и потом выбрасывать в строку. }
 
+{
+
+TLSIni.StoreFormat -> LSNI format    ( reading location support yes/no )
+                   -> Classic format ( reading location support yes/no )
+                   -> BLOB
+
+TLSIni.Destination -> File
+                   -> Abstract (saving and loading implement by event)
+
+TLSReg -> Registry (without format / single BLOB)
+
+}
+
 interface
 
 uses
@@ -614,11 +627,11 @@ begin
   FCurrentComments := TUserParam.TCommentList.Create;
 
   {         RegionClass          OpeningKey                       ClosingKey                      Caption  }
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'comment');
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'comment');
-  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'comment');
-  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'comment');
+//  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');
+//  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'comment');
+//  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'comment');
+//  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'comment');
+//  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'comment');
 
 end;
 
@@ -626,7 +639,7 @@ procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
   { TODO 1 -oVasilyevSM -cTUserParamsReader: Костыль. Получается двойной вызов ProcessRegions почти всегда. }
-  if (_KeyWord.KeyType <> ktSourceEnd) or not ProcessRegions then
+//  if (_KeyWord.KeyType <> ktSourceEnd) or not CheckRegions then
     inherited KeyEvent(_KeyWord);
 
   case _KeyWord.KeyType of

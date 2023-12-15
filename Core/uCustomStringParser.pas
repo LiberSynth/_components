@@ -35,7 +35,8 @@ uses
 
 type
 
-  { TODO 5 -oVasilyevSM -cTCustomStringParser: Section }
+  { TODO 5 -oVasilyevSM -cuCustomStringParser: Section }
+  { TODO 2 -oVasilyevSM -cuCustomStringParser: Проверить, не стал ли он тяжелее. }
 
   TStanding = (stBefore, stInside, stAfter);
 
@@ -77,9 +78,6 @@ type
 
     );
 
-    procedure Open(_Parser: TCustomStringParser);
-    procedure Close(_Parser: TCustomStringParser);
-
     procedure CheckUnterminating;
 
     property Caption: String read FCaption;
@@ -90,6 +88,7 @@ type
     function CanClose(_Parser: TCustomStringParser): Boolean; virtual;
     procedure Opened(_Parser: TCustomStringParser); virtual;
     procedure Closed(_Parser: TCustomStringParser); virtual;
+    procedure Execute(_Parser: TCustomStringParser; var _Handled: Boolean); virtual;
 
   public
 
@@ -110,9 +109,7 @@ type
   private
 
     function TryOpen(_Parser: TCustomStringParser): Boolean;
-    function TryClose(_Parser: TCustomStringParser): Boolean;
-    procedure OpenRegion(_Parser: TCustomStringParser; _Region: TRegion);
-    procedure CloseRegion(_Parser: TCustomStringParser);
+    function TryClose(_Parser: TCustomStringParser; var _ClosingKey: TKeyWord): Boolean;
     procedure CheckUnterminated;
 
     property Active: Boolean read FActive;
@@ -121,12 +118,7 @@ type
   end;
 
   TBlock = class(TRegion)
-
-  protected
-
-    procedure Opened(_Parser: TCustomStringParser); override;
-    procedure Closed(_Parser: TCustomStringParser); override;
-
+    { На данный момент повода здесь что-то добавить нет. }
   end;
 
   TCustomStringParser = class abstract
@@ -145,10 +137,11 @@ type
     FKeyWords: TKeyWordList;
     FRegions: TRegionList;
 
-    function GetCursorKey(var _Value: TKeyWord): Boolean;
+    function GetCursorKey(var _Value: TKeyWord): Boolean; inline;
+    procedure ToggleStanding(_To: TStanding);
+    function CheckRegions: Boolean;
     function RegionActive: Boolean; inline;
-
-    procedure CheckUnterminated(_KeyType: TKeyType);
+    procedure CheckUnterminated(_KeyType: TKeyType); inline;
 
     function GetRest: Int64; inline;
 
@@ -164,13 +157,13 @@ type
 
     { События для потомков }
     procedure InitParser; virtual;
-    procedure AfterStepEvent; virtual; { TODO 5 -oVasilyevSM -cTCustomStringParser:  название не очень +help }
-    function ProcessRegions: Boolean; { TODO 5 -oVasilyevSM -cTCustomStringParser: -> strict private }
+    procedure StepCommited; virtual;
     function ElementProcessingKey(_KeyWord: TKeyWord): Boolean; virtual;
     function ElementTerminatingKey(_KeyWord: TKeyWord): Boolean; virtual;
     procedure ProcessElement; virtual;
+    function ExecuteRegion: Boolean;
+    procedure ToggleElement(_KeyWord: TKeyWord); virtual;
     procedure CheckSyntax(const _KeyWord: TKeyWord); virtual;
-    procedure DoAfterKey(_KeyWord: TKeyWord); virtual;
 
   public
 
@@ -182,23 +175,20 @@ type
     { События для потомков }
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
     procedure MoveEvent; virtual;
-    procedure ToggleElement(_KeyWord: TKeyWord); virtual;
     procedure ElementTerminatedEvent(_KeyWord: TKeyWord); virtual;
 
     { Методы и свойства для управления }
-    { TODO 1 -oVasilyevSM -cGeneral: _Incrementer должен быть Unsigned для запрета движения назад. Случай в
-      TQoutedStringRegion.Closed - результат неправильной организации в базовом функционале, должно уйти. }
     procedure Move(_Incrementer: Int64 = 1); inline;
-    procedure Terminate;
     function ReadElement(_Trim: Boolean): String; virtual;
-    procedure AddRegion( { TODO 2 -oVasilyevSM -cTCustomStringParser : Может, добавить клон AddBlock для красоты? И для
-      логичности. И занести в хэлп сразу. }
+    procedure AddRegion(
+
         const _RegionClass: TRegionClass;
         const _OpeningKey: TKeyWord;
         const _ClosingKey: TKeyWord;
         const _Caption: String
 
     );
+    procedure Terminate;
     function Nested: Boolean;
 
     (*****************************)
@@ -213,38 +203,33 @@ type
     property SrcLen: Int64 read FSrcLen;
     property Rest: Int64 read GetRest;
     property KeyWords: TKeyWordList read FKeyWords;
-    { TODO 2 -oVasilyevSM -cTCustomStringParser: Теоретически, сочетание CursorStanding = csInside несовместимо с
-      ElementStart = 0. Надо эксперимент поставить и, возможно, генерировать исключение в этом случае, чтобы не написать
-      фигню в потомках. То же самое для RegionStart, если он открыт, то не 0 и наоборот. }
-    property CursorStanding: TStanding read FCursorStanding write FCursorStanding;
-    property ElementStart: Int64 read FElementStart write FElementStart;
-    property RegionStart: Int64 read FRegionStart write FRegionStart;
+    property CursorStanding: TStanding read FCursorStanding;
+    property ElementStart: Int64 read FElementStart;
+    property RegionStart: Int64 read FRegionStart;
     property Terminated: Boolean read FTerminated;
+
+  end;
+
+  TLocation = record
+
+    CurrentLine: Int64;
+    CurrentLineStart: Int64;
+
+    LastElementLine: Int64;
+    LastElementStart: Int64;
+    LastLineStart: Int64;
+
+    procedure Remember(_Cursor: Int64);
+
+    function Line: Int64;
+    function Column: Int64;
+    function Position: Int64;
 
   end;
 
   TLocatingStringParser = class abstract(TCustomStringParser)
 
   strict private
-
-  type
-
-    TLocation = record
-
-      CurrentLine: Int64;
-      CurrentLineStart: Int64;
-
-      LastElementLine: Int64;
-      LastElementStart: Int64;
-      LastLineStart: Int64;
-
-      procedure Remember(_Cursor: Int64);
-
-      function Line: Int64;
-      function Column: Int64;
-      function Position: Int64;
-
-    end;
 
   const
 
@@ -260,7 +245,7 @@ type
 
   protected
 
-    procedure AfterStepEvent; override;
+    procedure StepCommited; override;
 
   public
 
@@ -300,7 +285,7 @@ type
   end;
 
 {$IFDEF DEBUG}
-procedure CheckRegions(_Regions: TRegionList);
+procedure _ValidateRegions(_Regions: TRegionList);
 var
   SSA, SSB: TRegion;
 begin
@@ -357,33 +342,6 @@ begin
 
 end;
 
-procedure TRegion.Open(_Parser: TCustomStringParser);
-begin
-
-  Opened(_Parser);
-
-  with _Parser do begin
-
-    Move(OpeningKey.KeyLength);
-    RegionStart := _Parser.Cursor;
-
-  end;
-
-end;
-
-procedure TRegion.Close(_Parser: TCustomStringParser);
-begin
-
-  with _Parser do begin
-
-    Move(ClosingKey.KeyLength);
-    Closed(_Parser);
-    RegionStart := 0;
-
-  end;
-
-end;
-
 procedure TRegion.CheckUnterminating;
 begin
   raise EStringParserException.CreateFmt('Unterminated %s', [Caption]);
@@ -407,6 +365,10 @@ procedure TRegion.Closed(_Parser: TCustomStringParser);
 begin
 end;
 
+procedure TRegion.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
+begin
+end;
+
 { TRegionList }
 
 function TRegionList.TryOpen(_Parser: TCustomStringParser): Boolean;
@@ -420,7 +382,9 @@ begin
 
       if Region.CanOpen(_Parser) then begin
 
-        OpenRegion(_Parser, Region);
+        Region.Opened(_Parser);
+        FActiveRegion := Region;
+        FActive := True;
         Exit(True);
 
       end;
@@ -429,28 +393,19 @@ begin
   
 end;
 
-function TRegionList.TryClose(_Parser: TCustomStringParser): Boolean;
+function TRegionList.TryClose(_Parser: TCustomStringParser; var _ClosingKey: TKeyWord): Boolean;
 begin
+
   Result := Active and ActiveRegion.CanClose(_Parser);
-  if Result then
-    CloseRegion(_Parser);
-end;
 
-procedure TRegionList.OpenRegion(_Parser: TCustomStringParser; _Region: TRegion);
-begin
+  if Result then begin
 
-  _Region.Open(_Parser);
-  FActiveRegion := _Region;
-  FActive       := True;
+    _ClosingKey := ActiveRegion.ClosingKey;
+    ActiveRegion.Closed(_Parser);
+    FActiveRegion := nil;
+    FActive := False;
 
-end;
-
-procedure TRegionList.CloseRegion(_Parser: TCustomStringParser);
-begin
-
-  ActiveRegion.Close(_Parser);
-  FActiveRegion := nil;
-  FActive       := False;
+  end;
 
 end;
 
@@ -458,28 +413,6 @@ procedure TRegionList.CheckUnterminated;
 begin
   if Active then
     FActiveRegion.CheckUnterminating;
-end;
-
-{ TBlock }
-
-procedure TBlock.Opened(_Parser: TCustomStringParser);
-begin
-  inherited Opened(_Parser);
-  _Parser.Move(OpeningKey.KeyLength);
-end;
-
-procedure TBlock.Closed(_Parser: TCustomStringParser);
-begin
-
-  inherited Closed(_Parser);
-
-  with _Parser do begin
-
-    CursorStanding := stAfter;
-    ElementStart := 0;
-
-  end;
-
 end;
 
 { TCustomStringParser }
@@ -497,7 +430,7 @@ begin
   InitParser;
 
   {$IFDEF DEBUG}
-  CheckRegions(FRegions);
+  _ValidateRegions(Regions);
   {$ENDIF}
 
 end;
@@ -545,6 +478,43 @@ begin
 
 end;
 
+procedure TCustomStringParser.ToggleStanding(_To: TStanding);
+begin
+
+  FCursorStanding := _To;
+
+  if _To = stInside then FElementStart := Cursor
+  else FElementStart := 0;
+
+end;
+
+function TCustomStringParser.CheckRegions: Boolean;
+var
+  ClosingKey: TKeyWord;
+begin
+
+  Result := Regions.TryClose(Self, ClosingKey);
+  if Result then begin
+
+    { Move после переключения, потому что ключ не должен войти в регион. Конец перед ключом. }
+    Move(ClosingKey.KeyLength);
+    FRegionStart := 0;
+    Exit;
+
+  end;
+
+  Result := Regions.TryOpen(Self);
+  if Result then begin
+
+    { Move до переключения, потому что ключ не должен войти в регион. Начало после ключа. }
+    Move(Regions.ActiveRegion.OpeningKey.KeyLength);
+    ToggleStanding(stInside); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 1 (RegionOpened) }
+    FRegionStart := Cursor;
+
+  end;
+
+end;
+
 function TCustomStringParser.RegionActive: Boolean;
 begin
   Result := Regions.Active;
@@ -556,7 +526,6 @@ begin
   if (_KeyType = ktSourceEnd) then begin
 
     { Sections.CheckUnterminated; }
-    { Blocks.CheckUnterminated;   }
     Regions.CheckUnterminated;
 
   end;
@@ -572,16 +541,6 @@ function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
 begin
   with _KeyWord do
     Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
-end;
-
-procedure TCustomStringParser.AfterStepEvent;
-begin
-end;
-
-function TCustomStringParser.ProcessRegions: Boolean;
-begin
-  with Regions do
-    Result := TryClose(Self) or TryOpen(Self);
 end;
 
 procedure TCustomStringParser.InitParser;
@@ -601,6 +560,10 @@ begin
 
 end;
 
+procedure TCustomStringParser.StepCommited;
+begin
+end;
+
 function TCustomStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
 begin
   Result := False;
@@ -613,10 +576,27 @@ end;
 
 procedure TCustomStringParser.ProcessElement;
 begin
+  ToggleStanding(stAfter); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 2 (ProcessElement) }
+end;
 
-  CursorStanding := stAfter;
-  ElementStart   := 0;
+function TCustomStringParser.ExecuteRegion: Boolean;
+begin
 
+  Result := False;
+  Regions.ActiveRegion.Execute(Self, Result);
+
+  if Result then begin
+
+    ToggleStanding(stAfter); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 2 (after RegionExecute) }
+    FRegionStart := 0;
+
+  end;
+
+end;
+
+procedure TCustomStringParser.ToggleElement(_KeyWord: TKeyWord);
+begin
+  ToggleStanding(stBefore); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 3 (ToggleElement) }
 end;
 
 procedure TCustomStringParser.CheckSyntax(const _KeyWord: TKeyWord);
@@ -624,17 +604,7 @@ begin
   CheckUnterminated(_KeyWord.KeyType);
 end;
 
-procedure TCustomStringParser.DoAfterKey(_KeyWord: TKeyWord);
-begin
-end;
-
 procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);
-
-{  Имеем четыре события:                                                }
-(* ElementBefore      ElementInside      ElementAfter       NexElement *)
-(* X__________________X__________________X__________________X          *)
-(*   spaces, comments         body         spaces, comments            *)
-
 begin
 
   CheckSyntax(_KeyWord);
@@ -664,43 +634,30 @@ end;
 procedure TCustomStringParser.MoveEvent;
 begin
 
-  if not RegionActive and (CursorStanding = stBefore) then begin
+  if not RegionActive then begin
 
-    { TODO 1 -oVasilyevSM -cTCustomStringParser: Базовый функционал: Автопереключение регионом. }
-    CursorStanding := stInside;
-    ElementStart := Cursor;
+    if CursorStanding = stBefore then
+      ToggleStanding(stInside); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 1 (MoveEvent) }
+
+    CheckSyntax(KWR_EMPTY);
 
   end;
 
-  if not RegionActive then
-    CheckSyntax(KWR_EMPTY);
-
-end;
-
-procedure TCustomStringParser.ToggleElement(_KeyWord: TKeyWord);
-begin
-  CursorStanding := stBefore;
-  ElementStart   := 0;
 end;
 
 procedure TCustomStringParser.ElementTerminatedEvent(_KeyWord: TKeyWord);
 begin
 end;
 
-function TCustomStringParser.Nested: Boolean;
-begin
-  Result := NestedLevel > 0;
-end;
-
 procedure TCustomStringParser.Move(_Incrementer: Int64);
 begin
+
+  if _Incrementer < 1 then
+    raise EStringParserException.Create('Back moving.');
+
   if not Terminated then
     Inc(FCursor, _Incrementer);
-end;
 
-procedure TCustomStringParser.Terminate;
-begin
-  FTerminated := True;
 end;
 
 function TCustomStringParser.ReadElement(_Trim: Boolean): String;
@@ -724,21 +681,45 @@ begin
   Regions.Add(_RegionClass.Create(_OpeningKey, _ClosingKey, _Caption));
 end;
 
+procedure TCustomStringParser.Terminate;
+begin
+  FTerminated := True;
+end;
+
+function TCustomStringParser.Nested: Boolean;
+begin
+  Result := NestedLevel > 0;
+end;
+
 procedure TCustomStringParser.Read;
+
+(*                   Имеем три точки переключения CursorStanding:                   *)
+(*                                                                                  *)
+(* Before              Inside              After               Before (NextElement) *)
+(* 3___________________1___________________2___________________3___________________ *)
+(*   spaces, comments          body          spaces, comments          body         *)
+(*                                                                                  *)
+(* ToggleElement       MoveEvent           ProcessElement      ToggleElement        *)
+(* ToggleElement       RegionOpened        after RegionExecute ToggleElement        *)
+(*                                                                                  *)
+(*        Но! Регион - комментарий переключает только After в Before на Close       *)
+
 var
   CursorKey: TKeyWord;
 begin
 
   while (Rest > 0) and not FTerminated do begin
 
-    if not ProcessRegions then
+    if not CheckRegions then
 
-      if not RegionActive and GetCursorKey(CursorKey) then begin
+      if RegionActive then begin
+
+        if not ExecuteRegion then { TODO -oVasilyevSM -cUCustomStringParser: Может, Execute нужно вызвать один раз? А то много работы получается. }
+          Move;
+
+      end else if not RegionActive and GetCursorKey(CursorKey) then begin
 
         KeyEvent(CursorKey);
-        { TODO 1 -oVasilyevSM -cTCustomStringParser: Базовый функционал:Этот метод не нужен, все можно сделать в
-          перекрытии после inherited. }
-        DoAfterKey(CursorKey);
         Move(CursorKey.KeyLength);
 
       end else begin
@@ -748,7 +729,7 @@ begin
 
       end;
 
-    AfterStepEvent;
+    StepCommited;
 
   end;
 
@@ -756,9 +737,9 @@ begin
 
 end;
 
-{ TLocatingStringParser.TLocation }
+{ TLocation }
 
-procedure TLocatingStringParser.TLocation.Remember(_Cursor: Int64);
+procedure TLocation.Remember(_Cursor: Int64);
 begin
 
   LastElementLine  := CurrentLine;
@@ -767,17 +748,17 @@ begin
 
 end;
 
-function TLocatingStringParser.TLocation.Line: Int64;
+function TLocation.Line: Int64;
 begin
   Result := LastElementLine;
 end;
 
-function TLocatingStringParser.TLocation.Column: Int64;
+function TLocation.Column: Int64;
 begin
   Result := LastElementStart - LastLineStart + 1;
 end;
 
-function TLocatingStringParser.TLocation.Position: Int64;
+function TLocation.Position: Int64;
 begin
   Result := LastElementStart;
 end;
@@ -851,7 +832,7 @@ begin
 
 end;
 
-procedure TLocatingStringParser.AfterStepEvent;
+procedure TLocatingStringParser.StepCommited;
 begin
   RefreshLocation;
 end;

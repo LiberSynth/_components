@@ -141,12 +141,11 @@ type
     function ElementProcessingKey(_KeyWord: TKeyWord): Boolean; override;
     function ElementTerminatingKey(_KeyWord: TKeyWord): Boolean; override;
     procedure CheckSyntax(const _KeyWord: TKeyWord); override;
-    procedure DoAfterKey(_KeyWord: TKeyWord); override;
 
     procedure ReadName; virtual; abstract;
     procedure ReadType; virtual; abstract;
     procedure ReadValue; virtual; abstract;
-    procedure ReadParams(_CursorShift: Int64); virtual; abstract;
+    procedure ReadParams; virtual; abstract;
     function IsParamsType: Boolean; virtual; abstract;
 
     property ElementType: TElementType read FElementType write FElementType;
@@ -160,6 +159,7 @@ type
 
     destructor Destroy; override;
 
+    procedure KeyEvent(const _KeyWord: TKeyWord); override;
     procedure ProcessElement; override;
     procedure ToggleElement(_KeyWord: TKeyWord); override;
 
@@ -210,16 +210,16 @@ type
 
     function CanOpen(_Parser: TCustomStringParser): Boolean; override;
     function CanClose(_Parser: TCustomStringParser): Boolean; override;
-    procedure Opened(_Parser: TCustomStringParser); override;
     procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
 
   TNestedParamsBlock = class(TBlock)
 
+  protected
+
     function CanOpen(_Parser: TCustomStringParser): Boolean; override;
-    procedure Opened(_Parser: TCustomStringParser); override;
-    procedure Closed(_Parser: TCustomStringParser); override;
+    procedure Execute(_Parser: TCustomStringParser; var _Handled: Boolean); override;
 
   end;
 
@@ -378,13 +378,14 @@ begin
 
   with FStrictSyntax do begin
 
-    {   ElementType  CursorStanding Nested       Keys                                                          }
-    Add(etName,      stBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                             );
-    Add(etName,      stBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]            );
-    Add(etName,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktTypeIdent, ktAssigning]                );
-    Add(etType,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktAssigning]                             );
-    Add(etValue,     stBefore,      nsNoMatter,  [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]);
-    Add(etValue,     stAfter,       nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                 );
+    {   ElementType  CursorStanding Nested       Keys                                                                           }
+    Add(etName,      stBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                                              );
+    Add(etName,      stBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]                             );
+    Add(etName,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktTypeIdent, ktAssigning]                                 );
+    Add(etType,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktAssigning]                                              );
+    Add(etValue,     stBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]                 );
+    Add(etValue,     stBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktNestedClosing, ktSplitter]);
+    Add(etValue,     stAfter,       nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                                  );
     Add(etValue,     stAfter,       nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing, ktSplitter]);
 
   end;
@@ -394,6 +395,13 @@ begin
   AddRegion(TQoutedStringRegion, KWR_QUOTE_DOBLE,     KWR_QUOTE_DOBLE,     'string'    );
   AddRegion(TNestedParamsBlock,  KWR_OPENING_BRACKET, KWR_CLOSING_BRACKET, 'parameters');
 
+end;
+
+procedure TParamsStringParser.KeyEvent(const _KeyWord: TKeyWord);
+begin
+  inherited KeyEvent(_KeyWord);
+  if Nested and (_KeyWord.KeyType = ktNestedClosing) then
+    Terminate;
 end;
 
 function TParamsStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
@@ -483,12 +491,6 @@ begin
 
     end;
 
-end;
-
-procedure TParamsStringParser.DoAfterKey(_KeyWord: TKeyWord);
-begin
-  if Nested and (_KeyWord.KeyType = ktNestedClosing) then
-    Terminate;
 end;
 
 procedure TParamsStringParser.ProcessElement;
@@ -582,8 +584,8 @@ begin
 
     Result :=
 
-        (ElementType = etValue) and
         (CursorStanding = stBefore) and
+        (ElementType = etValue) and
         inherited;
 
 end;
@@ -591,21 +593,6 @@ end;
 function TQoutedStringRegion.CanClose(_Parser: TCustomStringParser): Boolean;
 begin
   Result := inherited and not Doubling(_Parser);
-end;
-
-procedure TQoutedStringRegion.Opened(_Parser: TCustomStringParser);
-begin
-
-  inherited Opened(_Parser);
-
-  with _Parser do begin
-
-    CursorStanding := stInside;
-    { TODO 1 -oVasilyevSM -cTCustomStringParser: Базовый функционал: Че за костыли? Почему еще не подвинуто? }
-    ElementStart := Cursor + OpeningKey.KeyLength;
-
-  end;
-
 end;
 
 procedure TQoutedStringRegion.Closed(_Parser: TCustomStringParser);
@@ -618,17 +605,8 @@ begin
     if ClosingKey.KeyLength = 1 then
       DoublingChar := ClosingKey.StrValue[1];
 
-    Move(- ClosingKey.KeyLength);
-    try
-
-      ProcessElement;
-
-    finally
-
-      Move(ClosingKey.KeyLength);
-      DoublingChar := #0;
-
-    end;
+    ProcessElement;
+    DoublingChar := #0;
 
   end;
 
@@ -650,26 +628,16 @@ begin
 
 end;
 
-procedure TNestedParamsBlock.Opened(_Parser: TCustomStringParser);
+procedure TNestedParamsBlock.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
 begin
 
-  inherited Opened(_Parser);
+  inherited Execute(_Parser, _Handled);
 
-  with _Parser as TParamsStringParser do begin
+  with _Parser as TParamsStringParser do
+    ReadParams;
 
-    CursorStanding := stInside;
-    ElementStart   := Cursor;
-    ReadParams(OpeningKey.KeyLength);
+  _Handled := True;
 
-  end;
-
-end;
-
-procedure TNestedParamsBlock.Closed(_Parser: TCustomStringParser);
-begin
-  { TODO 1 -oVasilyevSM -cGeneral: Базовый функционал: Автопереключение регионом. Он и так должен быть value здесь. }
-  (_Parser as TParamsStringParser).ElementType := etValue;
-  inherited Closed(_Parser);
 end;
 
 end.

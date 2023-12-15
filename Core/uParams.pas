@@ -438,22 +438,19 @@ type
     function TrimDigital(const _Value: String): String;
     function UndoubleSymbols(const _Value: String): String;
 
-    property PresetTypes: Boolean read FPresetTypes;
-
   private
 
     constructor Create(const _Source: String; _Params: TParams); reintroduce;
     constructor CreateNested(_MasterParser: TParamsReader; _Params: TParams); reintroduce;
+
+    property PresetTypes: Boolean read FPresetTypes write FPresetTypes;
 
   protected
 
     procedure ReadName; override;
     procedure ReadType; override;
     procedure ReadValue; override;
-    { TODO 1 -oVasilyevSM -cTCustomStringParser: Базовый функционал: Надо бы распутать этот шифт. Он не должен быть
-      нужен. Почему блок запускается до движения мастера на открывающий ключ? По идее, это должно сбивать с толку блок.
-      Похоже, это обходится. Костыль. }
-    procedure ReadParams(_CursorShift: Int64); override;
+    procedure ReadParams; override;
     function IsParamsType: Boolean; override;
     procedure BeforeReadParam(_Param: TParam); virtual;
     procedure AfterReadParam(_Param: TParam); virtual;
@@ -860,7 +857,7 @@ end;
 
 class procedure TParam.ValidateName(const _Value, _PathSeparator: String);
 const
-  SC_PARAM_NAME_FORBIDDEN_CHARS = [' '];
+  SC_PARAM_NAME_FORBIDDEN_CHARS = [' ', '''', '"'];
 var
   i: Integer;
 begin
@@ -870,11 +867,11 @@ begin
 
   for i := 1 to Length(_Value) do
     if not CharInSet(_Value[i], SC_TYPED_CHARS) then
-      raise EParamsException.CreateFmt('Character #%d in invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
+      raise EParamsException.CreateFmt('Character #%d is invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
 
   for i := 1 to Length(_Value) do
     if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
-      raise EParamsException.CreateFmt('Character ''%s'' in invalid in param name ''%s''', [_Value[i], _Value]);
+      raise EParamsException.CreateFmt('Character ''%s'' is invalid in param name ''%s''', [_Value[i], _Value]);
 
   if Pos(_PathSeparator, _Value) > 0 then
     raise EParamsException.CreateFmt('Character ''%s'' is used as a path separator. So it is invalid in param name ''%s''.', [_PathSeparator, _Value]);
@@ -2250,11 +2247,15 @@ function TParams.SaveToString: String;
 
           (soForceQuoteStrings in SaveToStringOptions) or
           { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
-          (Pos(CR,   Result) > 0) or
-          (Pos(LF,   Result) > 0) or
-          (Pos(';',  Result) > 0) or
-          (Pos('=',  Result) > 0) or
-          (Pos(':',  Result) > 0)
+          (Pos(CR,  Result) > 0) or
+          (Pos(LF,  Result) > 0) or
+          (Pos(';', Result) > 0) or
+          (Pos('=', Result) > 0) or
+          (Pos(':', Result) > 0) or
+          { Интересный случай, пока они не вложенные, все работает. Но вложенные воспринимают ")" как конец свей
+            вложенности, а остаток начинает мастер дочитывать. Поэтому, для порядку обе скобки суем в кавычки. }
+          (Pos('(', Result) > 0) or
+          (Pos(')', Result) > 0)
 
       then Result := QuoteStr(Result);
 
@@ -2290,6 +2291,7 @@ begin
 
     try
 
+      PresetTypes := True;
       Read;
 
     finally
@@ -2310,6 +2312,7 @@ constructor TParamsReader.CreateNested;
 begin
   inherited CreateNested(_MasterParser);
   FParams := _Params;
+  FPresetTypes := _MasterParser.PresetTypes;
 end;
 
 procedure TParamsReader.CheckPresetType(_Strict: Boolean);
@@ -2374,6 +2377,7 @@ begin
 
   Value := ReadElement(False);
 
+  { TODO 4 -oVasilyevSM -cuParams: При попытке чтения нетипизованных параметров не выламывается и читает неправильно. }
   if PresetTypes then
     CheckPresetType(True);
 
@@ -2419,7 +2423,7 @@ begin
 
 end;
 
-procedure TParamsReader.ReadParams(_CursorShift: Int64);
+procedure TParamsReader.ReadParams;
 var
   P: TParam;
   NestedParams: TParams;
@@ -2448,7 +2452,7 @@ begin
       { TODO 2 -oVasilyevSM -cTCustomStringParser: Не очень, что передача управления исполнена в конструкторе
         абстрактного класса, а возврат - локально в потомках. Лучше это делать там же, где и передавалось, в деструкторе
         абстрактного класса. А то так и забыть можно. }
-      Self.Move(Cursor - _CursorShift - Self.Cursor); // Self.Location := Location;
+      Self.Move(Cursor - Self.Cursor); // Self.Location := Location;
 
     finally
       Free;
