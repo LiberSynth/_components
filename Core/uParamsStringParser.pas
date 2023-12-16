@@ -25,6 +25,8 @@ unit uParamsStringParser;
 (*                                                                                         *)
 (*******************************************************************************************)
 
+{ TODO 4 -oVasilyevSM -cuCustomStringParser: Для многострочных строковых параметров нужно экранирование. }
+
 interface
 
 uses
@@ -491,6 +493,15 @@ begin
 
     end;
 
+  if
+
+      (ElementType = etValue) and
+      (CursorStanding = stInside) and
+      IsParamsType and
+      (Source[Cursor] <> '(')
+
+  then raise EParamsReadException.Create(_GetMessage);
+
 end;
 
 procedure TParamsStringParser.ProcessElement;
@@ -598,8 +609,6 @@ end;
 procedure TQoutedStringRegion.Closed(_Parser: TCustomStringParser);
 begin
 
-  inherited Closed(_Parser);
-
   with _Parser as TParamsStringParser do begin
 
     if ClosingKey.KeyLength = 1 then
@@ -609,6 +618,8 @@ begin
     DoublingChar := #0;
 
   end;
+
+  inherited Closed(_Parser);
 
 end;
 
@@ -631,11 +642,10 @@ end;
 procedure TNestedParamsBlock.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
 begin
 
-  inherited Execute(_Parser, _Handled);
-
   with _Parser as TParamsStringParser do
     ReadParams;
 
+  inherited Execute(_Parser, _Handled);
   _Handled := True;
 
 end;

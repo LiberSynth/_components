@@ -300,6 +300,7 @@ type
     FSaveToStringOptions: TSaveToStringOptions;
     FItems: TParamList;
     FListHolder: TParamsListHolder;
+    FLocation: Boolean;
 
     function Add(const _Name: String): TParam;
 
@@ -417,6 +418,7 @@ type
     property PathSeparator: Char read FPathSeparator;
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions;
     property Count: Integer read GetCount;
+    property Location: Boolean read FLocation write FLocation;
 
   end;
 
@@ -508,7 +510,7 @@ begin
     if SameText(ParamDataTypeToStr(Item), Value) then
       Exit(Item);
 
-  raise EConvertError.CreateFmt('%s is not a TParamDataType value', [Value]);
+  raise EConvertError.CreateFmt('%s is not a param data type value', [Value]);
 
 end;
 
@@ -1986,6 +1988,7 @@ begin
 
     else begin
 
+      { TODO 4 -oVasilyevSM -cuParams: Ошибка. Сдвигает многострочное значение, происходит инъекция пробелов. }
       if Length(_Value) > 0 then _Value := _Value + CRLF;
       _Value := Format('(%s%s)', [CRLF, ShiftText(_Value, 1)]);
 
@@ -2189,6 +2192,8 @@ procedure TParams.Assign(_Source: TParams; _ForceAdding: Boolean);
 var
   Src: TParam;
 begin
+  { TODO 3 -oVasilyevSM -cuParams: Ошибка. A: Params = (B: String = 'zxc') после нетипизованного присваивания возвращает
+    B: Unknown = }
   for Src in _Source.Items do
     AssignValue(Src.Name, Src, _ForceAdding);
 end;
@@ -2285,18 +2290,27 @@ begin
 end;
 
 procedure TParams.LoadFromString(const _Value: String);
+var
+  Parser: TCustomStringParser;
+  Locator: TLocator;
 begin
 
-  with ParamsReaderClass.Create(_Value, Self) do
+  Parser:= ParamsReaderClass.Create(_Value, Self);
+  try
 
+    if Location then Locator := TLocator.Create(Parser)
+    else Locator := nil;
     try
 
-      PresetTypes := True;
-      Read;
+      Parser.Read;
 
     finally
-      Free;
+      Locator.Free;
     end;
+
+  finally
+    Parser.Free;
+  end;
 
 end;
 
@@ -2310,9 +2324,17 @@ end;
 
 constructor TParamsReader.CreateNested;
 begin
+
   inherited CreateNested(_MasterParser);
-  FParams := _Params;
+
+  FParams      := _Params;
   FPresetTypes := _MasterParser.PresetTypes;
+  { TODO 2 -oVasilyevSM -cuParams: Потенциально опасный код. Нужно исключение при попытке уничтожить владельца событий,
+    если есть вложенный подписчик. }
+  OnRead       := _MasterParser.OnRead;
+  OnCheckPoint := _MasterParser.OnCheckPoint;
+  { Вложенный объект НЕ должен вызывать OnDestroy. }
+
 end;
 
 procedure TParamsReader.CheckPresetType(_Strict: Boolean);
@@ -2448,11 +2470,8 @@ begin
 
       Read;
       AfterReadParams(P);
-      { Возврат управления от помощника к мастеру }
-      { TODO 2 -oVasilyevSM -cTCustomStringParser: Не очень, что передача управления исполнена в конструкторе
-        абстрактного класса, а возврат - локально в потомках. Лучше это делать там же, где и передавалось, в деструкторе
-        абстрактного класса. А то так и забыть можно. }
-      Self.Move(Cursor - Self.Cursor); // Self.Location := Location;
+      { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
+      RetrieveControl(Self);
 
     finally
       Free;

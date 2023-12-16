@@ -97,14 +97,14 @@ function QuoteStr(const Value: String; const Quote: Char = ''''): String;
 function UnquoteStr(const Value: String; const Quote: Char = ''''): String;
 function DoubleStr(const Value: String; const Quote: Char = ''''): String;
 function UndoubleStr(const Value: String; const Quote: Char = ''''): String;
-function CutStr(var Value: String; Count: Integer): Boolean; overload;
-function CutStr(Count: Integer; const Value: String): String; overload;
+function CutStr(var Value: String; Count: Integer): Boolean;
 function SameText(const Value: String; Patterns: TStringArray): Boolean; overload;
 
 function StrMaskMatch(Value, Mask: String): Boolean;
 function FileMaskMatch(const FileName, Mask: String): Boolean;
 function FileMasksMatch(const FileName, Masks: String): Boolean;
 
+{ TODO 4 -oVasilyevSM -cuStrUtils: Не менять местами параметры. }
 function ShiftText(const Value: String; Level: ShortInt; Interval: Byte = 2): String; overload;
 procedure ShiftText(Level: ShortInt; Interval: Byte; var Value: String); overload;
 procedure ShiftText(Level: ShortInt; var Value: String); overload;
@@ -144,7 +144,6 @@ function ConcatStrArrays(const ArrayA, ArrayB: TStringArray; Distinct: Boolean =
 function SortStrArray(const Value: TStringArray): TStringArray;
 procedure DelimStrToArray(var StrArray: TStringArray; Value: String; const Delimiter: String = ';'; Sorted: Boolean = False); overload;
 function DelimStrToArray(const Value: String; const Delimiter: String = ';'; Sorted: Boolean = False): TStringArray; overload;
-
 function ArrayToDelimStr(const StrArray: TStringArray; const Delimiter: String = ';'): String;
 
 procedure CleanUpAnsiString(var Value: AnsiString);
@@ -869,12 +868,6 @@ begin
   if Result then Value := Copy(Value, 1, L - Count);
 end;
 
-function CutStr(Count: Integer; const Value: String): String;
-begin
-  Result := Value;
-  CutStr(Result, Count);
-end;
-
 function SameText(const Value: String; Patterns: TStringArray): Boolean;
 var
   i: Integer;
@@ -998,6 +991,7 @@ begin
     if Level > 0 then begin { Right }
 
       Result := Indent + StringReplace(Value, CRLF, CRLF + Indent, [rfReplaceAll]);
+
       if CRLFTerminated then
         Result := Copy(Result, 1, Length(Result) - Length(Indent));
 
