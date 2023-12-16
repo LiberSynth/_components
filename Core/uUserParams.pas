@@ -25,6 +25,7 @@ unit uUserParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
+{ TODO 3 -oVasilyevSM -cTuUserParams: Есть еще один кейс - пустой файл только с комментариями }
 { TODO 5 -oVasilyevSM -cTUserFormatParams: Нужны параметры, хранящие исходное форматирование. Всю строку между элементами
   запоминать там и потом выбрасывать в строку. }
 
@@ -47,7 +48,7 @@ uses
   { VCL }
   Generics.Collections, SysUtils,
   { Liber Synth }
-  uConsts, uTypes, uStrUtils, uParams, uCustomStringParser, uParamsStringParser;
+  uConsts, uTypes, uDataUtils, uStrUtils, uParams, uCustomStringParser, uParamsStringParser;
 
 type
 
@@ -61,7 +62,8 @@ type
 
   TCommentAnchor = (
 
-      caBeforeParam, caBeforeName, caAfterName, caBeforeType, caAfterType, caBeforeValue, caAfterValue, caAfterParam, caInsideEmptyParams
+      caBeforeParam, caBeforeName, caAfterName, caBeforeType, caAfterType,
+      caBeforeValue, caAfterValue, caAfterParam, caInsideEmptyParams
 
   );
 
@@ -155,23 +157,6 @@ const
 
 type
 
-  TKeyWordHelper = record helper for TKeyWord
-
-  private
-
-    constructor Create(_KeyType: TKeyType; const _StrValue: String); overload;
-
-    function GetKeyType: TKeyType;
-    procedure SetKeyType(const _Value: TKeyType);
-
-    {$HINTS OFF}
-    function TypeInSet(const _Set: TKeyTypes): Boolean;
-    {$HINTS ON}
-
-    property KeyType: TKeyType read GetKeyType write SetKeyType;
-
-  end;
-
   TUserParamsReader = class(TParamsReader)
 
   strict private
@@ -180,12 +165,9 @@ type
     FCurrentComments: TUserParam.TCommentList;
     FCommentTerminatedValue: Boolean;
 
-    procedure CheckBeforeNameComments;
-    procedure SaveLastComments;
-
   private
 
-    function ReadComment(_Shift: Byte): String;
+    function ReadComment: String;
     procedure AddComment(
 
         const _Value: String;
@@ -210,9 +192,8 @@ type
 
     destructor Destroy; override;
 
-    procedure KeyEvent(const _KeyWord: TKeyWord); override;
     function ReadElement(_Trim: Boolean): String; override;
-    procedure ElementTerminatedEvent(_KeyWord: TKeyWord); override;
+    procedure ElementTerminated(_KeyWord: TKeyWord); override;
 
   end;
 
@@ -220,6 +201,7 @@ type
 
   protected
 
+    function CanClose(_Parser: TCustomStringParser): Boolean; override;
     procedure Opened(_Parser: TCustomStringParser); override;
 
   end;
@@ -228,7 +210,7 @@ type
 
   protected
 
-    procedure Closed(_Parser: TCustomStringParser); override;
+    procedure Execute(_Parser: TCustomStringParser; var _Handled: Boolean); override;
 
   end;
 
@@ -236,12 +218,29 @@ type
 
   strict private
 
-    FTerminator: String;
+    procedure DetermineClosingKey(_Parser: TCustomStringParser);
 
   protected
 
-    function CanClose(_Parser: TCustomStringParser): Boolean; override;
-    procedure Closed(_Parser: TCustomStringParser); override;
+    procedure Execute(_Parser: TCustomStringParser; var _Handled: Boolean); override;
+    procedure CheckUnterminated; override;
+
+  end;
+
+  TKeyWordHelper = record helper for TKeyWord
+
+  private
+
+    constructor Create(_KeyType: TKeyType; const _StrValue: String); overload;
+
+    function GetKeyType: TKeyType;
+    procedure SetKeyType(const _Value: TKeyType);
+
+    {$HINTS OFF}
+    function TypeInSet(const _Set: TKeyTypes): Boolean;
+    {$HINTS ON}
+
+    property KeyType: TKeyType read GetKeyType write SetKeyType;
 
   end;
 
@@ -277,9 +276,9 @@ begin
   Splitter := ' ';
   Index := 0;
 
-  { TODO 3 -oVasilyevSM -cFormatParam: Нужен метод Search***(StartAt, Anchor), которым можно пробежать по списку с учетом
-    признака Anchor. Будет удобнее здесь орудовать. Цикл может быть какой-нибудь while и тогда еще можно будет First и
-    Last контролировать.
+  { TODO 3 -oVasilyevSM -cFormatParam: Нужен метод Search(StartAt, Anchor). Или привычно, Find(Anchor, var Comment):
+    Boolean, которым можно пробежать по списку с учетом признака Anchor. Будет удобнее здесь орудовать. Цикл может быть
+    какой-нибудь while и тогда еще можно будет First и Last контролировать.
 
     Нужно избавиться от смены порядка Value + Splitter / Splitter + Value. Постараться управлять начальным и конечным
     разделителем после обработки цикла.
@@ -504,29 +503,6 @@ begin
 
 end;
 
-{ TKeyWordHelper }
-
-constructor TKeyWordHelper.Create(_KeyType: TKeyType; const _StrValue: String);
-begin
-  Create(Integer(_KeyType), _StrValue);
-end;
-
-function TKeyWordHelper.GetKeyType: TKeyType;
-begin
-  Result := TKeyType(KeyTypeInternal)
-end;
-
-procedure TKeyWordHelper.SetKeyType(const _Value: TKeyType);
-begin
-  if Integer(_Value) <> KeyTypeInternal then
-    KeyTypeInternal := Integer(_Value)
-end;
-
-function TKeyWordHelper.TypeInSet(const _Set: TKeyTypes): Boolean;
-begin
-  Result := KeyType in _Set;
-end;
-
 { TUserParamsReader }
 
 destructor TUserParamsReader.Destroy;
@@ -535,39 +511,9 @@ begin
   inherited Destroy;
 end;
 
-procedure TUserParamsReader.CheckBeforeNameComments;
-var
-  i: Integer;
+function TUserParamsReader.ReadComment: String;
 begin
-
-  for i := 0 to CurrentComments.Count - 1 do
-    with CurrentComments[i] do
-      if Anchor = caBeforeName then
-        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
-
-end;
-
-procedure TUserParamsReader.SaveLastComments;
-var
-  i: Integer;
-begin
-
-  if Assigned(CurrentParam) then begin
-
-    for i := 0 to CurrentComments.Count - 1 do
-      with CurrentComments[i] do
-        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caAfterParam, Short);
-
-    CurrentParam.Comments.AddRange(CurrentComments.ToArray);
-    CurrentComments.Clear;
-
-  end;
-
-end;
-
-function TUserParamsReader.ReadComment(_Shift: Byte): String;
-begin
-  Result := Trim(Copy(Source, RegionStart, Cursor - RegionStart - _Shift));
+  Result := Trim(Copy(Source, RegionStart, Cursor - RegionStart));
 end;
 
 procedure TUserParamsReader.AddComment;
@@ -627,27 +573,12 @@ begin
   FCurrentComments := TUserParam.TCommentList.Create;
 
   {         RegionClass          OpeningKey                       ClosingKey                      Caption  }
-//  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');
-//  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'comment');
-//  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'comment');
-//  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'comment');
-//  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'comment');
 
-end;
-
-procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
-begin
-
-  { TODO 1 -oVasilyevSM -cTUserParamsReader: Костыль. Получается двойной вызов ProcessRegions почти всегда. }
-//  if (_KeyWord.KeyType <> ktSourceEnd) or not CheckRegions then
-    inherited KeyEvent(_KeyWord);
-
-  case _KeyWord.KeyType of
-
-    ktLineEnd:   if ElementType = etName then CheckBeforeNameComments;
-    ktSourceEnd: SaveLastComments;
-
-  end;
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'comment');
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'comment');
+  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'comment');
+  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'comment');
 
 end;
 
@@ -658,10 +589,10 @@ begin
     Result := TrimRight(Result);
 end;
 
-procedure TUserParamsReader.ElementTerminatedEvent(_KeyWord: TKeyWord);
+procedure TUserParamsReader.ElementTerminated(_KeyWord: TKeyWord);
 begin
 
-  inherited ElementTerminatedEvent(_KeyWord);
+  inherited ElementTerminated(_KeyWord);
 
   if
 
@@ -681,18 +612,28 @@ end;
 
 { TCustomCommentRegion }
 
+function TCustomCommentRegion.CanClose(_Parser: TCustomStringParser): Boolean;
+begin
+  Result := Executed;
+end;
+
 procedure TCustomCommentRegion.Opened(_Parser: TCustomStringParser);
 begin
+
+  CancelToggling := True;
 
   inherited Opened(_Parser);
 
   with _Parser as TUserParamsReader do
 
-    if (CursorStanding > stBefore) and (ElementStart > 0) then begin
+    if CursorStanding = stInside then begin
 
+      { Флаг нужен для обрезки пробелов справа от элемента при считывании. Они точно являюются отступом перед
+        комментарием, а не частью значения. }
       CommentTerminatedValue := True;
       try
 
+        { Обрабатываем текущий элемент. Начало комментария это всегда конец тела, что бы там ни было. }
         ProcessElement;
 
       finally
@@ -705,16 +646,22 @@ end;
 
 { TLongCommentRegion }
 
-procedure TLongCommentRegion.Closed(_Parser: TCustomStringParser);
+procedure TLongCommentRegion.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
+var
+  p: Int64;
 begin
-
-  inherited Closed(_Parser);
 
   with _Parser as TUserParamsReader do begin
 
+    { Перемещаемся сразу на конец комментария, чтобы не бежать туда циклом. Этот Pos найдет его быстрее. }
+    p := Pos(ClosingKey.StrValue, Source, Cursor);
+    if p = 0 then Move(SrcLen - Cursor + 1)
+    else Move(p - Cursor);
+
+    { Считываем, потому что уже можем. Так меньше лишней нагрузки, так как CanClose уже просто True. }
     AddComment(
 
-        ReadComment(ClosingKey.KeyLength),
+        ReadComment,
         OpeningKey.StrValue,
         ClosingKey.StrValue,
         False
@@ -723,54 +670,74 @@ begin
 
   end;
 
+  inherited Execute(_Parser, _Handled);
+  _Handled := True;
+
 end;
 
 { TShortCommentRegion }
 
-function TShortCommentRegion.CanClose(_Parser: TCustomStringParser): Boolean;
-
-  function _CheckEnd: Boolean;
-  begin
-
-    Result := _Parser.Rest = 0;
-
-    if Result then
-      FTerminator := '';
-
-  end;
-
-  function _CheckLine(const _Value: String): Boolean;
-  begin
-
-    with _Parser do
-      Result := Copy(Source, Cursor, 2) = _Value;
-
-    if Result then FTerminator := _Value;
-
-  end;
-
+procedure TShortCommentRegion.DetermineClosingKey(_Parser: TCustomStringParser);
 begin
-  Result := _CheckEnd or _CheckLine(CRLF) or _CheckLine(CR) or _CheckLine(LF);
+
+  with _Parser do
+
+    if      Eof                                                  then ClosingKey := KWR_EMPTY
+    else if Copy(Source, Cursor, 2) = KWR_LINE_END_CRLF.StrValue then ClosingKey := KWR_LINE_END_CRLF
+    else if Copy(Source, Cursor, 1) = KWR_LINE_END_CR.  StrValue then ClosingKey := KWR_LINE_END_CR
+    else if Copy(Source, Cursor, 1) = KWR_LINE_END_LF.  StrValue then ClosingKey := KWR_LINE_END_LF
+    else raise EParamsReadException.Create('Impossible case of comment reading.');
+
 end;
 
-procedure TShortCommentRegion.Closed(_Parser: TCustomStringParser);
+procedure TShortCommentRegion.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
+var
+  p: Int64;
 begin
-
-  inherited Closed(_Parser);
 
   with _Parser as TUserParamsReader do begin
 
-    AddComment(
+    { Перемещаемся сразу на конец комментария, чтобы не бежать туда циклом. Этот Pos найдет его быстрее. }
+    p := Min(Pos(CR, Source, Cursor), Pos(LF, Source, Cursor));
+    if p = 0 then Move(SrcLen - Cursor + 1)
+    else Move(p - Cursor);
 
-        ReadComment(0),
-        OpeningKey.StrValue,
-        FTerminator,
-        True
-
-    );
+    { Считываем, потому что уже можем. Так меньше лишней нагрузки, так как CanClose уже просто True. }
+    DetermineClosingKey(_Parser);
+    AddComment(ReadComment, OpeningKey.StrValue, ClosingKey.StrValue, True);
 
   end;
 
+  inherited Execute(_Parser, _Handled);
+  _Handled := True;
+
+end;
+
+procedure TShortCommentRegion.CheckUnterminated;
+begin
+end;
+
+{ TKeyWordHelper }
+
+constructor TKeyWordHelper.Create(_KeyType: TKeyType; const _StrValue: String);
+begin
+  Create(Integer(_KeyType), _StrValue);
+end;
+
+function TKeyWordHelper.GetKeyType: TKeyType;
+begin
+  Result := TKeyType(KeyTypeInternal)
+end;
+
+procedure TKeyWordHelper.SetKeyType(const _Value: TKeyType);
+begin
+  if Integer(_Value) <> KeyTypeInternal then
+    KeyTypeInternal := Integer(_Value)
+end;
+
+function TKeyWordHelper.TypeInSet(const _Set: TKeyTypes): Boolean;
+begin
+  Result := KeyType in _Set;
 end;
 
 end.

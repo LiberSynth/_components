@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections, Windows,
   { LiberSynth }
-  uConsts, uTypes, uCore;
+  uConsts, uTypes, uCore, uDataUtils;
 
 type
 
@@ -67,6 +67,7 @@ type
     FClosingKey: TKeyWord;
     FCaption: String;
     FExecuted: Boolean;
+    FCancelToggling: Boolean;
 
   private
 
@@ -78,8 +79,6 @@ type
 
     );
 
-    procedure CheckUnterminated;
-
     property Caption: String read FCaption;
 
   protected
@@ -89,11 +88,14 @@ type
     procedure Opened(_Parser: TCustomStringParser); virtual;
     procedure Closed(_Parser: TCustomStringParser); virtual;
     procedure Execute(_Parser: TCustomStringParser; var _Handled: Boolean); virtual;
+    procedure CheckUnterminated; dynamic;
+
+    property CancelToggling: Boolean read FCancelToggling write FCancelToggling;
 
   public
 
-    property OpeningKey: TKeyWord read FOpeningKey;
-    property ClosingKey: TKeyWord read FClosingKey;
+    property OpeningKey: TKeyWord read FOpeningKey write FClosingKey;
+    property ClosingKey: TKeyWord read FClosingKey write FClosingKey;
     property Executed: Boolean read FExecuted write FExecuted;
 
   end;
@@ -106,6 +108,8 @@ type
 
     FActive: Boolean;
     FActiveRegion: TRegion;
+
+    function GetOpeningRegion(_Parser: TCustomStringParser; var _ActiveRegion: TRegion): Boolean;
 
   private
 
@@ -385,26 +389,46 @@ end;
 
 { TRegionList }
 
+function TRegionList.GetOpeningRegion(_Parser: TCustomStringParser; var _ActiveRegion: TRegion): Boolean;
+var
+  i, L: Integer;
+  IA: TIntegerarray;
+begin
+
+  { Тут такая история. Есть два региона, один открывается по '(*', другой - по '('. При пробежке простым циклом, когда
+    впереди '(*' выиграет первый попавшийся из них - с ключом '('. Но он - не тот, кто должен открыться по '(*'. }
+
+  SetLength(IA, 0);
+  for i := 0 to Count - 1 do
+    if Items[i].CanOpen(_Parser) then
+      AddToIntArray(IA, i);
+
+  Result := Length(IA) > 0;
+  if Result then begin
+
+    L := 0;
+    for i := Low(IA) to High(IA) do
+      if Items[IA[i]].OpeningKey.KeyLength > L then
+        _ActiveRegion := Items[IA[i]];
+
+  end;
+
+end;
+
 function TRegionList.TryOpen(_Parser: TCustomStringParser): Boolean;
 var
   Region: TRegion;
 begin
 
-  if not Active then
+  Result := not Active and GetOpeningRegion(_Parser, Region);
+  if Result then begin
 
-    for Region in Self do
+    Region.Opened(_Parser);
+    FActiveRegion := Region;
+    FActive := True;
 
-      if Region.CanOpen(_Parser) then begin
+  end;
 
-        Region.Opened(_Parser);
-        FActiveRegion := Region;
-        FActive := True;
-        Exit(True);
-
-      end;
-      
-  Result := False;
-  
 end;
 
 function TRegionList.TryClose(_Parser: TCustomStringParser; var _ClosingKey: TKeyWord): Boolean;
@@ -497,7 +521,7 @@ var
   CursorKey: TKeyWord;
 begin
 
-  while (Rest > 0) and not FTerminated do begin
+  while not Eof and not FTerminated do begin
 
     if not CheckRegions then
 
@@ -573,9 +597,15 @@ begin
   Result := Regions.TryOpen(Self);
   if Result then begin
 
-    { Move до переключения, потому что ключ не должен войти в регион. Начало после ключа. }
-    Move(Regions.ActiveRegion.OpeningKey.KeyLength);
-    ToggleStanding(stInside); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 1 (RegionOpened) }
+    with Regions.ActiveRegion do begin
+
+      { Move до переключения, потому что ключ не должен войти в регион. Начало после ключа. }
+      Move(OpeningKey.KeyLength);
+      if not CancelToggling then
+        ToggleStanding(stInside); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 1 (RegionOpened) }
+
+    end;
+
     FRegionStart := Cursor;
 
   end;
@@ -720,8 +750,7 @@ begin
   if ElementStart > 0 then
 
     if _Trim then
-      { TODO 5 -oVasilyevSM -cTCustomStringParser: Разобрать, я вроде видел, что очищаются не только пробелы, но и табы,
-        и что-то еще. Но как? SysUtils.Trim по коду только на пробел значение проверяет. }
+      { Все SysUtils.Trim обрезают все, что <= ' '. Все табы, ритерны итд. }
       Result := Trim(Copy(Source, ElementStart, Cursor - ElementStart))
     else
       Result := Copy(Source, ElementStart, Cursor - ElementStart)
@@ -750,7 +779,7 @@ begin
 
     else Result := False;
 
-  if Result then begin
+  if Result and not Regions.ActiveRegion.CancelToggling then begin
 
     ToggleStanding(stAfter); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 2 (after RegionExecute) }
     FRegionStart := 0;
@@ -814,8 +843,11 @@ end;
 procedure TCustomStringParser.Move(_Incrementer: Int64);
 begin
 
-  if _Incrementer < 1 then { Под сомнением. }
+  {$IFDEF DEBUG}
+  { Помогает ошибки найти. }
+  if (_Incrementer < 1) and not Eof then
     raise EStringParserException.Create('Back moving.');
+  {$ENDIF}
 
   if not Terminated then
     Inc(FCursor, _Incrementer);

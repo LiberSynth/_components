@@ -150,6 +150,12 @@ function Power(const Base, Exponent: Double): Double; overload;
 function Power(const Base, Exponent: Single): Single; overload;
 { ^ Жизнь без Math в каждом юните)) ^ }
 
+function Min(const Values: array of Int64): Int64; overload;
+function Max(const Values: array of Int64): Int64; overload;
+
+procedure AddToIntArray(var IntArray: TIntegerArray; const Value: Integer; Sorted: Boolean = False);
+function ExistsInIntArray(const IntArray: TIntegerArray; const Value: Integer): Boolean;
+
 type
 
   { TODO 3 -oVasilyevSM -cuDataUtils: Точно нельзя без класса никак? И еще, не только для строк можно? }
@@ -157,7 +163,7 @@ type
 
   public
 
-    class function Get<T>(Value: T; Map: array of String): String;
+    class function Get<T>(Value: T; const Map: array of String): String;
 
   end;
 
@@ -918,9 +924,88 @@ asm // StackAlignSafe
 @@Exit:
 end;
 
+function Min(const Values: array of Int64): Int64; overload;
+var
+  Value: Int64;
+begin
+
+  Result := Values[Low(Values)];
+  for Value in Values do
+    if Value < Result then
+      Result := Value;
+
+end;
+
+function Max(const Values: array of Int64): Int64; overload;
+var
+  Value: Int64;
+begin
+
+  Result := Values[Low(Values)];
+  for Value in Values do
+    if Value > Result then
+      Result := Value;
+
+end;
+
+procedure AddToIntArray(var IntArray: TIntegerArray; const Value: Integer; Sorted: Boolean);
+var
+  L, i, Index: Integer;
+begin
+
+  L := Length(IntArray);
+
+  if Sorted then
+  begin
+
+    Index := -1;
+
+    for i := Low(IntArray) to High(IntArray) do
+
+      if IntArray[i] > Value then
+      begin
+
+        Index := i;
+        Break;
+
+      end;
+
+    if Index = -1 then Index := L;
+
+    SetLength(IntArray, L + 1);
+
+    for i := High(IntArray) downto Index + 1 do
+      IntArray[i] := IntArray[i - 1];
+
+    IntArray[Index] := Value;
+
+  end
+  else
+  begin
+
+    SetLength(IntArray, L + 1);
+    IntArray[L] := Value;
+
+  end;
+
+end;
+
+function ExistsInIntArray(const IntArray: TIntegerArray; const Value: Integer): Boolean;
+var
+  Item: Integer;
+begin
+
+  for Item in IntArray do
+    if Item = Value then
+      Exit(True);
+
+  Result := False;
+
+end;
+
 { Matrix<T> }
 
-class function Matrix.Get<T>(Value: T; Map: array of String): String;
+class function Matrix.Get<T>(Value: T; const Map: array of String): String;
 var
   B: Byte;
 begin

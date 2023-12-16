@@ -84,6 +84,7 @@ function ByteAnsiStrToData(const Value: AnsiString): TData; //
 { ^ Преобразование основных типов данных в визуальную строку и обратно. Полный набор. ^ }
 
 { v Для парсинга и автоскриптов v }
+function Pos(const Pattern, Value: String; Start: Int64): Int64; overload;
 function PosOf(Patterns: String; const Value: String; Start: Integer = 1): Integer; overload;
 function PosOf(const Patterns: TStringArray; const Value: String): Integer; overload;
 function ReadStrTo(var Value: String; const Pattern: String; WithPattern: Boolean = False): String;
@@ -671,6 +672,28 @@ end;
 function ByteAnsiStrToData(const Value: AnsiString): TData;
 begin
   Result := ByteStrToData(String(Value));
+end;
+
+function Pos(const Pattern, Value: String; Start: Int64): Int64;
+var
+  Last, PL: Integer;
+begin
+
+  PL   := Length(Pattern);
+  Last := Length(Value) - PL + 1;
+
+  Result := Start;
+  while Result <= Last do begin
+
+    if Copy(Value, Result, PL) = Pattern then
+      Exit;
+
+    Inc(Result);
+
+  end;
+
+  Result := 0;
+
 end;
 
 function PosOf(Patterns: String; const Value: String; Start: Integer): Integer;
