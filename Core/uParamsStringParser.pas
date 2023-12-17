@@ -353,16 +353,15 @@ begin
 
   with Reading do begin
 
-    {   Operation      ElementType Nested      KeyTypes                                      }
-    Add(opProcessing,  etName,     nsNoMatter, [ktLineEnd, ktSpace, ktTypeIdent, ktAssigning]);
-    Add(opTerminating, etName,     nsNoMatter, [ktTypeIdent, ktAssigning]                    );
+    {   Operation      ElementType Nested       KeyTypes                                             }
+    Add(opProcessing,  etName,     nsNoMatter,  [ktLineEnd, ktSpace, ktTypeIdent, ktAssigning]       );
+    Add(opTerminating, etName,     nsNoMatter,  [ktTypeIdent, ktAssigning]                           );
 
-    Add(opProcessing,  etType,     nsNoMatter, [ktLineEnd, ktSpace, ktAssigning]);
-    Add(opTerminating, etType,     nsNoMatter, [ktAssigning]                    );
+    Add(opProcessing,  etType,     nsNoMatter,  [ktLineEnd, ktSpace, ktAssigning]                    );
+    Add(opTerminating, etType,     nsNoMatter,  [ktAssigning]                                        );
 
-    Add(opProcessing,  etValue,    nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]);
-    Add(opTerminating, etValue,    nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]);
-
+    Add(opProcessing,  etValue,    nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]                 );
+    Add(opTerminating, etValue,    nsNotNested, [ktLineEnd, ktSplitter, ktSourceEnd]                 );
     Add(opProcessing,  etValue,    nsNested,    [ktLineEnd, ktSplitter, ktSourceEnd, ktNestedClosing]);
     Add(opTerminating, etValue,    nsNested,    [ktLineEnd, ktSplitter, ktSourceEnd, ktNestedClosing]);
 

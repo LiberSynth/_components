@@ -235,22 +235,33 @@ type
 
   end;
 
+  TLocation = record
+
+    Line: Int64;
+    Column: Int64;
+    Position: Int64;
+
+    constructor Create(_Line, _Column, _Position: Int64);
+
+  end;
+
   TLocator = class
 
   strict private
 
     FParser: TCustomStringParser;
+    FNativeException: Boolean;
     FLastElementStart: Int64;
 
     procedure ParserOnRead(_InternalRead: TObjProc; _Nested: Boolean);
     procedure ParserOnCheckPoint(_Cursor: Int64);
     procedure ParserOnDestroy;
 
-    procedure GetLocation(var _Line, _Column, _Position: Int64);
+    function Location: TLocation;
 
   public
 
-    constructor Create(_Parser: TCustomStringParser);
+    constructor Create(_Parser: TCustomStringParser; _NativeException: Boolean = True);
     destructor Destroy; override;
 
   end;
@@ -272,11 +283,30 @@ type
 
   end;
 
+  ELocatedException = class(ECoreException)
+
+  strict private
+
+    FInitExceptionClass: ExceptClass;
+    FInitMessage: String;
+    FLocation: TLocation;
+
+  private
+
+    constructor Create(
+
+        _InitExceptionClass: ExceptClass;
+        const _InitMessage: String;
+        _Location: TLocation
+
+    );
+
+  end;
+
 const
 
   KWR_EMPTY:         TKeyWord = (KeyTypeInternal: Integer(ktNone);      StrValue: '';   KeyLength: 0           );
   KWR_SOURCE_END:    TKeyWord = (KeyTypeInternal: Integer(ktSourceEnd); StrValue: '';   KeyLength: 0           );
-  { TODO 3 -oVasilyevSM -cTCustomStringPaarser: ¬ообще-то эти ключи не используютс€, можно их убрать отсюда.   }
   KWR_LINE_END_CR:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CR;   KeyLength: Length(CR)  );
   KWR_LINE_END_LF:   TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: LF;   KeyLength: Length(LF)  );
   KWR_LINE_END_CRLF: TKeyWord = (KeyTypeInternal: Integer(ktLineEnd);   StrValue: CRLF; KeyLength: Length(CRLF));
@@ -299,12 +329,12 @@ type
   end;
 
 {$IFDEF DEBUG}
-procedure _ValidateRegions(_Regions: TRegionList);
+procedure _ValidateRegions(_Regions: TRegionList; _KeyWords: TKeyWordList);
 var
   SSA, SSB: TRegion;
+  KW: TKeyWord;
+  i, j: Integer;
 begin
-
-  { TODO 4 -oVasilyevSM -cTCustomStringParser: ƒобавить еще одну проверку, что эти ключи не пересекаютс€ с обычными. }
 
   for SSA in _Regions do
     for SSB in _Regions do
@@ -316,7 +346,21 @@ begin
             (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.OpeningKey)) or
             (not SSA.ClosingKey.Equal(KWR_EMPTY) and SSA.ClosingKey.Equal(SSB.ClosingKey))
 
-        then raise ECoreException.Create(' regions setting is wrong. Some keys are intersected.');
+        then raise ECoreException.Create('Setting is wrong. Some block''s or region''s keys are intersected.');
+
+  for i := 0 to _KeyWords.Count - 1 do
+    for j := 0 to _KeyWords.Count - 1 do
+      if i <> j then
+        if _KeyWords[i].Equal(_KeyWords[j]) then
+          raise ECoreException.Create('Setting is wrong. Some keys are intersected.');
+
+  for SSA in _Regions do
+    for KW in _KeyWords do
+      if KW.Equal(SSA.OpeningKey) then
+        raise ECoreException.Create('Setting is wrong. Some keys are intersected with region''s opening key.');
+
+  { «акрывающие ключи блоков будут пересекатьс€ с обычными, потому что блок закрываетс€ мастером и вложенную обработку
+    надо прекращать по отдельному ключу. }
 
 end;
 {$ENDIF}
@@ -468,7 +512,7 @@ begin
   InitParser;
 
   {$IFDEF DEBUG}
-  _ValidateRegions(Regions);
+  _ValidateRegions(Regions, KeyWords);
   {$ENDIF}
 
 end;
@@ -715,7 +759,6 @@ begin
 
   with KeyWords do begin
 
-    { TODO 3 -oVasilyevSM -cTCustomStringPaarser: ¬ообще-то эти ключи не используютс€, можно их убрать отсюда. }
     Add(KWR_LINE_END_CRLF);
     Add(KWR_LINE_END_LF  );
     Add(KWR_LINE_END_CR  );
@@ -872,12 +915,13 @@ end;
 
 { TLocator }
 
-constructor TLocator.Create(_Parser: TCustomStringParser);
+constructor TLocator.Create(_Parser: TCustomStringParser; _NativeException: Boolean);
 begin
 
   inherited Create;
 
   FParser           := _Parser;
+  FNativeException  := _NativeException;
   FLastElementStart := 1;
 
   with FParser do begin
@@ -908,8 +952,6 @@ begin
 end;
 
 procedure TLocator.ParserOnRead(_InternalRead: TObjProc; _Nested: Boolean);
-var
-  Line, Column, Position: Int64;
 begin
 
   try
@@ -923,20 +965,14 @@ begin
       if _Nested then raise
       else
 
-        GetLocation(Line, Column, Position);
+        if FNativeException then
 
-        { TODO 4 -oVasilyevSM -cTLocatingStringParser: ѕерегенераци€ на выбор, Native/Parametrized. Ёто Native, а тип
-          Parametrized должен генерировать исключение другого класса с параметрами: ссылка на класс исходного
-          исключени€, его Message и набор локации, Line, Column, Position. }
-        raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Column: %d, Position: %d', [
+          { Ћокаци€ должна полностью совпадать с Notepad и Notepad++. }
+          with Location do
+            raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Column: %d, Position: %d', [
+                E.Message, Line, Column, Position])
 
-            E.Message,
-            { Ћокаци€ должна полностью совпадать с Notepad и Notepad++. }
-            Line,
-            Column,
-            Position
-
-        ]);
+        else raise ELocatedException.Create(ExceptClass(E.ClassType), E.Message, Location);
 
     end;
 
@@ -954,20 +990,19 @@ begin
   FParser := nil;
 end;
 
-procedure TLocator.GetLocation(var _Line, _Column, _Position: Int64);
+function TLocator.Location: TLocation;
 var
   i, LineStart: Int64;
   Source: String;
 begin
 
-  { TODO 4 -oVasilyevSM -cuCustomStringParams: _bug0001.ini }
-  _Position := FLastElementStart;
-  _Line := 1;
+  Result.Position := FLastElementStart;
+  Result.Line := 1;
   LineStart := 1;
 
   Source := FParser.Source;
   i := 2;
-  while i <= _Position do begin
+  while i <= Result.Position do begin
 
     if
 
@@ -976,7 +1011,7 @@ begin
 
     then begin
 
-      Inc(_Line);
+      Inc(Result.Line);
       LineStart := i;
 
     end;
@@ -985,7 +1020,7 @@ begin
 
   end;
 
-  _Column := _Position - LineStart + 1;
+  Result.Column := Result.Position - LineStart + 1;
 
 end;
 
@@ -1000,6 +1035,19 @@ end;
 constructor EStringParserException.CreateFmt(const _Message: String; const _Args: array of const; _CheckPoint: Boolean);
 begin
   Create(Format(_Message, _Args), _CheckPoint);
+end;
+
+{ ELocatedException }
+
+constructor ELocatedException.Create;
+begin
+
+  inherited Create('Parser read exception was occured.');
+
+  FInitExceptionClass := _InitExceptionClass;
+  FInitMessage        := _InitMessage;
+  FLocation           := _Location;
+
 end;
 
 { TKeyWordHelper }
@@ -1018,6 +1066,17 @@ procedure TKeyWordHelper.SetKeyType(const _Value: TKeyType);
 begin
   if Integer(_Value) <> KeyTypeInternal then
     KeyTypeInternal := Integer(_Value);
+end;
+
+{ TLocation }
+
+constructor TLocation.Create(_Line, _Column, _Position: Int64);
+begin
+
+  Line     := _Line;
+  Column   := _Column;
+  Position := _Position;
+
 end;
 
 end.
