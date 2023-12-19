@@ -76,9 +76,14 @@ type
 
     TComment = record
 
-      Text: String;
+    strict private
+
       Opening: String;
       Closing: String;
+
+    private
+
+      Text: String;
       Anchor: TCommentAnchor;
       Short: Boolean;
 
@@ -91,6 +96,8 @@ type
         _Short: Boolean
 
       );
+      procedure GetMargins(_SingleString: Boolean; var _Opening, _Closing: String);
+      procedure ReplaceAnchor(_Anchor: TCommentAnchor);
 
     end;
 
@@ -117,9 +124,8 @@ type
           var _Value: String;
           _Anchor: TCommentAnchor;
           _SingleString: Boolean;
-          _First: Boolean;
-          _Last: Boolean;
-          _LastShort: Boolean;
+          _FirstParam: Boolean;
+          _LastParam: Boolean;
           _Nested: Boolean
 
       );
@@ -135,7 +141,9 @@ type
           _Short: Boolean
 
       );
-      function GetBlock(_Anchor: TCommentAnchor; _SingleString, _First, _Last, _Nested: Boolean): String;
+      function GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
+
+      function LastIsShort: Boolean;
 
     end;
 
@@ -167,8 +175,7 @@ type
 
     function ParamClass: TParamClass; override;
     function ParamsReaderClass: TParamsReaderClass; override;
-    function FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String; override;
-    function FormatParam1(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
+    function FormatParam(_Param: TParam; _Value: String; _FirstParam, _LastParam: Boolean): String; override;
 
   end;
 
@@ -326,6 +333,29 @@ begin
   
 end;
 
+procedure TUserParam.TComment.GetMargins(_SingleString: Boolean; var _Opening, _Closing: String);
+begin
+
+  if Short and _SingleString then begin
+
+    _Opening := '(*';
+    _Closing := '*)';
+
+  end else begin
+
+    _Opening := Opening;
+    if Short then _Closing := CRLF
+    else _Closing := Closing;
+
+  end;
+
+end;
+
+procedure TUserParam.TComment.ReplaceAnchor(_Anchor: TCommentAnchor);
+begin
+  Anchor := _Anchor;
+end;
+
 { TUserParam.TCommentList }
 
 procedure TUserParam.TCommentList.AddComment;
@@ -333,7 +363,7 @@ begin
   inherited Add(TComment.Create(_Value, _Opening, _Closing, _Anchor, _Short));
 end;
 
-function TUserParam.TCommentList.GetBlock(_Anchor: TCommentAnchor; _SingleString, _First, _Last, _Nested: Boolean): String;
+function TUserParam.TCommentList.GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
 const
 
   LongSplitter = {$IFDEF FORMATCOMMENTDEBUG}'#'{$ELSE}' '{$ENDIF};
@@ -344,34 +374,27 @@ var
 
   function _GetValue(_Short: Boolean): String;
   var
-    Opn, Cls, RightField: String;
+    Opening, Closing, RightField: String;
   begin
 
     with Comment do begin
 
-      { TODO -oVasilyevSM -cuUserParams: Метод TComment.Get(var L, R), а потом только корректировать L и R. }
-      if _Short and _SingleString then Opn := '(*'
-      else Opn := Opening;
+      GetMargins(_SingleString, Opening, Closing);
 
-      if _Short then
-        if _SingleString then Cls := '*)'
-        else Cls := CRLF
-      else Cls := Closing;
-
+      { Разделитель комментариев в блоке }
       if _Short and not _SingleString then Splitter := ''
       else Splitter := LongSplitter;
 
-      { "Поля" вокруг текста одного комментария внутри его скобок. }
+      { "Поля" вокруг текста одного комментария внутри его границ. }
       if _Short then RightField := ''
       else RightField := ' ';
 
-
       Result := Format('%s %s%s%s%s', [
 
-          Opn,
+          Opening,
           {$IFDEF FORMATCOMMENTDEBUG}CommentAnchorToStr(_Anchor) + ':' + {$ENDIF}Text,
           RightField,
-          Cls,
+          Closing,
           Splitter
 
       ]);
@@ -382,43 +405,19 @@ var
 
 var
   Search: TUserParam.TCommentList;
-  LastShort: Boolean;
 begin
 
-  { TODO 1 -oVasilyevSM -cFormatParam: Нужен метод Search(StartAt, Anchor). Или привычно, Find(Anchor, var Comment):
-    Boolean, которым можно пробежать по списку с учетом признака Anchor. Будет удобнее здесь орудовать. Цикл может быть
-    какой-нибудь while и тогда еще можно будет First и Last контролировать.
+  { TODO 1 -oVasilyevSM -cFormatParam: В режиме Untyped комментарии типа должны складываться в BeforeValue. }
 
-    Нужно избавиться от смены порядка Value + Splitter / Splitter + Value. Постараться управлять начальным и конечным
-    разделителем после обработки цикла.
-
-    Splitter сбрасывается один раз, в Short SingleString. И там он, получается, играет роль отступа. Именно поэтому там
-    не меняется порядок Splitter + Value, причем, он обратный. Следовательно, в остальных обработках он играет двойную
-    роль, разделителя и отступа одновременно. В этом-то вся и проблема. Трудно форматировать по шаблону снаружи, не
-    зная, что вернется изнутри. Должен быть отдельный Offset и добавляться перед перед циклом всегда и после цикла
-    только в режиме SingleString. А сплиттер - только в конце и в не SingleString - кроме последнего. В режиме
-    MultiString Short просто использовать Closing для отделения кмментариев друг от друга. Похоже, придется в
-    некоторых случаях делать Cut после цикла, чтобы сбросить последний сплиттер. *** - и тогда Search не нужен, а только
-    функция GetAll(Anchor), которая вернет их правильно разделенными без указания отсюда. Сама разберется, Short - нет,
-    Long - да. А здесь только Offset в конце надо умно добавить и то не факт. Возможно, это дело функции Format. }
-
-    { TODO 1 -oVasilyevSM -cFormatParam: В режиме Untyped комментарии типа должны складываться в BeforeValue... }
-
-  Result    := '';
-  Splitter  := '';
-  LastShort := False;
+  Result        := '';
+  Splitter      := '';
 
   Search := Filter(_Anchor);
   try
 
     for Comment in Search do
-
-      with Comment do begin
-
+      with Comment do
         Result := Result + _GetValue(Short);
-        LastShort := Short;
-
-      end;
 
   finally
     Search.Free;
@@ -426,9 +425,14 @@ begin
 
   { Как раз последний разделитель значений нужно отрезать, неважно, какие были в цикле. }
   CutStr(Result, Length(Splitter));
-  { Отступы справа и слева блока комментариев }
-  ProcessOffsets(Result, _Anchor, _SingleString, _First, _Last, LastShort, _Nested);
+  { Отступы справа и слева всего блока комментариев }
+  ProcessOffsets(Result, _Anchor, _SingleString, _FirstParam, _LastParam, _Nested);
 
+end;
+
+function TUserParam.TCommentList.LastIsShort: Boolean;
+begin
+  Result := Last.Short;
 end;
 
 procedure TUserParam.TCommentList.ProcessOffsets;
@@ -440,8 +444,8 @@ procedure TUserParam.TCommentList.ProcessOffsets;
 
         Integer(_Anchor) shl 3 or
         BooleanToInt(_SingleString) shl 2 or
-        BooleanToInt(_First) shl 1 or
-        BooleanToInt(_Last);
+        BooleanToInt(_FirstParam) shl 1 or
+        BooleanToInt(_LastParam);
 
   end;
 
@@ -451,87 +455,87 @@ const
 
   RA_OffsetSetting: array [0..71] of TOffsetInfoReply = (
 
-    { Anchor              Single First  Last  }
-    { caBeforeParam       False  False  False } (LeftOffset: '';     RightOffset: CRLF  ),
-    { caBeforeParam       False  False  True  } (LeftOffset: '';     RightOffset: CRLF  ),
-    { caBeforeParam       False  True   False } (LeftOffset: '';     RightOffset: CRLF  ),
-    { caBeforeParam       False  True   True  } (LeftOffset: '';     RightOffset: CRLF  ),
-    { caBeforeParam       True   False  False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeParam       True   False  True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeParam       True   True   False } (LeftOffset: Offset; RightOffset: Offset),
-    { caBeforeParam       True   True   True  } (LeftOffset: Offset; RightOffset: Offset),
+    { Anchor              SingleString FirstParam  LastParam }
+    { caBeforeParam       False        False       False } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False        False       True  } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False        True        False } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False        True        True  } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       True         False       False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       True         False       True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       True         True        False } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeParam       True         True        True  } (LeftOffset: Offset; RightOffset: Offset),
 
-    { caBeforeName        False  False  False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        False  False  True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        False  True   False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        False  True   True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        True   False  False } (LeftOffset: Offset; RightOffset: Offset),
-    { caBeforeName        True   False  True  } (LeftOffset: Offset; RightOffset: Offset),
-    { caBeforeName        True   True   False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        True   True   True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False        False       False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False        False       True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False        True        False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False        True        True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True         False       False } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeName        True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeName        True         True        False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True         True        True  } (LeftOffset: '';     RightOffset: Offset),
 
-    { caAfterName         False  False  False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         False  False  True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         False  True   False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         False  True   True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         True   False  False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         True   False  True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         True   True   False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         True   True   True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False        False       False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False        False       True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False        True        False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False        True        True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True         False       False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True         False       True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True         True        False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
 
-    { caBeforeType        False  False  False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        False  False  True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        False  True   False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        False  True   True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        True   False  False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        True   False  True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        True   True   False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        True   True   True  } (LeftOffset: '';     RightOffset: Offset),
-    { caAfterType         False  False  False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False        False       False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False        False       True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False        True        False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False        True        True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True         False       False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True         False       True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True         True        False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True         True        True  } (LeftOffset: '';     RightOffset: Offset),
 
-    { caAfterType         False  False  True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         False  True   False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         False  True   True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         True   False  False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         True   False  True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         True   True   False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         True   True   True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False        False       False } (LeftOffset: '';     RightOffset: Offset),
+    { caAfterType         False        False       True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False        True        False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False        True        True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True         False       False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True         False       True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True         True        False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
 
-    { caBeforeValue       False  False  False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       False  False  True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       False  True   False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       False  True   True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       True   False  False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       True   False  True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       True   True   False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       True   True   True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False        False       False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False        False       True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False        True        False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False        True        True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True         False       False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True         False       True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True         True        False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True         True        True  } (LeftOffset: '';     RightOffset: Offset),
 
-    { caAfterValue        False  False  False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        False  False  True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        False  True   False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        False  True   True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        True   False  False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        True   False  True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        True   True   False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        True   True   True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False        False       False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False        False       True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False        True        False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False        True        True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True         False       False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True         False       True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True         True        False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
 
-    { caAfterParam        False  False  False } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False  False  True  } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False  True   False } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False  True   True  } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        True   False  False } (LeftOffset: Offset; RightOffset: Offset),
-    { caAfterParam        True   False  True  } (LeftOffset: Offset; RightOffset: Offset),
-    { caAfterParam        True   True   False } (LeftOffset: Offset; RightOffset: Offset),
-    { caAfterParam        True   True   True  } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        False        False       False } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False        False       True  } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False        True        False } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False        True        True  } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        True         False       False } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True         True        False } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True         True        True  } (LeftOffset: Offset; RightOffset: Offset),
 
-    { caInsideEmptyParams False  False  False } (LeftOffset: CRLF;   RightOffset: CRLF  ),
-    { caInsideEmptyParams False  False  True  } (LeftOffset: CRLF;   RightOffset: CRLF  ),
-    { caInsideEmptyParams False  True   False } (LeftOffset: CRLF;   RightOffset: CRLF  ),
-    { caInsideEmptyParams False  True   True  } (LeftOffset: CRLF;   RightOffset: CRLF  ),
-    { caInsideEmptyParams True   False  False } (LeftOffset: Offset; RightOffset: Offset),
-    { caInsideEmptyParams True   False  True  } (LeftOffset: Offset; RightOffset: Offset),
-    { caInsideEmptyParams True   True   False } (LeftOffset: Offset; RightOffset: Offset),
-    { caInsideEmptyParams True   True   True  } (LeftOffset: Offset; RightOffset: Offset)
+    { caInsideEmptyParams False        False       False } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False        False       True  } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False        True        False } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False        True        True  } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams True         False       False } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True         True        False } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True         True        True  } (LeftOffset: Offset; RightOffset: Offset)
 
   );
 
@@ -546,7 +550,7 @@ begin
     if not _Nested and (_Anchor in [caBeforeParam, caBeforeName]) then
       LeftOffset := '';
 
-    if _LastShort and not _SingleString then
+    if LastIsShort and not _SingleString then
       RightOffset := '';
 
     _Value := LeftOffset + _Value + RightOffset;
@@ -605,7 +609,7 @@ begin
   Result := TUserParamsReader;
 end;
 
-function TUserParams.FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
+function TUserParams.FormatParam(_Param: TParam; _Value: String; _FirstParam, _LastParam: Boolean): String;
 const
 
   SC_VALUE_TYPED   = '%5:s%6:s%0:s%7:s: %8:s%1:s%9:s%3:s= %10:s%2:s%11:s%4:s%12:s';
@@ -638,10 +642,11 @@ var
 
   end;
 
-  procedure _FormatParams;
+  procedure _FormatParams(_LastIsShort: Boolean);
   begin
     if SingleString then _Value := Format('(%s)', [_Value])
-    else _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1)+ CRLF]);
+    else if _LastIsShort then _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1)])
+    else _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1) + CRLF]);
   end;
 
 var
@@ -654,29 +659,24 @@ begin
   if Typed then ParamFormat := SC_VALUE_TYPED
   else ParamFormat := SC_VALUE_UNTYPED;
 
-  (* Splitter *)
-  if _Last then Splitter := ''
-  else if SingleString then Splitter := ';'
-  else Splitter := CRLF;
-
-  if _Param.DataType = dtParams then
-    _FormatParams;
-
   with _Param as TUserParam do begin
 
-    BeforeParam       := Comments.GetBlock(caBeforeParam,       SingleString, _First, _Last, Nested);
-    BeforeName        := Comments.GetBlock(caBeforeName,        SingleString, _First, _Last, Nested);
-    AfterName         := Comments.GetBlock(caAfterName,         SingleString, _First, _Last, Nested);
-    BeforeType        := Comments.GetBlock(caBeforeType,        SingleString, _First, _Last, Nested);
-    AfterType         := Comments.GetBlock(caAfterType,         SingleString, _First, _Last, Nested);
-    BeforeValue       := Comments.GetBlock(caBeforeValue,       SingleString, _First, _Last, Nested);
-    AfterValue        := Comments.GetBlock(caAfterValue,        SingleString, _First, _Last, Nested);
-    AfterParam        := Comments.GetBlock(caAfterParam,        SingleString, _First, _Last, Nested);
-    InsideEmptyParams := Comments.GetBlock(caInsideEmptyParams, SingleString, _First, _Last, Nested);
+    if _Param.DataType = dtParams then
+      _FormatParams(Comments.LastIsShort);
 
-    { TODO 3 -oVasilyevSM -cFormatParam: После значения типа Параметры добавляется лишний CRLF в конец блока
-      комментариев. Это делается здесь и он есть Splitter. Но выключать это нужно только если последний комментарий в
-      блоке AfterValue короткий. (* Splitter *) сюда и анализировать в нем новую переменную типа LastWasShort. }
+    BeforeParam       := Comments.GetBlock(caBeforeParam,       SingleString, _FirstParam, _LastParam, Nested);
+    BeforeName        := Comments.GetBlock(caBeforeName,        SingleString, _FirstParam, _LastParam, Nested);
+    AfterName         := Comments.GetBlock(caAfterName,         SingleString, _FirstParam, _LastParam, Nested);
+    BeforeType        := Comments.GetBlock(caBeforeType,        SingleString, _FirstParam, _LastParam, Nested);
+    AfterType         := Comments.GetBlock(caAfterType,         SingleString, _FirstParam, _LastParam, Nested);
+    BeforeValue       := Comments.GetBlock(caBeforeValue,       SingleString, _FirstParam, _LastParam, Nested);
+    AfterValue        := Comments.GetBlock(caAfterValue,        SingleString, _FirstParam, _LastParam, Nested);
+    AfterParam        := Comments.GetBlock(caAfterParam,        SingleString, _FirstParam, _LastParam, Nested);
+    InsideEmptyParams := Comments.GetBlock(caInsideEmptyParams, SingleString, _FirstParam, _LastParam, Nested);
+
+    if _LastParam then Splitter := ''
+    else if SingleString then Splitter := ';'
+    else Splitter := CRLF;
     Result := Format(ParamFormat, [
 
         {  0 } Name,
@@ -696,108 +696,6 @@ begin
     ]);
 
   end;
-
-end;
-
-function TUserParams.FormatParam1(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
-const
-
-  SC_VALUE_TYPED   = '%5:s%6:s%0:s%7:s: %8:s%1:s%9:s%3:s= %10:s%2:s%11:s%4:s%12:s';
-  SC_VALUE_UNTYPED = '%5:s%6:s%0:s%7:s%3:s= %10:s%2:s%11:s%4:s%12:s';
-
-var
-  ParamFormat: String;
-  BeforeParam, BeforeName, AfterName, BeforeType, AfterType, BeforeValue, AfterValue, AfterParam, InsideEmptyParams: String;
-  Splitter, BeforeAssigningSpace: String;
-  SingleString, Typed: Boolean;
-  L: Integer;
-begin
-
-  Typed := not (soTypesFree in SaveToStringOptions);
-  SingleString := soSingleString in SaveToStringOptions;
-
-  if Typed then ParamFormat := SC_VALUE_TYPED
-  else ParamFormat := SC_VALUE_UNTYPED;
-
-  if SingleString then
-    if _Last then Splitter := ' '
-    else Splitter := ';'
-  else
-    if _Last then Splitter := ''
-    else Splitter := CRLF;
-
-  with _Param as TUserParam do begin
-
-//    BeforeParam       := Comments.Get(caBeforeParam,       SingleString, Typed);
-//    BeforeName        := Comments.Get(caBeforeName,        SingleString, Typed);
-//    AfterName         := Comments.Get(caAfterName,         SingleString, Typed);
-//    BeforeType        := Comments.Get(caBeforeType,        SingleString, Typed);
-//    AfterType         := Comments.Get(caAfterType,         SingleString, Typed);
-//    BeforeValue       := Comments.Get(caBeforeValue,       SingleString, Typed);
-//    AfterValue        := Comments.Get(caAfterValue,        SingleString, Typed);
-//    AfterParam        := Comments.Get(caAfterParam,        SingleString, Typed);
-//    InsideEmptyParams := Comments.Get(caInsideEmptyParams, SingleString, Typed);
-
-    { Если перед '=' был короткий комментарий, то это '=' оказывается на следующей строке. Поэтому только в этом случае
-      перед '=' пробел не нужен. И это два варианта, для выгрузки с типами - после типа, без типов - после имени. }
-    if Typed then begin
-
-      L := Length(AfterType);
-      if (L >= 2) and (Copy(AfterType, L - 1, 2) = CRLF) then BeforeAssigningSpace := ''
-      else BeforeAssigningSpace := ' ';
-
-    end else begin
-
-      L := Length(AfterName);
-      if (L >= 2) and (Copy(AfterName, L - 1, 2) = CRLF) then BeforeAssigningSpace := ''
-      else BeforeAssigningSpace := ' ';
-
-    end;
-
-    if DataType = dtParams then begin
-
-      if Length(_Value) = 0 then _Value := InsideEmptyParams
-      else if not SingleString then _Value := _Value + CRLF;
-
-      if SingleString then
-
-        if Length(_Value) = 0  then _Value := '()'
-        else _Value := Format('( %s)', [_Value])
-
-      else begin
-
-        _Value := Format('(%s%s)', [CRLF, ShiftText(_Value, 1)]);
-
-        L := Length(AfterValue);
-        if (L >= 2) and (Copy(AfterValue, L - 1, 2) = CRLF) then
-          AfterValue := Copy(AfterValue, 1, L - 2);
-
-      end;
-
-    end;
-
-    Result := Format(ParamFormat, [
-
-        {  0 } Name,
-        {  1 } ParamDataTypeToStr(DataType),
-        {  2 } _Value,
-        {  3 } BeforeAssigningSpace,
-        {  4 } Splitter,
-        {  5 } BeforeParam,
-        {  6 } BeforeName,
-        {  7 } AfterName,
-        {  8 } BeforeType,
-        {  9 } AfterType,
-        { 10 } BeforeValue,
-        { 11 } AfterValue,
-        { 12 } AfterParam
-
-    ]);
-
-  end;
-
-  if SingleString and not _First then
-    Result := ' ' + Result;
 
 end;
 
@@ -842,7 +740,7 @@ begin
     for i := 0 to CurrentComments.Count - 1 do
       with CurrentComments[i] do
         if Anchor = caBeforeName then
-          CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
+          CurrentComments[i].ReplaceAnchor(caBeforeParam);
 
 end;
 
@@ -855,7 +753,7 @@ begin
 
     for i := 0 to CurrentComments.Count - 1 do
       with CurrentComments[i] do
-        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caAfterParam, Short);
+        CurrentComments[i].ReplaceAnchor(caAfterParam);
 
     CurrentParam.Comments.AddRange(CurrentComments);
     CurrentComments.Clear;
@@ -887,8 +785,7 @@ begin
   ParamComments := (_Param as TUserParam).Comments;
 
   for i := 0 to CurrentComments.Count - 1 do
-    with CurrentComments[i] do
-      ParamComments.AddComment(Text, Opening, Closing, caInsideEmptyParams, Short);
+    ParamComments.Add(CurrentComments[i]);
 
   CurrentComments.Clear;
 
