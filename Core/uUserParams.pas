@@ -76,14 +76,9 @@ type
 
     TComment = record
 
-    strict private
-
+      Text: String;
       Opening: String;
       Closing: String;
-
-    private
-
-      Text: String;
       Anchor: TCommentAnchor;
       Short: Boolean;
 
@@ -97,7 +92,6 @@ type
 
       );
       procedure GetMargins(_SingleString: Boolean; var _Opening, _Closing: String);
-      procedure ReplaceAnchor(_Anchor: TCommentAnchor);
 
     end;
 
@@ -134,7 +128,7 @@ type
 
       procedure AddComment(
 
-          const _Value: String;
+          const _Text: String;
           const _Opening: String;
           const _Closing: String;
           _Anchor: TCommentAnchor;
@@ -355,16 +349,11 @@ begin
 
 end;
 
-procedure TUserParam.TComment.ReplaceAnchor(_Anchor: TCommentAnchor);
-begin
-  Anchor := _Anchor;
-end;
-
 { TUserParam.TCommentList }
 
 procedure TUserParam.TCommentList.AddComment;
 begin
-  inherited Add(TComment.Create(_Value, _Opening, _Closing, _Anchor, _Short));
+  inherited Add(TComment.Create(_Text, _Opening, _Closing, _Anchor, _Short));
 end;
 
 function TUserParam.TCommentList.GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
@@ -378,12 +367,12 @@ var
 
   function _GetValue(_Short: Boolean): String;
   var
-    Opening, Closing, RightField: String;
+    LeftMargin, RightMargin, RightField: String;
   begin
 
     with Comment do begin
 
-      GetMargins(_SingleString, Opening, Closing);
+      GetMargins(_SingleString, LeftMargin, RightMargin);
 
       { Разделитель комментариев в блоке }
       if _Short and not _SingleString then Splitter := ''
@@ -395,10 +384,10 @@ var
 
       Result := Format('%s %s%s%s%s', [
 
-          Opening,
+          LeftMargin,
           {$IFDEF FORMATCOMMENTDEBUG}CommentAnchorToStr(_Anchor) + ':' + {$ENDIF}Text,
           RightField,
-          Closing,
+          RightMargin,
           Splitter
 
       ]);
@@ -661,9 +650,18 @@ var
 
   procedure _FormatParams(_LastIsShort: Boolean);
   begin
-    if SingleString then _Value := Format('(%s)', [_Value])
-    else if _LastIsShort then _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1)])
-    else _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1) + CRLF]);
+
+    if Length(_Value) = 0 then begin
+
+      if SingleString then _Value := Format('(%s)', [InsideEmptyParams])
+      else _Value := Format('(%s)', [ShiftText(InsideEmptyParams, 1)])
+
+    end else
+
+      if SingleString then _Value := Format('(%s)', [_Value])
+      else if _LastIsShort then _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1)])
+      else _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1) + CRLF]);
+
   end;
 
   function _CheckLastCRLF: Boolean;
@@ -688,9 +686,6 @@ begin
 
   with _Param as TUserParam do begin
 
-    if _Param.DataType = dtParams then
-      _FormatParams(Comments.LastIsShort);
-
     BeforeParam       := Comments.GetBlock(caBeforeParam,       SingleString, _FirstParam, _LastParam, Nested);
     BeforeName        := Comments.GetBlock(caBeforeName,        SingleString, _FirstParam, _LastParam, Nested);
     AfterName         := Comments.GetBlock(caAfterName,         SingleString, _FirstParam, _LastParam, Nested);
@@ -701,9 +696,13 @@ begin
     AfterParam        := Comments.GetBlock(caAfterParam,        SingleString, _FirstParam, _LastParam, Nested);
     InsideEmptyParams := Comments.GetBlock(caInsideEmptyParams, SingleString, _FirstParam, _LastParam, Nested);
 
+    if _Param.DataType = dtParams then
+      _FormatParams(Comments.LastIsShort);
+
     if _CheckLastCRLF then Splitter := ''
     else if SingleString then Splitter := ';'
     else Splitter := CRLF;
+
     Result := Format(ParamFormat, [
 
         {  0 } Name,
@@ -767,7 +766,7 @@ begin
     for i := 0 to CurrentComments.Count - 1 do
       with CurrentComments[i] do
         if Anchor = caBeforeName then
-          CurrentComments[i].ReplaceAnchor(caBeforeParam);
+          CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
 
 end;
 
@@ -780,7 +779,7 @@ begin
 
     for i := 0 to CurrentComments.Count - 1 do
       with CurrentComments[i] do
-        CurrentComments[i].ReplaceAnchor(caAfterParam);
+        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caAfterParam, Short);
 
     CurrentParam.Comments.AddRange(CurrentComments);
     CurrentComments.Clear;
@@ -803,7 +802,7 @@ end;
 
 procedure TUserParamsReader.AfterReadParams(_Param: TParam);
 var
-  i: Integer;
+  Comment: TUserParam.TComment;
   ParamComments: TUserParam.TCommentList;
 begin
 
@@ -811,8 +810,9 @@ begin
 
   ParamComments := (_Param as TUserParam).Comments;
 
-  for i := 0 to CurrentComments.Count - 1 do
-    ParamComments.Add(CurrentComments[i]);
+  for Comment in CurrentComments do
+    with Comment do
+      ParamComments.AddComment(Text, Opening, Closing, caInsideEmptyParams, Short);
 
   CurrentComments.Clear;
 
