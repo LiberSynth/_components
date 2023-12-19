@@ -27,8 +27,8 @@ unit uUserParams;
 
 { TODO 2 -oVasilyevSM -cTuUserParams: ”борка }
 { TODO 3 -oVasilyevSM -cTuUserParams: ≈сть еще один кейс - пустой файл только с комментари€ми }
-{ TODO 5 -oVasilyevSM -cTUserFormatParams: Ќужны параметры, хран€щие исходное форматирование. ¬сю строку между элементами
-  запоминать там и потом выбрасывать в строку. }
+{ TODO 5 -oVasilyevSM -cTUserFormatParams: Ќужны параметры, хран€щие исходное форматирование. ¬сю строку между
+  элементами запоминать в объект и потом выбрасывать в обратно строку в исходном виде, что бы там ни было. }
 
 {
 
@@ -144,6 +144,7 @@ type
       function GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
 
       function LastIsShort: Boolean;
+      function Contains(_Anchor: TCommentAnchor): Boolean;
 
     end;
 
@@ -243,6 +244,7 @@ type
 
     function CanClose(_Parser: TCustomStringParser): Boolean; override;
     procedure Opened(_Parser: TCustomStringParser); override;
+    procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
 
@@ -287,6 +289,7 @@ type
 function CommentAnchorToStr(Value: TCommentAnchor): String;
 const
 
+  {$IFDEF FORMATCOMMENTDEBUG}
   SA_StringValues: array[TCommentAnchor] of String = (
 
       { caBeforeParam       } 'BP',
@@ -300,21 +303,22 @@ const
       { caInsideEmptyParams } 'IP'
 
   );
+  {$ELSE}
+  SA_StringValues: array[TCommentAnchor] of String = (
 
-//  SA_StringValues: array[TCommentAnchor] of String = (
-//
-//      { caBeforeParam       } 'BeforeParam',
-//      { caBeforeName        } 'BeforeName',
-//      { caAfterName         } 'AfterName',
-//      { caBeforeType        } 'BeforeType',
-//      { caAfterType         } 'AfterType',
-//      { caBeforeValue       } 'BeforeValue',
-//      { caAfterValue        } 'AfterValue',
-//      { caAfterParam        } 'AfterParam',
-//      { caInsideEmptyParams } 'InsideEmptyParams'
-//
-//  );
-//
+      { caBeforeParam       } 'BeforeParam',
+      { caBeforeName        } 'BeforeName',
+      { caAfterName         } 'AfterName',
+      { caBeforeType        } 'BeforeType',
+      { caAfterType         } 'AfterType',
+      { caBeforeValue       } 'BeforeValue',
+      { caAfterValue        } 'AfterValue',
+      { caAfterParam        } 'AfterParam',
+      { caInsideEmptyParams } 'InsideEmptyParams'
+
+  );
+  {$ENDIF}
+
 begin
   Result := SA_StringValues[Value];
 end;
@@ -432,7 +436,7 @@ end;
 
 function TUserParam.TCommentList.LastIsShort: Boolean;
 begin
-  Result := Last.Short;
+  Result := (Count > 0) and Last.Short;
 end;
 
 procedure TUserParam.TCommentList.ProcessOffsets;
@@ -559,6 +563,19 @@ begin
 
 end;
 
+function TUserParam.TCommentList.Contains(_Anchor: TCommentAnchor): Boolean;
+var
+  Item: TComment;
+begin
+
+  for Item in Self do
+    if Item.Anchor = _Anchor then
+      Exit(True);
+
+  Result := False;
+
+end;
+
 function TUserParam.TCommentList.Filter(_Anchor: TCommentAnchor): TCommentList;
 var
   Comment: TComment;
@@ -649,6 +666,16 @@ var
     else _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1) + CRLF]);
   end;
 
+  function _CheckLastCRLF: Boolean;
+  var
+    L: Integer;
+  begin
+    { Ёто совсем подбор, конечно, но оно за гранью всей логики. ¬ том месте, где должна заканчиватьс€ строка просто
+      может быть уже есть CRLF от короткого комментари€. Ёто и провер€ем, чтобы пуста€ строка не добавилась лишн€€. }
+    L := Length(AfterValue);
+    Result := (L > 1) and ((Copy(AfterValue, L - 1, 2) = CRLF) or _LastParam);
+  end;
+
 var
   ParamFormat, Splitter: String;
 begin
@@ -674,7 +701,7 @@ begin
     AfterParam        := Comments.GetBlock(caAfterParam,        SingleString, _FirstParam, _LastParam, Nested);
     InsideEmptyParams := Comments.GetBlock(caInsideEmptyParams, SingleString, _FirstParam, _LastParam, Nested);
 
-    if _LastParam then Splitter := ''
+    if _CheckLastCRLF then Splitter := ''
     else if SingleString then Splitter := ';'
     else Splitter := CRLF;
     Result := Format(ParamFormat, [
@@ -858,6 +885,17 @@ end;
 function TCustomCommentRegion.CanClose(_Parser: TCustomStringParser): Boolean;
 begin
   Result := Executed;
+end;
+
+procedure TCustomCommentRegion.Closed(_Parser: TCustomStringParser);
+begin
+
+  inherited Closed(_Parser);
+
+  with _Parser as TParamsReader do
+    if (ElementType = etValue) and (CursorStanding = stAfter) then
+      KeyEvent(KWR_LINE_END_CRLF);
+
 end;
 
 procedure TCustomCommentRegion.Opened(_Parser: TCustomStringParser);

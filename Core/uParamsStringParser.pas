@@ -150,7 +150,6 @@ type
     procedure ReadParams; virtual; abstract;
     function IsParamsType: Boolean; virtual; abstract;
 
-    property ElementType: TElementType read FElementType write FElementType;
     property Reading: TReadInfoList read FReading;
     property DoublingChar: Char read FDoublingChar write FDoublingChar;
 
@@ -164,6 +163,8 @@ type
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
     procedure ProcessElement; override;
     procedure ToggleElement(_KeyWord: TKeyWord); override;
+
+    property ElementType: TElementType read FElementType write FElementType;
 
   end;
 
