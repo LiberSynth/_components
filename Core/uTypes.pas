@@ -34,7 +34,7 @@ type
   TIntegerArray = TArray<Integer>;
   TStringArray = TArray<String>;
 
-  BLOB = RawByteString; // RawByteString is too long to write everywhere ;)
+  BLOB = RawByteString; { RawByteString is too long to write everywhere. }
 
   TBOM = (bomForward, bomBackward);
 

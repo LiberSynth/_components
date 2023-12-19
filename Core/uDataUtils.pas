@@ -154,16 +154,37 @@ function Min(const Values: array of Int64): Int64; overload;
 function Max(const Values: array of Int64): Int64; overload;
 
 procedure AddToIntArray(var IntArray: TIntegerArray; const Value: Integer; Sorted: Boolean = False);
-function ExistsInIntArray(const IntArray: TIntegerArray; const Value: Integer): Boolean;
+function Contains(const IntArray: TIntegerArray; const Value: Integer): Boolean;
+
+procedure Invert(var Value: Byte); overload;
+procedure Invert(var Value: Word); overload;
+procedure Invert(var Value: Integer); overload;
 
 type
 
   { TODO 3 -oVasilyevSM -cuDataUtils: Точно нельзя без класса никак? И еще, не только для строк можно? }
-  Matrix = class abstract
+  { TODO 3 -oVasilyevSM -cuDataUtils: Еще похимичить. Не вполне универсально. }
+  Matrix<TKey, TReply> = class abstract
 
   public
 
-    class function Get<T>(Value: T; const Map: array of String): String;
+    class function Get(Index: TKey; const Map: TArray<TReply>): TReply;
+
+  end;
+
+  MatrixR<TReply> = class abstract
+
+  public
+
+    class function Get<TKey>(Index: TKey; const Map: TArray<TReply>): TReply;
+
+  end;
+
+  StrMatrix = class abstract
+
+  public
+
+    class function Get<T>(Index: T; const Map: array of String): String;
 
   end;
 
@@ -990,7 +1011,7 @@ begin
 
 end;
 
-function ExistsInIntArray(const IntArray: TIntegerArray; const Value: Integer): Boolean;
+function Contains(const IntArray: TIntegerArray; const Value: Integer): Boolean;
 var
   Item: Integer;
 begin
@@ -1003,14 +1024,85 @@ begin
 
 end;
 
-{ Matrix<T> }
+procedure Invert(var Value: Byte);
+var
+  i: Byte;
+  Result: Byte;
+begin
+  Result := 0;
+  for i := 0 to 7 do
+    Result := Result xor (1 shl i);
+  Value := Result;
+end;
 
-class function Matrix.Get<T>(Value: T; const Map: array of String): String;
+procedure Invert(var Value: Word);
+var
+  i: Byte;
+  Result: Word;
+begin
+  Result := 0;
+  for i := 0 to 15 do
+    Result := Result xor (1 shl i);
+  Value := Result;
+end;
+
+procedure Invert(var Value: Integer);
+var
+  i: Byte;
+  Result: Integer;
+begin
+  Result := 0;
+  for i := 0 to 31 do
+    Result := Result xor (1 shl i);
+  Value := Result;
+end;
+
+{ Matrix<TReply, TKey> }
+
+class function Matrix<TKey, TReply>.Get(Index: TKey; const Map: TArray<TReply>): TReply;
 var
   B: Byte;
 begin
-  Move(Value, B, 1);
+
+  Move(Index, B, 1);
+
+  if B > High(Map) then
+    raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [B, Low(Map), High(Map)]);
+
   Result := Map[B];
+
+end;
+
+{ MatrixF<TReply> }
+
+class function MatrixR<TReply>.Get<TKey>(Index: TKey; const Map: TArray<TReply>): TReply;
+var
+  B: Byte;
+begin
+
+  Move(Index, B, 1);
+
+  if B > High(Map) then
+    raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [B, Low(Map), High(Map)]);
+
+  Result := Map[B];
+
+end;
+
+{ StrMatrix }
+
+class function StrMatrix.Get<T>(Index: T; const Map: array of String): String;
+var
+  B: Byte;
+begin
+
+  Move(Index, B, 1);
+
+  if B > High(Map) then
+    raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [B, Low(Map), High(Map)]);
+
+  Result := Map[B];
+
 end;
 
 end.

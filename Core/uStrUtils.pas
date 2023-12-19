@@ -127,7 +127,7 @@ function FormatNowToFileName(EmptyZero: Boolean = True): String;
 function StrToArray(Value: String; const Delimiter: String = ';'; DelimBehind: Boolean = True): TStringArray;
 function ArrayToStr(const StrArray: TStringArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String; overload;
 function ArrayToStr(const IntArray: TIntegerArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String; overload;
-function ExistsInArray(const Value: String; const StrArray: TStringArray): Boolean;
+function Contains(const StrArray: TStringArray; const Value: String): Boolean;
 procedure AddToStrArray(
 
     var StrArray: TStringArray;
@@ -1166,7 +1166,7 @@ begin
 
 end;
 
-function ExistsInArray(const Value: String; const StrArray: TStringArray): Boolean;
+function Contains(const StrArray: TStringArray; const Value: String): Boolean;
 var
   S: String;
 begin
@@ -1187,7 +1187,7 @@ begin
   if
 
       (not IgnoreEmpty or (Length(Value) > 0)) and
-      (not Distinct or not ExistsInArray(Value, StrArray))
+      (not Distinct or not Contains(StrArray, Value))
 
   then begin
 
@@ -1234,7 +1234,7 @@ begin
   SetLength(Result, 0);
 
   for S in ArrayA do
-    if ExistsInArray(S, ArrayB) then
+    if Contains(ArrayB, S) then
       AddToStrArray(Result, S);
 
 end;
@@ -1247,7 +1247,7 @@ begin
   SetLength(Result, 0);
 
   for S in ArrayFrom do
-    if not ExistsInArray(S, ArrayToExclude) then
+    if not Contains(ArrayToExclude, S) then
       AddToStrArray(Result, S);
 
 end;
@@ -1259,7 +1259,7 @@ begin
 
   SetLength(Result, 0);
   for S in ArrayA do
-    if not Distinct or not ExistsInArray(S, Result) then
+    if not Distinct or not Contains(Result, S) then
       AddToStrArray(Result, S, Sorted);
 
 end;

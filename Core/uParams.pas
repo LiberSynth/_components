@@ -301,6 +301,7 @@ type
     FItems: TParamList;
     FListHolder: TParamsListHolder;
     FLocation: Boolean;
+    FNested: Boolean;
 
     function Add(const _Name: String): TParam;
 
@@ -354,6 +355,8 @@ type
     function ParamClass: TParamClass; virtual;
     function ParamsReaderClass: TParamsReaderClass; virtual;
     function FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String; virtual;
+
+    property Nested: Boolean read FNested write FNested;
 
   public
 
@@ -846,6 +849,7 @@ procedure TParam.SetAsParams(_Value: TParams);
 begin
   PresetData(dtParams);
   TParams(FData) := _Value;
+  _Value.Nested := True;
 end;
 
 procedure TParam.Clear;

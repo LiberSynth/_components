@@ -25,6 +25,7 @@ unit uUserParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
+{ TODO 2 -oVasilyevSM -cTuUserParams: Уборка }
 { TODO 3 -oVasilyevSM -cTuUserParams: Есть еще один кейс - пустой файл только с комментариями }
 { TODO 5 -oVasilyevSM -cTUserFormatParams: Нужны параметры, хранящие исходное форматирование. Всю строку между элементами
   запоминать там и потом выбрасывать в строку. }
@@ -95,18 +96,46 @@ type
 
     TCommentList = class(TList<TComment>)
 
-    private
+    strict private
 
-      procedure Add(
+    type
 
-        const _Value: String;
-        const _Opening: String;
-        const _Closing: String;
-        _Anchor: TCommentAnchor;
-        _Short: Boolean
+      TOffsetInfoReply = record
+
+        LeftOffset: String;
+        RightOffset: String;
+
+        procedure Get(var _LeftOffset, _RightOffset: String);
+
+      end;
+
+    strict private
+
+      function Filter(_Anchor: TCommentAnchor): TCommentList;
+      procedure ProcessOffsets(
+
+          var _Value: String;
+          _Anchor: TCommentAnchor;
+          _SingleString: Boolean;
+          _First: Boolean;
+          _Last: Boolean;
+          _LastShort: Boolean;
+          _Nested: Boolean
 
       );
-      function Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
+
+    private
+
+      procedure AddComment(
+
+          const _Value: String;
+          const _Opening: String;
+          const _Closing: String;
+          _Anchor: TCommentAnchor;
+          _Short: Boolean
+
+      );
+      function GetBlock(_Anchor: TCommentAnchor; _SingleString, _First, _Last, _Nested: Boolean): String;
 
     end;
 
@@ -139,6 +168,7 @@ type
     function ParamClass: TParamClass; override;
     function ParamsReaderClass: TParamsReaderClass; override;
     function FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String; override;
+    function FormatParam1(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
 
   end;
 
@@ -176,6 +206,8 @@ type
         _Short: Boolean
 
     );
+    procedure DetachBeforeParam;
+    procedure SaveTail;
     procedure BeforeReadParam(_Param: TParam); override;
     procedure AfterReadParam(_Param: TParam); override;
     procedure AfterReadParams(_Param: TParam); override;
@@ -192,6 +224,7 @@ type
 
     destructor Destroy; override;
 
+    procedure KeyEvent(const _KeyWord: TKeyWord); override;
     function ReadElement(_Trim: Boolean): String; override;
     procedure ElementTerminated(_KeyWord: TKeyWord); override;
 
@@ -244,6 +277,42 @@ type
 
   end;
 
+function CommentAnchorToStr(Value: TCommentAnchor): String;
+const
+
+  SA_StringValues: array[TCommentAnchor] of String = (
+
+      { caBeforeParam       } 'BP',
+      { caBeforeName        } 'BN',
+      { caAfterName         } 'AN',
+      { caBeforeType        } 'BT',
+      { caAfterType         } 'AT',
+      { caBeforeValue       } 'BV',
+      { caAfterValue        } 'AV',
+      { caAfterParam        } 'AP',
+      { caInsideEmptyParams } 'IP'
+
+  );
+
+//  SA_StringValues: array[TCommentAnchor] of String = (
+//
+//      { caBeforeParam       } 'BeforeParam',
+//      { caBeforeName        } 'BeforeName',
+//      { caAfterName         } 'AfterName',
+//      { caBeforeType        } 'BeforeType',
+//      { caAfterType         } 'AfterType',
+//      { caBeforeValue       } 'BeforeValue',
+//      { caAfterValue        } 'AfterValue',
+//      { caAfterParam        } 'AfterParam',
+//      { caInsideEmptyParams } 'InsideEmptyParams'
+//
+//  );
+//
+begin
+  Result := SA_StringValues[Value];
+end;
+
+
 { TUserParam.TComment }
 
 constructor TUserParam.TComment.Create;
@@ -259,24 +328,64 @@ end;
 
 { TUserParam.TCommentList }
 
-procedure TUserParam.TCommentList.Add;
+procedure TUserParam.TCommentList.AddComment;
 begin
   inherited Add(TComment.Create(_Value, _Opening, _Closing, _Anchor, _Short));
 end;
 
-function TUserParam.TCommentList.Get(_Anchor: TCommentAnchor; _SingleString, _Typed: Boolean): String;
+function TUserParam.TCommentList.GetBlock(_Anchor: TCommentAnchor; _SingleString, _First, _Last, _Nested: Boolean): String;
+const
+
+  LongSplitter = {$IFDEF FORMATCOMMENTDEBUG}'#'{$ELSE}' '{$ENDIF};
+
 var
   Comment: TComment;
-  Value: String;
   Splitter: String;
-  Index: Word;
+
+  function _GetValue(_Short: Boolean): String;
+  var
+    Opn, Cls, RightField: String;
+  begin
+
+    with Comment do begin
+
+      { TODO -oVasilyevSM -cuUserParams: Метод TComment.Get(var L, R), а потом только корректировать L и R. }
+      if _Short and _SingleString then Opn := '(*'
+      else Opn := Opening;
+
+      if _Short then
+        if _SingleString then Cls := '*)'
+        else Cls := CRLF
+      else Cls := Closing;
+
+      if _Short and not _SingleString then Splitter := ''
+      else Splitter := LongSplitter;
+
+      { "Поля" вокруг текста одного комментария внутри его скобок. }
+      if _Short then RightField := ''
+      else RightField := ' ';
+
+
+      Result := Format('%s %s%s%s%s', [
+
+          Opn,
+          {$IFDEF FORMATCOMMENTDEBUG}CommentAnchorToStr(_Anchor) + ':' + {$ENDIF}Text,
+          RightField,
+          Cls,
+          Splitter
+
+      ]);
+
+    end;
+
+  end;
+
+var
+  Search: TUserParam.TCommentList;
+  LastShort: Boolean;
 begin
 
-  Result := '';
-  Splitter := ' ';
-  Index := 0;
-
-  { TODO 3 -oVasilyevSM -cFormatParam: Нужен метод Search(StartAt, Anchor). Или привычно, Find(Anchor, var Comment):
+  { TODO 1 -oVasilyevSM -cFormatParam: Нужен метод Search(StartAt, Anchor). Или привычно, Find(Anchor, var Comment):
     Boolean, которым можно пробежать по списку с учетом признака Anchor. Будет удобнее здесь орудовать. Цикл может быть
     какой-нибудь while и тогда еще можно будет First и Last контролировать.
 
@@ -291,74 +400,171 @@ begin
     MultiString Short просто использовать Closing для отделения кмментариев друг от друга. Похоже, придется в
     некоторых случаях делать Cut после цикла, чтобы сбросить последний сплиттер. *** - и тогда Search не нужен, а только
     функция GetAll(Anchor), которая вернет их правильно разделенными без указания отсюда. Сама разберется, Short - нет,
-    Long - да. А здесь только Offset в конце надо умно добавить и то не факт. Возможно, это дело функции Format.
+    Long - да. А здесь только Offset в конце надо умно добавить и то не факт. Возможно, это дело функции Format. }
 
-    И есть еще одно. В режиме Untyped комментарии типа должны складываться в BeforeValue... }
+    { TODO 1 -oVasilyevSM -cFormatParam: В режиме Untyped комментарии типа должны складываться в BeforeValue... }
 
-    { TODO 3 -oVasilyevSM -cFormatParam: После значения иногда добавляет лишний CRLF в короткий комментарий:
-      = 'asd' -- 13.1
+  Result    := '';
+  Splitter  := '';
+  LastShort := False;
 
-      -- 13.2
-    }
-  if _SingleString then
+  Search := Filter(_Anchor);
+  try
 
-    for Comment in Self do
-      with Comment do
-        if Anchor = _Anchor then
+    for Comment in Search do
 
-          if Short then begin
+      with Comment do begin
 
-            { Short SingleString }
+        Result := Result + _GetValue(Short);
+        LastShort := Short;
 
-            Value := '(* ' + Text + ' *)';
+      end;
 
-            if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
-            else Result := Result + Value + Splitter;
+  finally
+    Search.Free;
+  end;
 
-          end else begin
+  { Как раз последний разделитель значений нужно отрезать, неважно, какие были в цикле. }
+  CutStr(Result, Length(Splitter));
+  { Отступы справа и слева блока комментариев }
+  ProcessOffsets(Result, _Anchor, _SingleString, _First, _Last, LastShort, _Nested);
 
-            { Long SingleString }
+end;
 
-            Value := Opening + ' ' + Text + ' ' + Closing;
+procedure TUserParam.TCommentList.ProcessOffsets;
 
-            if _Anchor in [caAfterName, caAfterType, caAfterValue] then Result := Result + Splitter + Value
-            else Result := Result + Value + Splitter;
+  function _OffsetInfoKey: Byte;
+  begin
 
-          end
+    Result :=
 
-        else
+        Integer(_Anchor) shl 3 or
+        BooleanToInt(_SingleString) shl 2 or
+        BooleanToInt(_First) shl 1 or
+        BooleanToInt(_Last);
 
-  else
+  end;
 
-    for Comment in Self do
-      with Comment do
-        if Anchor = _Anchor then
+const
 
-          if Short then begin
+  {$IFDEF FORMATCOMMENTDEBUG}Offset = '_'{$ELSE}Offset = ' '{$ENDIF};
 
-            { Short MultiString }
+  RA_OffsetSetting: array [0..71] of TOffsetInfoReply = (
 
-            if _Anchor in [caAfterParam] then Value := Opening + ' ' + Text
-            else Value := Opening + ' ' + Text + Closing;
+    { Anchor              Single First  Last  }
+    { caBeforeParam       False  False  False } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False  False  True  } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False  True   False } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False  True   True  } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       True   False  False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       True   False  True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       True   True   False } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeParam       True   True   True  } (LeftOffset: Offset; RightOffset: Offset),
 
-            if (Index > 0) or (_Anchor in [caBeforeParam, caBeforeType, caAfterParam, caInsideEmptyParams]) then
-              Splitter := '';
-            Inc(Index);
+    { caBeforeName        False  False  False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False  False  True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False  True   False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False  True   True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True   False  False } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeName        True   False  True  } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeName        True   True   False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True   True   True  } (LeftOffset: '';     RightOffset: Offset),
 
-            Result := Result + Splitter + Value;
+    { caAfterName         False  False  False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False  False  True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False  True   False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False  True   True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True   False  False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True   False  True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True   True   False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True   True   True  } (LeftOffset: Offset; RightOffset: ''    ),
 
-          end else begin
+    { caBeforeType        False  False  False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False  False  True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False  True   False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False  True   True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True   False  False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True   False  True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True   True   False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True   True   True  } (LeftOffset: '';     RightOffset: Offset),
+    { caAfterType         False  False  False } (LeftOffset: '';     RightOffset: Offset),
 
-            { Long MultiString }
+    { caAfterType         False  False  True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False  True   False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False  True   True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True   False  False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True   False  True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True   True   False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True   True   True  } (LeftOffset: Offset; RightOffset: ''    ),
 
-            if _Anchor in [caBeforeParam, caAfterParam, caInsideEmptyParams] then Splitter := CRLF;
+    { caBeforeValue       False  False  False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False  False  True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False  True   False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False  True   True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True   False  False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True   False  True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True   True   False } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True   True   True  } (LeftOffset: '';     RightOffset: Offset),
 
-            Value := Opening + ' ' + Text + ' ' + Closing;
+    { caAfterValue        False  False  False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False  False  True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False  True   False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False  True   True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True   False  False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True   False  True  } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True   True   False } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True   True   True  } (LeftOffset: Offset; RightOffset: ''    ),
 
-            if _Anchor in [caAfterName, caAfterType, caAfterValue, caAfterParam] then Result := Result + Splitter + Value
-            else Result := Result + Value + Splitter;
+    { caAfterParam        False  False  False } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False  False  True  } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False  True   False } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False  True   True  } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        True   False  False } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True   False  True  } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True   True   False } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True   True   True  } (LeftOffset: Offset; RightOffset: Offset),
 
-          end;
+    { caInsideEmptyParams False  False  False } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False  False  True  } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False  True   False } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False  True   True  } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams True   False  False } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True   False  True  } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True   True   False } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True   True   True  } (LeftOffset: Offset; RightOffset: Offset)
+
+  );
+
+var
+  LeftOffset, RightOffset: String;
+begin
+
+  if Length(_Value) > 0 then begin
+
+    RA_OffsetSetting[_OffsetInfoKey].Get(LeftOffset, RightOffset);
+
+    if not _Nested and (_Anchor in [caBeforeParam, caBeforeName]) then
+      LeftOffset := '';
+
+    if _LastShort and not _SingleString then
+      RightOffset := '';
+
+    _Value := LeftOffset + _Value + RightOffset;
+
+  end;
+
+end;
+
+function TUserParam.TCommentList.Filter(_Anchor: TCommentAnchor): TCommentList;
+var
+  Comment: TComment;
+begin
+
+  Result := TUserParam.TCommentList.Create;
+
+  for Comment in Self do
+    if Comment.Anchor = _Anchor then
+      Result.Add(Comment);
 
 end;
 
@@ -383,7 +589,7 @@ begin
 
   Comments.Clear;
   if _Source is TUserParam then
-    Comments.AddRange(TUserParam(_Source).Comments.ToArray);
+    Comments.AddRange(TUserParam(_Source).Comments);
 
 end;
 
@@ -406,14 +612,106 @@ const
   SC_VALUE_UNTYPED = '%5:s%6:s%0:s%7:s%3:s= %10:s%2:s%11:s%4:s%12:s';
 
 var
+  Typed, SingleString: Boolean;
+  BeforeParam, BeforeName, AfterName, BeforeType, AfterType, BeforeValue, AfterValue, AfterParam, InsideEmptyParams: String;
+
+  function _BeforeAssigningSpace: String;
+  var
+    L: Integer;
+  begin
+
+    { Если перед '=' был короткий комментарий, то это '=' оказывается на следующей строке. Поэтому только в этом случае
+      перед '=' пробел не нужен. И это два варианта, для выгрузки с типами - после типа, без типов - после имени. }
+    if Typed then begin
+
+      L := Length(AfterType);
+      if (L >= 2) and (Copy(AfterType, L - 1, 2) = CRLF) then Result := ''
+      else Result := ' ';
+
+    end else begin
+
+      L := Length(AfterName);
+      if (L >= 2) and (Copy(AfterName, L - 1, 2) = CRLF) then Result := ''
+      else Result := ' ';
+
+    end;
+
+  end;
+
+  procedure _FormatParams;
+  begin
+    if SingleString then _Value := Format('(%s)', [_Value])
+    else _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1)+ CRLF]);
+  end;
+
+var
+  ParamFormat, Splitter: String;
+begin
+
+  Typed        := not (soTypesFree in SaveToStringOptions);
+  SingleString := soSingleString in SaveToStringOptions;
+
+  if Typed then ParamFormat := SC_VALUE_TYPED
+  else ParamFormat := SC_VALUE_UNTYPED;
+
+  (* Splitter *)
+  if _Last then Splitter := ''
+  else if SingleString then Splitter := ';'
+  else Splitter := CRLF;
+
+  if _Param.DataType = dtParams then
+    _FormatParams;
+
+  with _Param as TUserParam do begin
+
+    BeforeParam       := Comments.GetBlock(caBeforeParam,       SingleString, _First, _Last, Nested);
+    BeforeName        := Comments.GetBlock(caBeforeName,        SingleString, _First, _Last, Nested);
+    AfterName         := Comments.GetBlock(caAfterName,         SingleString, _First, _Last, Nested);
+    BeforeType        := Comments.GetBlock(caBeforeType,        SingleString, _First, _Last, Nested);
+    AfterType         := Comments.GetBlock(caAfterType,         SingleString, _First, _Last, Nested);
+    BeforeValue       := Comments.GetBlock(caBeforeValue,       SingleString, _First, _Last, Nested);
+    AfterValue        := Comments.GetBlock(caAfterValue,        SingleString, _First, _Last, Nested);
+    AfterParam        := Comments.GetBlock(caAfterParam,        SingleString, _First, _Last, Nested);
+    InsideEmptyParams := Comments.GetBlock(caInsideEmptyParams, SingleString, _First, _Last, Nested);
+
+    { TODO 3 -oVasilyevSM -cFormatParam: После значения типа Параметры добавляется лишний CRLF в конец блока
+      комментариев. Это делается здесь и он есть Splitter. Но выключать это нужно только если последний комментарий в
+      блоке AfterValue короткий. (* Splitter *) сюда и анализировать в нем новую переменную типа LastWasShort. }
+    Result := Format(ParamFormat, [
+
+        {  0 } Name,
+        {  1 } ParamDataTypeToStr(DataType),
+        {  2 } _Value,
+        {  3 } _BeforeAssigningSpace,
+        {  4 } Splitter,
+        {  5 } BeforeParam,
+        {  6 } BeforeName,
+        {  7 } AfterName,
+        {  8 } BeforeType,
+        {  9 } AfterType,
+        { 10 } BeforeValue,
+        { 11 } AfterValue,
+        { 12 } AfterParam
+
+    ]);
+
+  end;
+
+end;
+
+function TUserParams.FormatParam1(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
+const
+
+  SC_VALUE_TYPED   = '%5:s%6:s%0:s%7:s: %8:s%1:s%9:s%3:s= %10:s%2:s%11:s%4:s%12:s';
+  SC_VALUE_UNTYPED = '%5:s%6:s%0:s%7:s%3:s= %10:s%2:s%11:s%4:s%12:s';
+
+var
   ParamFormat: String;
   BeforeParam, BeforeName, AfterName, BeforeType, AfterType, BeforeValue, AfterValue, AfterParam, InsideEmptyParams: String;
   Splitter, BeforeAssigningSpace: String;
   SingleString, Typed: Boolean;
   L: Integer;
 begin
-
-  { TODO 2 -oVasilyevSM -cTUserParams.FormatParam: Ошибка: A: Params = ( B: Integer = 0; C: String = 'asd' ); }
 
   Typed := not (soTypesFree in SaveToStringOptions);
   SingleString := soSingleString in SaveToStringOptions;
@@ -430,15 +728,15 @@ begin
 
   with _Param as TUserParam do begin
 
-    BeforeParam       := Comments.Get(caBeforeParam,       SingleString, Typed);
-    BeforeName        := Comments.Get(caBeforeName,        SingleString, Typed);
-    AfterName         := Comments.Get(caAfterName,         SingleString, Typed);
-    BeforeType        := Comments.Get(caBeforeType,        SingleString, Typed);
-    AfterType         := Comments.Get(caAfterType,         SingleString, Typed);
-    BeforeValue       := Comments.Get(caBeforeValue,       SingleString, Typed);
-    AfterValue        := Comments.Get(caAfterValue,        SingleString, Typed);
-    AfterParam        := Comments.Get(caAfterParam,        SingleString, Typed);
-    InsideEmptyParams := Comments.Get(caInsideEmptyParams, SingleString, Typed);
+//    BeforeParam       := Comments.Get(caBeforeParam,       SingleString, Typed);
+//    BeforeName        := Comments.Get(caBeforeName,        SingleString, Typed);
+//    AfterName         := Comments.Get(caAfterName,         SingleString, Typed);
+//    BeforeType        := Comments.Get(caBeforeType,        SingleString, Typed);
+//    AfterType         := Comments.Get(caAfterType,         SingleString, Typed);
+//    BeforeValue       := Comments.Get(caBeforeValue,       SingleString, Typed);
+//    AfterValue        := Comments.Get(caAfterValue,        SingleString, Typed);
+//    AfterParam        := Comments.Get(caAfterParam,        SingleString, Typed);
+//    InsideEmptyParams := Comments.Get(caInsideEmptyParams, SingleString, Typed);
 
     { Если перед '=' был короткий комментарий, то это '=' оказывается на следующей строке. Поэтому только в этом случае
       перед '=' пробел не нужен. И это два варианта, для выгрузки с типами - после типа, без типов - после имени. }
@@ -531,7 +829,38 @@ begin
     raise EParamsReadException.Create('Unexpected content element');
   end;
 
-  CurrentComments.Add(_Value, _Opening, _Closing, Anchor, _Short);
+  CurrentComments.AddComment(_Value, _Opening, _Closing, Anchor, _Short);
+
+end;
+
+procedure TUserParamsReader.DetachBeforeParam;
+var
+  i: Integer;
+begin
+
+  if (ElementType = etName) and (CursorStanding = stBefore) then
+    for i := 0 to CurrentComments.Count - 1 do
+      with CurrentComments[i] do
+        if Anchor = caBeforeName then
+          CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
+
+end;
+
+procedure TUserParamsReader.SaveTail;
+var
+  i: Integer;
+begin
+
+  if Assigned(CurrentParam) then begin
+
+    for i := 0 to CurrentComments.Count - 1 do
+      with CurrentComments[i] do
+        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caAfterParam, Short);
+
+    CurrentParam.Comments.AddRange(CurrentComments);
+    CurrentComments.Clear;
+
+  end;
 
 end;
 
@@ -559,7 +888,7 @@ begin
 
   for i := 0 to CurrentComments.Count - 1 do
     with CurrentComments[i] do
-      ParamComments.Add(Text, Opening, Closing, caInsideEmptyParams, Short);
+      ParamComments.AddComment(Text, Opening, Closing, caInsideEmptyParams, Short);
 
   CurrentComments.Clear;
 
@@ -579,6 +908,23 @@ begin
   AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'comment');
   AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'comment');
   AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'comment');
+
+end;
+
+procedure TUserParamsReader.KeyEvent(const _KeyWord: TKeyWord);
+begin
+
+  inherited KeyEvent(_KeyWord);
+
+  case _KeyWord.KeyType of
+
+    { Которые на предыдущих строках от имени премещаем в BeforeParam оттуда. }
+    ktLineEnd:   DetachBeforeParam;
+    { Обработка блока заканчивается в положении BeforeName. Но паарметра больше не будет. Перемещаем в AfterParam
+      последнего считанного параметра. }
+    ktSourceEnd: SaveTail;
+
+  end;
 
 end;
 
@@ -603,7 +949,7 @@ begin
 
     with CurrentParam do begin
 
-      Comments.AddRange(CurrentComments.ToArray);
+      Comments.AddRange(CurrentComments);
       CurrentComments.Clear;
 
     end;
@@ -659,14 +1005,7 @@ begin
     else Move(p - Cursor);
 
     { Считываем, потому что уже можем. Так меньше лишней нагрузки, так как CanClose уже просто True. }
-    AddComment(
-
-        ReadComment,
-        OpeningKey.StrValue,
-        ClosingKey.StrValue,
-        False
-
-    );
+    AddComment(ReadComment, OpeningKey.StrValue, ClosingKey.StrValue, False);
 
   end;
 
@@ -738,6 +1077,14 @@ end;
 function TKeyWordHelper.TypeInSet(const _Set: TKeyTypes): Boolean;
 begin
   Result := KeyType in _Set;
+end;
+
+{ TUserParam.TCommentList.TOffsetInfoReply }
+
+procedure TUserParam.TCommentList.TOffsetInfoReply.Get(var _LeftOffset, _RightOffset: String);
+begin
+  _LeftOffset  := LeftOffset;
+  _RightOffset := RightOffset;
 end;
 
 end.
