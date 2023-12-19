@@ -138,7 +138,6 @@ type
       function GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
 
       function LastIsShort: Boolean;
-      function Contains(_Anchor: TCommentAnchor): Boolean;
 
     end;
 
@@ -238,7 +237,6 @@ type
 
     function CanClose(_Parser: TCustomStringParser): Boolean; override;
     procedure Opened(_Parser: TCustomStringParser); override;
-    procedure Closed(_Parser: TCustomStringParser); override;
 
   end;
 
@@ -259,6 +257,7 @@ type
   protected
 
     procedure Execute(_Parser: TCustomStringParser; var _Handled: Boolean); override;
+    procedure Closed(_Parser: TCustomStringParser); override;
     procedure CheckUnterminated; override;
 
   end;
@@ -549,19 +548,6 @@ begin
     _Value := LeftOffset + _Value + RightOffset;
 
   end;
-
-end;
-
-function TUserParam.TCommentList.Contains(_Anchor: TCommentAnchor): Boolean;
-var
-  Item: TComment;
-begin
-
-  for Item in Self do
-    if Item.Anchor = _Anchor then
-      Exit(True);
-
-  Result := False;
 
 end;
 
@@ -887,17 +873,6 @@ begin
   Result := Executed;
 end;
 
-procedure TCustomCommentRegion.Closed(_Parser: TCustomStringParser);
-begin
-
-  inherited Closed(_Parser);
-
-  with _Parser as TParamsReader do
-    if (ElementType = etValue) and (CursorStanding = stAfter) then
-      KeyEvent(KWR_LINE_END_CRLF);
-
-end;
-
 procedure TCustomCommentRegion.Opened(_Parser: TCustomStringParser);
 begin
 
@@ -950,6 +925,17 @@ begin
 end;
 
 { TShortCommentRegion }
+
+procedure TShortCommentRegion.Closed(_Parser: TCustomStringParser);
+begin
+
+  inherited Closed(_Parser);
+
+  with _Parser as TParamsReader do
+    if (ElementType = etValue) and (CursorStanding = stAfter) then
+      KeyEvent(KWR_LINE_END_CRLF);
+
+end;
 
 procedure TShortCommentRegion.DetermineClosingKey(_Parser: TCustomStringParser);
 begin
