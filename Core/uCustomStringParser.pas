@@ -589,6 +589,7 @@ begin
   end;
 
   KeyEvent(KWR_SOURCE_END);
+  Terminate;
 
 end;
 
@@ -899,7 +900,11 @@ end;
 
 procedure TCustomStringParser.Terminate;
 begin
-  FTerminated := True;
+
+  FTerminated   := True;
+  FOnRead       := nil;
+  FOnCheckPoint := nil;
+
 end;
 
 function TCustomStringParser.Nested: Boolean;
@@ -911,6 +916,17 @@ procedure TCustomStringParser.Read;
 begin
   if Assigned(FOnRead) then FOnRead(InternalRead, Nested)
   else InternalRead;
+end;
+
+{ TLocation }
+
+constructor TLocation.Create(_Line, _Column, _Position: Int64);
+begin
+
+  Line     := _Line;
+  Column   := _Column;
+  Position := _Position;
+
 end;
 
 { TLocator }
@@ -937,7 +953,10 @@ end;
 destructor TLocator.Destroy;
 begin
 
-  if Assigned(FParser) then
+  if Assigned(FParser) then begin
+
+    if not FParser.Terminated then
+      raise EStringParserException.Create('Unexpected events host destroying.');
 
     with FParser do begin
 
@@ -946,6 +965,8 @@ begin
       OnDestroy    := nil;
 
     end;
+
+  end;
 
   inherited Destroy;
 
@@ -1066,17 +1087,6 @@ procedure TKeyWordHelper.SetKeyType(const _Value: TKeyType);
 begin
   if Integer(_Value) <> KeyTypeInternal then
     KeyTypeInternal := Integer(_Value);
-end;
-
-{ TLocation }
-
-constructor TLocation.Create(_Line, _Column, _Position: Int64);
-begin
-
-  Line     := _Line;
-  Column   := _Column;
-  Position := _Position;
-
 end;
 
 end.

@@ -472,7 +472,7 @@ const
     { caBeforeParam       True         False       False } (LeftOffset: '';     RightOffset: Offset),
     { caBeforeParam       True         False       True  } (LeftOffset: '';     RightOffset: Offset),
     { caBeforeParam       True         True        False } (LeftOffset: Offset; RightOffset: Offset),
-    { caBeforeParam       True         True        True  } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeParam       True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
 
     { caBeforeName        False        False       False } (LeftOffset: '';     RightOffset: Offset),
     { caBeforeName        False        False       True  } (LeftOffset: '';     RightOffset: Offset),

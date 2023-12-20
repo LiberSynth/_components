@@ -1986,7 +1986,7 @@ begin
 
   if _Param.DataType = dtParams then begin
 
-    if soSingleString in SaveToStringOptions then
+    if (soSingleString in SaveToStringOptions) or (_Param.AsParams.Count = 0) then
 
       _Value := Format('(%s)', [_Value])
 
@@ -2333,8 +2333,7 @@ begin
 
   FParams      := _Params;
   FPresetTypes := _MasterParser.PresetTypes;
-  { TODO 2 -oVasilyevSM -cuParams: Потенциально опасный код. Нужно исключение при попытке уничтожить владельца событий,
-    если есть вложенный подписчик. }
+  { При попытке уничтожить владельца событий будет исключение. }
   OnRead       := _MasterParser.OnRead;
   OnCheckPoint := _MasterParser.OnCheckPoint;
   { Вложенный объект НЕ должен вызывать OnDestroy. }
