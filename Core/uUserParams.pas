@@ -138,6 +138,7 @@ type
       function GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
 
       function LastIsShort: Boolean; overload;
+      function FirstIsShort(_Anchor: TCommentAnchor): Boolean;
       function LastIsShort(_Anchor: TCommentAnchor): Boolean; overload;
 
     end;
@@ -530,7 +531,7 @@ const
     { caAfterParam        False        False       False } (LeftOffset: CRLF;   RightOffset: ''    ),
     { caAfterParam        False        False       True  } (LeftOffset: CRLF;   RightOffset: ''    ),
     { caAfterParam        False        True        False } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False        True        True  } (LeftOffset: '';     RightOffset: ''    ),
+    { caAfterParam        False        True        True  } (LeftOffset: CRLF;   RightOffset: ''    ),
     { caAfterParam        True         False       False } (LeftOffset: Offset; RightOffset: Offset),
     { caAfterParam        True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
     { caAfterParam        True         True        False } (LeftOffset: Offset; RightOffset: Offset),
@@ -559,8 +560,12 @@ begin
     if not _Nested and (_Anchor in [caBeforeParam, caBeforeName]) then
       LeftOffset := '';
 
-    if not _SingleString and LastIsShort(_Anchor) then
-      RightOffset := '';
+    if not _SingleString then begin
+
+      if FirstIsShort(_Anchor) then LeftOffset := '';
+      if LastIsShort (_Anchor) then RightOffset := '';
+
+    end;
 
     _Value := LeftOffset + _Value + RightOffset;
 
@@ -578,6 +583,21 @@ begin
   for Comment in Self do
     if Comment.Anchor = _Anchor then
       Result.Add(Comment);
+
+end;
+
+function TUserParam.TCommentList.FirstIsShort(_Anchor: TCommentAnchor): Boolean;
+begin
+
+  with Filter(_Anchor) do
+
+    try
+
+      Result := (Count > 0) and First.Short;
+
+    finally
+      Free;
+    end;
 
 end;
 
