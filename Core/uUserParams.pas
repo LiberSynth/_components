@@ -380,7 +380,7 @@ var
       else Splitter := LongSplitter;
 
       { "Поля" вокруг текста одного комментария внутри его границ. }
-      if _Short then RightField := ''
+      if _Short and not _SingleString then RightField := ''
       else RightField := ' ';
 
       Result := Format('%s %s%s%s%s', [
@@ -481,7 +481,7 @@ const
     { caBeforeName        True         False       False } (LeftOffset: Offset; RightOffset: Offset),
     { caBeforeName        True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
     { caBeforeName        True         True        False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        True         True        True  } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True         True        True  } (LeftOffset: Offset; RightOffset: Offset),
 
     { caAfterName         False        False       False } (LeftOffset: Offset; RightOffset: ''    ),
     { caAfterName         False        False       True  } (LeftOffset: Offset; RightOffset: ''    ),
@@ -501,7 +501,7 @@ const
     { caBeforeType        True         True        False } (LeftOffset: '';     RightOffset: Offset),
     { caBeforeType        True         True        True  } (LeftOffset: '';     RightOffset: Offset),
 
-    { caAfterType         False        False       False } (LeftOffset: '';     RightOffset: Offset),
+    { caAfterType         False        False       False } (LeftOffset: Offset; RightOffset: Offset),
     { caAfterType         False        False       True  } (LeftOffset: Offset; RightOffset: ''    ),
     { caAfterType         False        True        False } (LeftOffset: Offset; RightOffset: ''    ),
     { caAfterType         False        True        True  } (LeftOffset: Offset; RightOffset: ''    ),
@@ -557,12 +557,13 @@ begin
 
     RA_OffsetSetting[_OffsetInfoKey].Get(LeftOffset, RightOffset);
 
-    if not _Nested and (_Anchor in [caBeforeParam, caBeforeName]) then
+    if (_Anchor in [caBeforeParam, caBeforeName]) and not _Nested and (not _SingleString or _FirstParam) then
       LeftOffset := '';
 
     if not _SingleString then begin
 
-      if FirstIsShort(_Anchor) then LeftOffset := '';
+      if FirstIsShort(_Anchor) and not (_Anchor in [caAfterName, caAfterType, caAfterValue, caInsideEmptyParams]) then
+        LeftOffset := '';
       if LastIsShort (_Anchor) then RightOffset := '';
 
     end;
