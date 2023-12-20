@@ -137,7 +137,8 @@ type
       );
       function GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
 
-      function LastIsShort: Boolean;
+      function LastIsShort: Boolean; overload;
+      function LastIsShort(_Anchor: TCommentAnchor): Boolean; overload;
 
     end;
 
@@ -422,6 +423,21 @@ begin
 
 end;
 
+function TUserParam.TCommentList.LastIsShort(_Anchor: TCommentAnchor): Boolean;
+begin
+
+  with Filter(_Anchor) do
+
+    try
+
+      Result := (Count > 0) and Last.Short;
+
+    finally
+      Free;
+    end;
+
+end;
+
 function TUserParam.TCommentList.LastIsShort: Boolean;
 begin
   Result := (Count > 0) and Last.Short;
@@ -514,7 +530,7 @@ const
     { caAfterParam        False        False       False } (LeftOffset: CRLF;   RightOffset: ''    ),
     { caAfterParam        False        False       True  } (LeftOffset: CRLF;   RightOffset: ''    ),
     { caAfterParam        False        True        False } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False        True        True  } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False        True        True  } (LeftOffset: '';     RightOffset: ''    ),
     { caAfterParam        True         False       False } (LeftOffset: Offset; RightOffset: Offset),
     { caAfterParam        True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
     { caAfterParam        True         True        False } (LeftOffset: Offset; RightOffset: Offset),
@@ -528,6 +544,7 @@ const
     { caInsideEmptyParams True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
     { caInsideEmptyParams True         True        False } (LeftOffset: Offset; RightOffset: Offset),
     { caInsideEmptyParams True         True        True  } (LeftOffset: Offset; RightOffset: Offset)
+    { Anchor              SingleString FirstParam  LastParam }
 
   );
 
@@ -542,7 +559,7 @@ begin
     if not _Nested and (_Anchor in [caBeforeParam, caBeforeName]) then
       LeftOffset := '';
 
-    if LastIsShort and not _SingleString then
+    if not _SingleString and LastIsShort(_Anchor) then
       RightOffset := '';
 
     _Value := LeftOffset + _Value + RightOffset;
@@ -796,6 +813,8 @@ begin
 
   ParamComments := (_Param as TUserParam).Comments;
 
+  { „тение вложенного блока завершено и обычные комментарии уже розданы внутренним параметрам. «десь остаютс€ только
+    "бесхозные" в случае, когда вложенных параметров не было. ќтдаем их параметру-мастеру как InsideEmptyParams. }
   for Comment in CurrentComments do
     with Comment do
       ParamComments.AddComment(Text, Opening, Closing, caInsideEmptyParams, Short);
@@ -859,7 +878,9 @@ begin
 
     with CurrentParam do begin
 
-      Comments.AddRange(CurrentComments);
+      { Ёлемент типа "параметры", если они были пустые, уже может содержать блок комментариев InsideEmptyParams,
+        положенный туда в конце исполнени€ региона (AfterReadParams). ѕоэтому, здесь делаем вставку в начало списка. }
+      Comments.InsertRange(0, CurrentComments);
       CurrentComments.Clear;
 
     end;
@@ -962,7 +983,7 @@ begin
     if p = 0 then Move(SrcLen - Cursor + 1)
     else Move(p - Cursor);
 
-    { —читываем, потому что уже можем. “ак меньше лишней нагрузки, так как CanClose уже просто True. }
+    { —читываем, потому что уже можем. “ак меньше лишней нагрузки, поскольку CanClose уже просто True. }
     DetermineClosingKey(_Parser);
     AddComment(ReadComment, OpeningKey.StrValue, ClosingKey.StrValue, True);
 
