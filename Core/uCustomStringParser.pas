@@ -126,7 +126,7 @@ type
     { Ќа данный момент повода здесь что-то добавить нет. }
   end;
 
-  TCustomStringParser = class abstract
+  TCustomStringParser = class abstract (TIntfObject)
 
   strict private
 
@@ -234,6 +234,8 @@ type
     property Terminated: Boolean read FTerminated;
 
   end;
+
+  TCustomStringParserClass = class of TCustomStringParser;
 
   TLocation = record
 
@@ -506,7 +508,6 @@ begin
 
   FSource := _Source;
   FSrcLen := Length(_Source);
-
   FCursor   := 1;
 
   InitParser;

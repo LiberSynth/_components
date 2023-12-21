@@ -25,6 +25,15 @@ unit uDataUtils;
 (*                                                                                         *)
 (*******************************************************************************************)
 
+{ TODO 5 -oVasilyevSM -cuDataUtils: Где '//' - добавлять исполнение и отлаживать. Осталось: и Data/Extended. }
+{ TODO 5 -oVasilyevSM -cuDataUtils: Похоже, что Double это действительно псевдоним Extended. Значения с большим
+  количеством знаков урезаются одинаково. Странно только что в Win64 SizeOf(Extended) = 10, а не 16, как утверждает
+  справка по RADStudio. }
+{ TODO 5 -oVasilyevSM -cuDataUtils: Функции типа FloatToInt, которые могу округлять значение. Можно завести глобальный
+  режим - округлять/не округлять и если не округлять, то возвращать исключение }
+{ TODO 5 -oVasilyevSM -cCommon: Попробовать использовать дженерик для хранения широко-типизованных данных. Класс
+  TValue<T>, и пересоздавать его при смене типа данных. А как он там будет с памятью орудовать - не наша проблема. }
+
 interface
 
 uses
@@ -37,12 +46,6 @@ uses
 { Представлен полный набор, чтобы голову не ломать, как это делать в каждом отдельном сочетании. Логика простая,
   <Тип A>To<Тип B>. Типы перечислены в uParams, что не до конца правильно, поскольку он зависимый от uDataUtils. Это
   на подумать. <Тип> это любой элемент TParamDataType без префикса. Исключения: Int[eger], Str[ing], AnsiStr[ing]. }
-{ TODO 5 -oVasilyevSM -cuDataUtils: Где '//' - добавлять исполнение и отлаживать. Осталось: и Data/Extended. }
-{ TODO 5 -oVasilyevSM -cuDataUtils: Похоже, что Double это действительно псевдоним Extended. Значения с большим
-  количеством знаков урезаются одинаково. Странно только что в Win64 SizeOf(Extended) = 10, а не 16, как утверждает
-  справка по RADStudio. }
-{ TODO 5 -oVasilyevSM -cuDataUtils: Функции типа FloatToInt, которые могу округлять значение. Можно завести глобальный
-  режим - округлять/не округлять и если не округлять, то возвращать исключение }
 function BooleanToInt(Value: Boolean): Integer;
 function BooleanToBigInt(Value: Boolean): Int64;
 function BooleanToFloat(Value: Boolean): Double;
@@ -162,13 +165,14 @@ procedure Invert(var Value: Integer); overload;
 
 type
 
-  { TODO 3 -oVasilyevSM -cuDataUtils: Точно нельзя без класса никак? И еще, не только для строк можно? }
+  { TODO 3 -oVasilyevSM -cuDataUtils: Точно нельзя без класса никак? }
   { TODO 3 -oVasilyevSM -cuDataUtils: Еще похимичить. Не вполне универсально. }
   Matrix<TKey, TReply> = class abstract
 
   public
 
-    class function Get(Index: TKey; const Map: TArray<TReply>): TReply;
+    class function PackKey(Index: TKey): Integer; virtual;
+    class function Get(Index: TKey; const Map: array of TReply): TReply;
 
   end;
 
@@ -176,7 +180,7 @@ type
 
   public
 
-    class function Get<TKey>(Index: TKey; const Map: TArray<TReply>): TReply;
+    class function Get<TKey>(Index: TKey; const Map: array of TReply): TReply;
 
   end;
 
@@ -1059,23 +1063,28 @@ end;
 
 { Matrix<TReply, TKey> }
 
-class function Matrix<TKey, TReply>.Get(Index: TKey; const Map: TArray<TReply>): TReply;
+class function Matrix<TKey, TReply>.PackKey(Index: TKey): Integer;
+begin
+  Move(Index, Result, 4);
+end;
+
+class function Matrix<TKey, TReply>.Get(Index: TKey; const Map: array of TReply): TReply;
 var
-  B: Byte;
+  I: Integer;
 begin
 
-  Move(Index, B, 1);
+  I := PackKey(Index);
 
-  if B > High(Map) then
-    raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [B, Low(Map), High(Map)]);
+  if I > High(Map) then
+    raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [I, Low(Map), High(Map)]);
 
-  Result := Map[B];
+  Result := Map[I];
 
 end;
 
-{ MatrixF<TReply> }
+{ MatrixR<TReply> }
 
-class function MatrixR<TReply>.Get<TKey>(Index: TKey; const Map: TArray<TReply>): TReply;
+class function MatrixR<TReply>.Get<TKey>(Index: TKey; const Map: array of TReply): TReply;
 var
   B: Byte;
 begin

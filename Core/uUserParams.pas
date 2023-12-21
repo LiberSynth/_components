@@ -170,25 +170,9 @@ type
   protected
 
     function ParamClass: TParamClass; override;
-    function ParamsReaderClass: TParamsReaderClass; override;
     function FormatParam(_Param: TParam; _Value: String; _FirstParam, _LastParam: Boolean): String; override;
 
   end;
-
-implementation
-
-const
-
-  KWR_LONG_COMMENT_OPENING_KEY_A:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '{';  KeyLength: Length('{'));
-  KWR_LONG_COMMENT_CLOSING_KEY_A:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '}';  KeyLength: Length('}'));
-  KWR_LONG_COMMENT_OPENING_KEY_B:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '(*'; KeyLength: Length('(*'));
-  KWR_LONG_COMMENT_CLOSING_KEY_B:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '*)'; KeyLength: Length('*)'));
-  KWR_LONG_COMMENT_OPENING_KEY_C:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '/*'; KeyLength: Length('/*'));
-  KWR_LONG_COMMENT_CLOSING_KEY_C:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '*/'; KeyLength: Length('*/'));
-  KWR_SHORT_COMMENT_OPENING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktShortCommentOpening); StrValue: '//'; KeyLength: Length('//'));
-  KWR_SHORT_COMMENT_OPENING_KEY_B: TKeyWord = (KeyTypeInternal: Integer(ktShortCommentOpening); StrValue: '--'; KeyLength: Length('--'));
-
-type
 
   TUserParamsReader = class(TParamsReader)
 
@@ -211,9 +195,6 @@ type
     );
     procedure DetachBeforeParam;
     procedure SaveTail;
-    procedure BeforeReadParam(_Param: TParam); override;
-    procedure AfterReadParam(_Param: TParam); override;
-    procedure AfterReadParams(_Param: TParam); override;
 
     property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
     property CurrentComments: TUserParam.TCommentList read FCurrentComments;
@@ -222,6 +203,10 @@ type
   protected
 
     procedure InitParser; override;
+
+    procedure BeforeReadParam(_Param: TParam); override;
+    procedure AfterReadParam(_Param: TParam); override;
+    procedure AfterReadParams(_Param: TParam); override;
 
   public
 
@@ -232,6 +217,21 @@ type
     procedure ElementTerminated(_KeyWord: TKeyWord); override;
 
   end;
+
+implementation
+
+const
+
+  KWR_LONG_COMMENT_OPENING_KEY_A:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '{';  KeyLength: Length('{'));
+  KWR_LONG_COMMENT_CLOSING_KEY_A:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '}';  KeyLength: Length('}'));
+  KWR_LONG_COMMENT_OPENING_KEY_B:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '(*'; KeyLength: Length('(*'));
+  KWR_LONG_COMMENT_CLOSING_KEY_B:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '*)'; KeyLength: Length('*)'));
+  KWR_LONG_COMMENT_OPENING_KEY_C:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentOpening);  StrValue: '/*'; KeyLength: Length('/*'));
+  KWR_LONG_COMMENT_CLOSING_KEY_C:  TKeyWord = (KeyTypeInternal: Integer(ktLongCommentClosing);  StrValue: '*/'; KeyLength: Length('*/'));
+  KWR_SHORT_COMMENT_OPENING_KEY_A: TKeyWord = (KeyTypeInternal: Integer(ktShortCommentOpening); StrValue: '//'; KeyLength: Length('//'));
+  KWR_SHORT_COMMENT_OPENING_KEY_B: TKeyWord = (KeyTypeInternal: Integer(ktShortCommentOpening); StrValue: '--'; KeyLength: Length('--'));
+
+type
 
   TCustomCommentRegion = class(TRegion)
 
@@ -634,11 +634,6 @@ begin
   Result := TUserParam;
 end;
 
-function TUserParams.ParamsReaderClass: TParamsReaderClass;
-begin
-  Result := TUserParamsReader;
-end;
-
 function TUserParams.FormatParam(_Param: TParam; _Value: String; _FirstParam, _LastParam: Boolean): String;
 const
 
@@ -812,6 +807,22 @@ begin
 
 end;
 
+procedure TUserParamsReader.InitParser;
+begin
+
+  inherited InitParser;
+
+  FCurrentComments := TUserParam.TCommentList.Create;
+
+  {         RegionClass          OpeningKey                       ClosingKey                      Caption  }
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'comment');
+  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'comment');
+  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'comment');
+  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'comment');
+
+end;
+
 procedure TUserParamsReader.BeforeReadParam(_Param: TParam);
 begin
   inherited BeforeReadParam(_Param);
@@ -841,23 +852,6 @@ begin
       ParamComments.AddComment(Text, Opening, Closing, caInsideEmptyParams, Short);
 
   CurrentComments.Clear;
-
-end;
-
-procedure TUserParamsReader.InitParser;
-begin
-
-  inherited InitParser;
-
-  FCurrentComments := TUserParam.TCommentList.Create;
-
-  {         RegionClass          OpeningKey                       ClosingKey                      Caption  }
-
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_B,  KWR_LONG_COMMENT_CLOSING_KEY_B, 'comment');
-  AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_C,  KWR_LONG_COMMENT_CLOSING_KEY_C, 'comment');
-  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_A, KWR_EMPTY,                      'comment');
-  AddRegion(TShortCommentRegion, KWR_SHORT_COMMENT_OPENING_KEY_B, KWR_EMPTY,                      'comment');
 
 end;
 
