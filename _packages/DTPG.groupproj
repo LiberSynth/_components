@@ -3,13 +3,16 @@
 			<ProjectGuid>{31BA45E7-D876-439B-98A9-0D001647FC80}</ProjectGuid>
 		</PropertyGroup>
 		<ItemGroup>
-			<Projects Include="0001.VCore\Sources\VCore.dproj">
+			<Projects Include="0001.VCore\Sources\LSCore.dproj">
 				<Dependencies/>
 			</Projects>
-			<Projects Include="0002.VUtils\Sources\VUtils.dproj">
+			<Projects Include="0002.VUtils\Sources\LSUtils.dproj">
 				<Dependencies/>
 			</Projects>
-			<Projects Include="0003.VDebug\Sources\VDebug.dproj">
+			<Projects Include="0003.VDebug\Sources\LSDebug.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="0004.LSComponents\Sources\LSComponents.dproj">
 				<Dependencies/>
 			</Projects>
 		</ItemGroup>
@@ -20,41 +23,50 @@
 				<Default.Personality/>
 			</BorlandProject>
 		</ProjectExtensions>
-		<Target Name="VCore">
-			<MSBuild Projects="0001.VCore\Sources\VCore.dproj"/>
+		<Target Name="LSCore">
+			<MSBuild Projects="0001.VCore\Sources\LSCore.dproj"/>
 		</Target>
-		<Target Name="VCore:Clean">
-			<MSBuild Projects="0001.VCore\Sources\VCore.dproj" Targets="Clean"/>
+		<Target Name="LSCore:Clean">
+			<MSBuild Projects="0001.VCore\Sources\LSCore.dproj" Targets="Clean"/>
 		</Target>
-		<Target Name="VCore:Make">
-			<MSBuild Projects="0001.VCore\Sources\VCore.dproj" Targets="Make"/>
+		<Target Name="LSCore:Make">
+			<MSBuild Projects="0001.VCore\Sources\LSCore.dproj" Targets="Make"/>
 		</Target>
-		<Target Name="VUtils">
-			<MSBuild Projects="0002.VUtils\Sources\VUtils.dproj"/>
+		<Target Name="LSUtils">
+			<MSBuild Projects="0002.VUtils\Sources\LSUtils.dproj"/>
 		</Target>
-		<Target Name="VUtils:Clean">
-			<MSBuild Projects="0002.VUtils\Sources\VUtils.dproj" Targets="Clean"/>
+		<Target Name="LSUtils:Clean">
+			<MSBuild Projects="0002.VUtils\Sources\LSUtils.dproj" Targets="Clean"/>
 		</Target>
-		<Target Name="VUtils:Make">
-			<MSBuild Projects="0002.VUtils\Sources\VUtils.dproj" Targets="Make"/>
+		<Target Name="LSUtils:Make">
+			<MSBuild Projects="0002.VUtils\Sources\LSUtils.dproj" Targets="Make"/>
 		</Target>
-		<Target Name="VDebug">
-			<MSBuild Projects="0003.VDebug\Sources\VDebug.dproj"/>
+		<Target Name="LSDebug">
+			<MSBuild Projects="0003.VDebug\Sources\LSDebug.dproj"/>
 		</Target>
-		<Target Name="VDebug:Clean">
-			<MSBuild Projects="0003.VDebug\Sources\VDebug.dproj" Targets="Clean"/>
+		<Target Name="LSDebug:Clean">
+			<MSBuild Projects="0003.VDebug\Sources\LSDebug.dproj" Targets="Clean"/>
 		</Target>
-		<Target Name="VDebug:Make">
-			<MSBuild Projects="0003.VDebug\Sources\VDebug.dproj" Targets="Make"/>
+		<Target Name="LSDebug:Make">
+			<MSBuild Projects="0003.VDebug\Sources\LSDebug.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="LSComponents">
+			<MSBuild Projects="0004.LSComponents\Sources\LSComponents.dproj"/>
+		</Target>
+		<Target Name="LSComponents:Clean">
+			<MSBuild Projects="0004.LSComponents\Sources\LSComponents.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="LSComponents:Make">
+			<MSBuild Projects="0004.LSComponents\Sources\LSComponents.dproj" Targets="Make"/>
 		</Target>
 		<Target Name="Build">
-			<CallTarget Targets="VCore;VUtils;VDebug"/>
+			<CallTarget Targets="LSCore;LSUtils;LSDebug;LSComponents"/>
 		</Target>
 		<Target Name="Clean">
-			<CallTarget Targets="VCore:Clean;VUtils:Clean;VDebug:Clean"/>
+			<CallTarget Targets="LSCore:Clean;LSUtils:Clean;LSDebug:Clean;LSComponents:Clean"/>
 		</Target>
 		<Target Name="Make">
-			<CallTarget Targets="VCore:Make;VUtils:Make;VDebug:Make"/>
+			<CallTarget Targets="LSCore:Make;LSUtils:Make;LSDebug:Make;LSComponents:Make"/>
 		</Target>
 		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')" Project="$(BDS)\Bin\CodeGear.Group.Targets"/>
 	</Project>

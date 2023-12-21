@@ -33,13 +33,12 @@ unit uUserParams;
 {
 
 TLSIni.StoreFormat -> LSNI format    ( reading location support yes/no )
-                   -> Classic format ( reading location support yes/no )
+                   -> Classic        ( reading location support yes/no )
                    -> BLOB
 
 TLSIni.Destination -> File
-                   -> Abstract (saving and loading implement by event)
-
-TLSReg -> Registry (without format / single BLOB)
+                   -> Registry ( structured / single param <- StoreFormat )
+                   -> Abstract ( saving and loading implement by event <- StoreFormat )
 
 }
 
