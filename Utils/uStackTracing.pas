@@ -29,7 +29,7 @@ begin
 end;
 {$ENDIF}
 
-function CallStackToStr(const Stack: TDbgInfoStack): string;
+function CallStackToStr(const Stack: TDbgInfoStack): String;
 var Ptr: Pointer;
 begin
   Result := '';
@@ -46,7 +46,7 @@ begin
   GetCallStackOS(PDbgInfoStack(Result)^, 1); // исключаем саму функцию GetCallStackOS
 end;
 
-function GetStackInfoStringProc(Info: Pointer): string;
+function GetStackInfoStringProc(Info: Pointer): String;
 begin
   Result := CallStackToStr(PDbgInfoStack(Info)^);
 end;

@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections, Windows,
   { LiberSynth }
-  uConsts, uTypes, uCore, uCustomParser, uDataUtils;
+  uConsts, uTypes, uCore, uCustomReadWrite, uDataUtils;
 
 type
 
@@ -126,13 +126,6 @@ type
     { Ќа данный момент повода здесь что-то добавить нет. }
   end;
 
-  ICustomStringParser = interface ['{2BFFF59C-28FF-40A6-A42A-DA4AB854ECB4}']
-
-    procedure SetSource(const _Source: String);
-    procedure SetLocated;
-
-  end;
-
   TLocation = record
 
     Line: Int64;
@@ -162,7 +155,14 @@ type
 
   end;
 
-  TCustomStringParser = class abstract (TCustomParser, ICustomStringParser)
+  IStringParser = interface ['{2BFFF59C-28FF-40A6-A42A-DA4AB854ECB4}']
+
+    procedure SetSource(const _Source: String);
+    procedure SetLocated;
+
+  end;
+
+  TCustomStringParser = class abstract (TCustomReader, IStringParser)
 
   strict private
 
@@ -232,7 +232,7 @@ type
 
     destructor Destroy; override;
 
-    { ICustomStringParser }
+    { IStringParser }
     procedure SetSource(const _Source: String);
     procedure SetLocated;
 

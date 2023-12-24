@@ -25,7 +25,59 @@ unit uLSIni;
 (*                                                                                         *)
 (*******************************************************************************************)
 
+{ TODO 3 -oVasilyevSM -cuLSIni: Нужен будет еще один контроль - после завершения считывания нельзя менять свойства
+  считывателя, экспортера и параметров. Это не адаптер. Если нужен адаптер, можно написать его, используя имеющиеся в
+  паблике классы. }
+{ TODO 3 -oVasilyevSM -cuLSIni: Все идет к тому чтобы пакеты назывались с номером в начале. Тогда они будуь правильно
+  сортироваться в списке установленных и можно будет их исходники в один каталог положить, по крайней мере тех, которые
+  без отдельных ДТ-юнитов. С LSDebug надо тоже подумать, возможно его исходники не должны лежать рядом с dpk. И тогда
+  все dpk переедут так, что будут ближе к исходникам в одном общем каталоге _components. Только их тоже надо будет
+  пронумеровать, а то уже куча получается там. }
 { TODO 4 -oVasilyevSM -cuLSIni: Иконка }
+
+(*
+
+  Парсер знает, что считывать, но не знает, куда.
+  Ридер - знает куда.
+  Корневой класс - ридер, потому что ради этого вообще вся ветка создана. Хотя строго говоря, он и не ридер и не парсер
+  еще. Не знает, откуда и куда.
+
+  Масштаб трагедии (без учета Typed и Untyped):
+
+  CustomReader
+    CustomStringParser
+      LSNIStringParser
+        LSNIParamsReader
+          LSNISCParamsReader
+          LSNIUFParamsReader
+      INIStringParser
+        INIParamsReader
+          INISCParamsReader
+          INIUFParamsReader
+    CustomBLOBParser
+      BLOBParamsReader
+    CustomRegistryParser
+      StructuredRegistryParser
+        StructuredRegistryParamsReader
+      SingleParamRegistryParser
+        SingleParamRegistryParamsReader
+
+  CustomWriter
+    CustomStringWriter
+      LSNIParamsWriter
+        LSNISCParamsWriter
+        LSNIUFParamsWriter
+      INIParamsWriter
+        INISCParamsWriter
+        INIUFParamsWriter
+    CustomBLOBWriter
+      ParamsBLOBWriter
+    CustomRegistryWriter~
+      CustomParamsRegistryWriter~
+        ParamsStructuredRegistryWriter~
+        ParamsSingleParamRegistryWriter~
+
+*)
 
 interface
 
@@ -33,12 +85,14 @@ uses
   { VCL }
   SysUtils, Classes,
   { LiberSynth }
-  uCore, uParams, uFileUtils, uUserParams, uCustomParser, uCustomStringParser, uComponentTypes;
+  uCore, uParams, uFileUtils, uUserParams, uCustomReadWrite, uCustomStringParser, uLSNIParamsReader,
+  uLSNISCParamsReader, uComponentTypes;
 
 type
 
   TIniStoreMethod = (smLSNIString, smClassicIni, smBLOB);
   TIniSourceType  = (stFile, stRegistryStructured, stRegistrySingleParam, stCustom);
+  TCommentSupport = (csNone, csStockFormat, csUserFormat);
 
   TLSIni = class(TComponent)
 
@@ -50,7 +104,7 @@ type
     FAutoLoad: Boolean;
     FSourcePath: String;
     FErrorsLocating: Boolean;
-    FCommentSupport: Boolean;
+    FCommentSupport: TCommentSupport;
 
     FParams: TParams;
 
@@ -58,12 +112,12 @@ type
     function ParamsClass: TParamsClass;
     function ReaderClass: TCustomParserClass;
     function SourceFile: String;
-    procedure SetReaderLocated(_Reader: TCustomParser);
-    procedure SetReaderSource(_Reader: TCustomParser);
-    procedure RetrieveReaderSource(_Reader: TCustomParser; const _Source: String);
-    procedure SetReaderParams(_Reader: TCustomParser);
+    procedure SetReaderLocated(_Reader: TCustomReader);
+    procedure SetReaderSource(_Reader: TCustomReader);
+    procedure RetrieveReaderSource(_Reader: TCustomReader; const _Source: String);
+    procedure SetReaderParams(_Reader: TCustomReader);
 
-    procedure SetCommentSupport(const _Value: Boolean);
+    procedure SetCommentSupport(const _Value: TCommentSupport);
     procedure SetSourceType(const _Value: TIniSourceType);
     procedure SetStoreMethod(const _Value: TIniStoreMethod);
     procedure SetErrorsLocating(const _Value: Boolean);
@@ -90,7 +144,7 @@ type
     property AutoSave: Boolean read FAutoSave write FAutoSave;
     property AutoLoad: Boolean read FAutoLoad write FAutoLoad;
     property ErrorsLocating: Boolean read FErrorsLocating write SetErrorsLocating;
-    property CommentSupport: Boolean read FCommentSupport write SetCommentSupport;
+    property CommentSupport: TCommentSupport read FCommentSupport write SetCommentSupport;
     property SourcePath: String read FSourcePath write FSourcePath;
 
   end;
@@ -111,14 +165,14 @@ begin
   StrToFile(Params.SaveToString, SourceFile);
 end;
 
-procedure TLSIni.SetCommentSupport(const _Value: Boolean);
+procedure TLSIni.SetCommentSupport(const _Value: TCommentSupport);
 begin
 
   if _Value <> FCommentSupport then begin
 
-    if _Value and (StoreMethod = smBLOB) then
+    if (_Value > csNone) and (StoreMethod = smBLOB) then
       raise EComponentException.Create('Invalid combination of properties. Comments are only supported for the string sources.');
-    if _Value and (SourceType in [stRegistryStructured, stRegistrySingleParam] ) then
+    if (_Value > csNone) and (SourceType in [stRegistryStructured, stRegistrySingleParam] ) then
       raise EComponentException.Create('Invalid combination of properties. Comments are not supported for the registry stored source.');
 
     FCommentSupport := _Value;
@@ -143,12 +197,12 @@ end;
 
 procedure TLSIni.SetReaderLocated;
 var
-  CustomStringParser: ICustomStringParser;
+  CustomStringParser: IStringParser;
 begin
 
   if ErrorsLocating then
 
-    if _Reader.GetInterface(ICustomStringParser, CustomStringParser) then
+    if _Reader.GetInterface(IStringParser, CustomStringParser) then
 
       CustomStringParser.SetLocated
 
@@ -156,7 +210,7 @@ begin
 
 end;
 
-procedure TLSIni.SetReaderParams(_Reader: TCustomParser);
+procedure TLSIni.SetReaderParams(_Reader: TCustomReader);
 var
   ParamsReader: IParamsReader;
 begin
@@ -169,7 +223,7 @@ begin
 
 end;
 
-procedure TLSIni.SetReaderSource(_Reader: TCustomParser);
+procedure TLSIni.SetReaderSource(_Reader: TCustomReader);
 var
   StringSource: String;
 begin
@@ -206,7 +260,7 @@ begin
 
   if _Value <> FSourceType then begin
 
-    if (_Value in [stRegistryStructured, stRegistrySingleParam]) and CommentSupport then
+    if (_Value in [stRegistryStructured, stRegistrySingleParam]) and (CommentSupport > csNone) then
       raise EComponentException.Create('Invalid combination of properties. Comments are not supported when saving to the registry.');
 
     FSourceType := _Value;
@@ -220,7 +274,7 @@ begin
 
   if _Value <> FStoreMethod then begin
 
-    if (_Value = smBLOB) and CommentSupport then
+    if (_Value = smBLOB) and (CommentSupport > csNone) then
       raise EComponentException.Create('Invalid combination of properties. Comments are only supported when saving to a string.');
 
     FStoreMethod := _Value;
@@ -250,47 +304,46 @@ end;
 
 function TLSIni.ParamsClass: TParamsClass;
 begin
-  if CommentSupport then Result := TUserParams
-  else Result := TParams;
+
+  case CommentSupport of
+
+    csNone:        Result := TParams;
+    csStockFormat: Result := TUserParams;
+//    csUserFormat:  Result := ;
+
+  else
+    raise EUncompletedMethod.Create;
+  end;
+
 end;
 
 function TLSIni.ReaderClass: TCustomParserClass;
 const
 
-  MapA: array [TIniStoreMethod] of TCustomParserClass = (
+  Map: array [TIniStoreMethod, TCommentSupport] of TCustomParserClass = (
 
-      { smLSNIString } TParamsReader,
-      { smClassicIni } nil,
-      { smBLOB       } nil
-
-  );
-
-  MapB: array [TIniStoreMethod] of TCustomParserClass = (
-
-      { smLSNIString } TUserParamsReader,
-      { smClassicIni } nil,
-      { smBLOB       } nil
+                       { csNone,            csStockFormat,       csUserFormat }
+      { smLSNIString } ( TLSNIParamsReader, TLSNISCParamsReader, nil          ),
+      { smClassicIni } ( nil,               nil,                 nil          ),
+      { smBLOB       } ( nil,               nil,                 nil          )
 
   );
 
 begin
 
-  { TODO 2 -oVasilyevSM -cuLSIni: Поддержка комментариев должна включать формат их сохранения - канонический / исходный.
-    2 потому что лучше сразу задать свойство с тройным типом. И тогда здесь будет матрица. }
-  if CommentSupport then Result := MapB[StoreMethod]
-  else Result := MapA[StoreMethod];
+  Result := Map[StoreMethod, CommentSupport];
 
   if not Assigned(Result) then
     raise EUncompletedMethod.Create;
 
 end;
 
-procedure TLSIni.RetrieveReaderSource(_Reader: TCustomParser; const _Source: String);
+procedure TLSIni.RetrieveReaderSource(_Reader: TCustomReader; const _Source: String);
 var
-  CustomStringParser: ICustomStringParser;
+  CustomStringParser: IStringParser;
 begin
 
-  if _Reader.GetInterface(ICustomStringParser, CustomStringParser) then
+  if _Reader.GetInterface(IStringParser, CustomStringParser) then
 
     CustomStringParser.SetSource(_Source)
 
@@ -304,14 +357,14 @@ begin
   FStoreMethod    := smLSNIString;
   FSourceType     := stFile;
   FAutoLoad       := True;
-  FCommentSupport := True;
+  FCommentSupport := csStockFormat;
   FErrorsLocating := True;
 
 end;
 
 procedure TLSIni.Load;
 var
-  Reader: TCustomParser;
+  Reader: TCustomReader;
 begin
 
   Reader := ReaderClass.Create;

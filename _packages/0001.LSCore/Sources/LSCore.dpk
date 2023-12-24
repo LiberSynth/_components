@@ -38,8 +38,10 @@ contains
   uGUID in '..\..\..\Core\uGUID.pas',
   uParams in '..\..\..\Core\uParams.pas',
   uUserParams in '..\..\..\Core\uUserParams.pas',
-  uCustomParser in '..\..\..\Core\uCustomParser.pas',
+  uCustomReadWrite in '..\..\..\Core\uCustomReadWrite.pas',
   uCustomStringParser in '..\..\..\Core\uCustomStringParser.pas',
-  uParamsStringParser in '..\..\..\Core\uParamsStringParser.pas';
+  uLSNIStringParser in '..\..\..\Core\uLSNIStringParser.pas',
+  uLSNIParamsReader in '..\..\..\Core\uLSNIParamsReader.pas',
+  uLSNISCParamsReader in '..\..\..\Core\uLSNISCParamsReader.pas';
 
 end.

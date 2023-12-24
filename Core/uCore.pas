@@ -27,8 +27,6 @@ unit uCore;
 
 interface
 
-{ TODO 3 -oVasilyevSM -cVCore: -> LSCore итд, все пакеты так же. }
-
 uses
   { VCL }
   SysUtils;

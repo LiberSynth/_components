@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils,
   { Utils }
-  uParams;
+  uParams, uLSNIParamsReader;
 
 { Сохраняемые параметры пакета }
 function PackageParams: TParams;
@@ -83,7 +83,7 @@ begin
   Params := TParams.Create;
   try
 
-    Params.LoadFromString(FileToStr(ParamsFilePath));
+    LSNIStrToParams(FileToStr(ParamsFilePath), Params);
 
   except
     on E: Exception do

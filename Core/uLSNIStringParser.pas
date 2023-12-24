@@ -1,4 +1,4 @@
-unit uParamsStringParser;
+unit uLSNIStringParser;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -25,7 +25,9 @@ unit uParamsStringParser;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 4 -oVasilyevSM -cuCustomStringParser: Для многострочных строковых параметров нужно экранирование. }
+{ TODO 4 -oVasilyevSM -cuParams: Ошибка. Сдвигает многострочное значение, происходит инъекция пробелов.
+  Либо нужно экранирование для многострочных строковых параметров, либо интеллектуальный сдвиг - только НЕ перенесенные
+  строки. }
 
 interface
 
@@ -50,7 +52,7 @@ type
   TOperation = (opProcessing, opTerminating);
   TNested    = (nsNested, nsNotNested, nsNoMatter);
 
-  TParamsStringParser = class(TCustomStringParser)
+  TLSNIStringParser = class(TCustomStringParser)
 
   strict private
 
@@ -261,9 +263,9 @@ begin
 
 end;
 
-{ TParamsStringParser.TReadInfo }
+{ TLSNIStringParser.TReadInfo }
 
-constructor TParamsStringParser.TReadInfo.Create;
+constructor TLSNIStringParser.TReadInfo.Create;
 begin
 
   Operation   := _Operation;
@@ -273,16 +275,16 @@ begin
 
 end;
 
-{ TParamsStringParser.TReadInfoList }
+{ TLSNIStringParser.TReadInfoList }
 
-procedure TParamsStringParser.TReadInfoList.Add;
+procedure TLSNIStringParser.TReadInfoList.Add;
 begin
   inherited Add(TReadInfo.Create(_Operation, _ElementType, _Nested, _KeyTypes));
 end;
 
-{ TParamsStringParser.TSyntaxInfo }
+{ TLSNIStringParser.TSyntaxInfo }
 
-constructor TParamsStringParser.TSyntaxInfo.Create;
+constructor TLSNIStringParser.TSyntaxInfo.Create;
 begin
 
   ElementType    := _ElementType;
@@ -292,16 +294,16 @@ begin
 
 end;
 
-{ TParamsStringParser.TSyntaxInfoList }
+{ TLSNIStringParser.TSyntaxInfoList }
 
-procedure TParamsStringParser.TSyntaxInfoList.Add;
+procedure TLSNIStringParser.TSyntaxInfoList.Add;
 begin
   inherited Add(TSyntaxInfo.Create(_ElementType, _CursorStanding, _Nested, _Keys));
 end;
 
-{ TParamsStringParser }
+{ TLSNIStringParser }
 
-constructor TParamsStringParser.Create;
+constructor TLSNIStringParser.Create;
 begin
 
   FReading         := TReadInfoList.Create;
@@ -312,7 +314,7 @@ begin
 
 end;
 
-constructor TParamsStringParser.CreateNested;
+constructor TLSNIStringParser.CreateNested;
 begin
 
   FReading := TReadInfoList.Create;
@@ -323,7 +325,7 @@ begin
 
 end;
 
-destructor TParamsStringParser.Destroy;
+destructor TLSNIStringParser.Destroy;
 begin
 
   FreeAndNil(FStrictSyntax );
@@ -334,7 +336,7 @@ begin
 
 end;
 
-procedure TParamsStringParser.InitParser;
+procedure TLSNIStringParser.InitParser;
 begin
 
   inherited InitParser;
@@ -399,14 +401,14 @@ begin
 
 end;
 
-procedure TParamsStringParser.KeyEvent(const _KeyWord: TKeyWord);
+procedure TLSNIStringParser.KeyEvent(const _KeyWord: TKeyWord);
 begin
   inherited KeyEvent(_KeyWord);
   if Nested and (_KeyWord.KeyType = ktNestedClosing) then
     Terminate;
 end;
 
-function TParamsStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
+function TLSNIStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
 var
   RI: TReadInfo;
 begin
@@ -426,7 +428,7 @@ begin
 
 end;
 
-function TParamsStringParser.ElementTerminatingKey(_KeyWord: TKeyWord): Boolean;
+function TLSNIStringParser.ElementTerminatingKey(_KeyWord: TKeyWord): Boolean;
 var
   RI: TReadInfo;
 begin
@@ -446,7 +448,7 @@ begin
 
 end;
 
-procedure TParamsStringParser.CheckSyntax(const _KeyWord: TKeyWord);
+procedure TLSNIStringParser.CheckSyntax(const _KeyWord: TKeyWord);
 
   function _GetMessage: String;
   begin
@@ -504,7 +506,7 @@ begin
 
 end;
 
-procedure TParamsStringParser.ProcessElement;
+procedure TLSNIStringParser.ProcessElement;
 begin
 
   case ElementType of
@@ -519,7 +521,7 @@ begin
 
 end;
 
-procedure TParamsStringParser.ToggleElement(_KeyWord: TKeyWord);
+procedure TLSNIStringParser.ToggleElement(_KeyWord: TKeyWord);
 begin
 
   case ElementType of
@@ -591,7 +593,7 @@ end;
 function TQoutedStringRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
 begin
 
-  with _Parser as TParamsStringParser do
+  with _Parser as TLSNIStringParser do
 
     Result :=
 
@@ -609,7 +611,7 @@ end;
 procedure TQoutedStringRegion.Closed(_Parser: TCustomStringParser);
 begin
 
-  with _Parser as TParamsStringParser do begin
+  with _Parser as TLSNIStringParser do begin
 
     if ClosingKey.KeyLength = 1 then
       DoublingChar := ClosingKey.StrValue[1];
@@ -628,7 +630,7 @@ end;
 function TNestedParamsBlock.CanOpen(_Parser: TCustomStringParser): Boolean;
 begin
 
-  with _Parser as TParamsStringParser do
+  with _Parser as TLSNIStringParser do
 
     Result :=
 
@@ -642,7 +644,7 @@ end;
 procedure TNestedParamsBlock.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
 begin
 
-  with _Parser as TParamsStringParser do
+  with _Parser as TLSNIStringParser do
     ReadParams;
 
   inherited Execute(_Parser, _Handled);

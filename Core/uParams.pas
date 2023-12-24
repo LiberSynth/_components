@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { LiberSynth }
-  uConsts, uTypes, uCore, uDataUtils, uStrUtils, uCustomStringParser, uParamsStringParser;
+  uConsts, uTypes, uCore, uDataUtils, uStrUtils;
 
 type
 
@@ -101,7 +101,6 @@ type
     { ^ Using FData methods ^ }
 
     procedure Clear;
-    class procedure ValidateName(const _Value, _PathSeparator: String);
 
     property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
 
@@ -132,6 +131,8 @@ type
   public
 
     destructor Destroy; override;
+
+    class procedure ValidateName(const _Value, _PathSeparator: String);
 
     property Name: String read FName;
     property DataType: TParamDataType read FDataType;
@@ -187,9 +188,6 @@ type
 
   TSaveToStringOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
   TSaveToStringOptions = set of TSaveToStringOption;
-
-  TParamsReader = class;
-  TParamsReaderClass = class of TParamsReader;
 
   TParams = class
 
@@ -248,7 +246,6 @@ type
       procedure SetDataType(_Index: Integer; const _Value: TParamDataType);
 
       property Name: String read FName;
-      property Items[_Index: Integer]: TParam read GetItems; default;
 
     public
 
@@ -256,9 +253,10 @@ type
       function Append: Integer;
       procedure Delete(_Index: Integer);
 
+      property Items[_Index: Integer]: TParam read GetItems; default;
       property Count: Integer read GetCount;
 
-      property DataType[_Index: Integer]: TParamDataType read GetDataType;
+      property DataType[_Index: Integer]: TParamDataType read GetDataType write SetDataType;
       property IsNull[_Index: Integer]: Boolean read GetIsNull write SetIsNull;
 
       property AsBoolean[_Index: Integer]: Boolean read GetAsBoolean write SetAsBoolean;
@@ -341,9 +339,8 @@ type
     procedure SetAsString(const _Path: String; const _Value: String);
     procedure SetAsBLOB(const _Path: String; const _Value: BLOB);
     procedure SetAsData(const _Path: String; const _Value: TData);
+    procedure SetAsParams(const _Path: String; _Value: TParams);
 
-    function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
-    function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
     function GetParam(_Path: String): TParam;
 
     property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cTParams: Сделать бы default, а то бесит это Items повсюду. }
@@ -361,6 +358,11 @@ type
     constructor Create(const _PathSeparator: Char = '.');
 
     destructor Destroy; override;
+
+    { TODO 5 -oVasilyevSM -cuParams: Против идеи, что управлять значениями можно только через TParams.As... Надо
+      подумать, что тут можно сделать. }
+    function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
+    function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
 
     { v Функции и свойства для основной работы v }
     function FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
@@ -399,7 +401,6 @@ type
     { TODO 5 -oVasilyevSM -cuParams: Похоже, тут не место этим методам. Параметры ничего не должны знать о считывателях.
       Это задача внешней функции, лежащей в юните каждого считывателя. }
     function SaveToString: String;
-    procedure LoadFromString(const _Value: String); virtual;
 
     property IsNull[const _Path: String]: Boolean read GetIsNull write SetIsNull;
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
@@ -413,7 +414,9 @@ type
     property AsString[const _Path: String]: String read GetAsString write SetAsString;
     property AsBLOB[const _Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
     property AsData[const _Path: String]: TData read GetAsData write SetAsData;
-    property AsParams[const _Path: String]: TParams read GetAsParams;
+    { TODO 5 -oVasilyevSM -cuParams: Против идеи, что управлять значениями можно только через TParams.As... Надо
+      подумать, что тут можно сделать. }
+    property AsParams[const _Path: String]: TParams read GetAsParams write SetAsParams;
     property List[const _Path: String]: TMultiParamList read GetList;
 
     property PathSeparator: Char read FPathSeparator;
@@ -430,57 +433,11 @@ type
 
   end;
 
-  { Этот класс нужен только для обращения к здешним объектам без циркулярной ссылки. Также, благодаря этому свойства
-    и методы для изменения данных в обход установленного протокола (As... :=) остаются в прайват. }
-  TParamsReader = class(TParamsStringParser, IParamsReader)
-
-  strict private
-
-    FParams: TParams;
-    FPresetTypes: Boolean;
-
-    FCurrentName: String;
-    FCurrentType: TParamDataType;
-
-    procedure CheckPresetType(_Strict: Boolean);
-    function TrimDigital(const _Value: String): String;
-    function UndoubleSymbols(const _Value: String): String;
-
-  private
-
-    constructor CreateNested(_MasterParser: TParamsReader); reintroduce;
-
-    property PresetTypes: Boolean read FPresetTypes write FPresetTypes;
-
-  protected
-
-    procedure ReadName; override;
-    procedure ReadType; override;
-    procedure ReadValue; override;
-    procedure ReadParams; override;
-    function IsParamsType: Boolean; override;
-    procedure BeforeReadParam(_Param: TParam); virtual;
-    procedure AfterReadParam(_Param: TParam); virtual;
-    procedure AfterReadParams(_Param: TParam); virtual;
-
-    property CurrentName: String read FCurrentName;
-    property CurrentType: TParamDataType read FCurrentType;
-
-  public
-
-    { ISetParams }
-    procedure SetParams(_Value: TParams);
-
-    property Params: TParams read FParams;
-
-  end;
-
   EParamsException = class(ECoreException);
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
 function ParamsToStr(Params: TParams): String;
-procedure StrToParams(const Value: String; Params: TParams);
 
 implementation
 
@@ -525,11 +482,6 @@ end;
 function ParamsToStr(Params: TParams): String;
 begin
   Result := Params.SaveToString;
-end;
-
-procedure StrToParams(const Value: String; Params: TParams);
-begin
-  Params.LoadFromString(Value);
 end;
 
 { TParam }
@@ -874,7 +826,7 @@ var
 begin
 
   if Length(_Value) = 0 then
-    raise EParamsReadException.Create('Empty param name');
+    raise EParamsException.Create('Empty param name');
 
   for i := 1 to Length(_Value) do
     if not CharInSet(_Value[i], SC_TYPED_CHARS) then
@@ -1922,6 +1874,11 @@ begin
   GetParam(_Path).AsData := _Value;
 end;
 
+procedure TParams.SetAsParams(const _Path: String; _Value: TParams);
+begin
+  GetParam(_Path).SetAsParams(_Value);
+end;
+
 function TParams.FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean;
 var
   Params: TParams;
@@ -1988,7 +1945,6 @@ begin
 
     else begin
 
-      { TODO 4 -oVasilyevSM -cuParams: Ошибка. Сдвигает многострочное значение, происходит инъекция пробелов. }
       if Length(_Value) > 0 then _Value := _Value + CRLF;
       _Value := Format('(%s%s)', [CRLF, ShiftText(_Value, 1)]);
 
@@ -2287,212 +2243,6 @@ begin
 
   end;
 
-end;
-
-procedure TParams.LoadFromString(const _Value: String);
-var
-  Parser: TParamsReader;
-begin
-
-  Parser := TParamsReader.Create;
-  try
-
-    Parser.Located := True;
-    Parser.NativeException := True;
-    Parser.SetSource(_Value);
-    Parser.SetParams(Self);
-    Parser.Read;
-
-  finally
-    Parser.Free;
-  end;
-
-end;
-
-{ TParamsReader }
-
-constructor TParamsReader.CreateNested;
-begin
-
-  inherited CreateNested(_MasterParser);
-
-  FPresetTypes := _MasterParser.PresetTypes;
-  Located := _MasterParser.Located;
-  Locator := _MasterParser.Locator;
-
-end;
-
-procedure TParamsReader.SetParams(_Value: TParams);
-begin
-  FParams := _Value;
-end;
-
-procedure TParamsReader.CheckPresetType(_Strict: Boolean);
-var
-  P: TParam;
-begin
-
-  { Определенный заранее тип данных }
-  if
-
-      (CurrentType = dtUnknown) and
-      Params.FindParam(CurrentName, P) and
-      (P.DataType <> dtUnknown)
-
-  then FCurrentType := P.DataType;
-
-  if _Strict and (CurrentType = dtUnknown) then
-    raise EParamsReadException.Create('Unknown param data type');
-
-end;
-
-function TParamsReader.TrimDigital(const _Value: String): String;
-begin
-  Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
-end;
-
-function TParamsReader.UndoubleSymbols(const _Value: String): String;
-begin
-
-  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
-    условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
-    потому что дублирование не нужно в комментариях совсем. }
-
-  if DoublingChar > #0 then Result := UndoubleStr(_Value, DoublingChar)
-  else Result := _Value;
-
-end;
-
-procedure TParamsReader.ReadName;
-var
-  Value: String;
-begin
-
-  Value := ReadElement(True);
-
-  TParam.ValidateName(Value, Params.PathSeparator);
-  FCurrentName := Value;
-
-end;
-
-procedure TParamsReader.ReadType;
-begin
-  FCurrentType := StrToParamDataType(ReadElement(True));
-  CheckPresetType(True);
-end;
-
-procedure TParamsReader.ReadValue;
-var
-  Value: String;
-  Index: Integer;
-begin
-
-  Value := ReadElement(False);
-
-  { TODO 3 -oVasilyevSM -cuParams: При попытке чтения нетипизованных параметров не выламывается и читает неправильно. }
-  if PresetTypes then
-    CheckPresetType(True);
-
-  { Считывание с зарегистрированными типами должно исполнятся в потомках с помощью отдельных свойств (Registered итд). }
-  with Params.AddList(CurrentName) do begin
-
-    if PresetTypes and (Count > 0) then Index := 0
-    else Index := Append;
-
-    BeforeReadParam(Items[Index]);
-
-    if Length(Value) > 0 then
-
-      case CurrentType of
-
-        dtBoolean:    AsBoolean   [Index] := StrToBoolean(             Value );
-        dtInteger:    AsInteger   [Index] := StrToInt(     TrimDigital(Value));
-        dtBigInt:     AsBigInt    [Index] := StrToBigInt(  TrimDigital(Value));
-        dtFloat:      AsFloat     [Index] := StrToFloat (  TrimDigital(Value));
-        dtExtended:   AsExtended  [Index] := StrToExtended(TrimDigital(Value));
-        dtDateTime:   AsDateTime  [Index] := StrToDateTime(            Value );
-        dtGUID:       AsGUID      [Index] := StrToGUID(                Value );
-        dtAnsiString: AsAnsiString[Index] := StrToAnsiStr   (          Value );
-        dtString:     AsString    [Index] := UndoubleSymbols(          Value );
-        dtBLOB:       AsBLOB      [Index] := HexStrToBLOB(             Value );
-        dtData:       AsData      [Index] := ByteStrToData(            Value );
-
-      end
-
-    else begin
-
-      IsNull[Index] := True;
-      SetDataType(Index, CurrentType);
-
-    end;
-
-    AfterReadParam(Items[Index]);
-
-  end;
-
-  FCurrentName := '';
-  FCurrentType := dtUnknown;
-
-end;
-
-procedure TParamsReader.ReadParams;
-var
-  P: TParam;
-  NestedParams: TParams;
-begin
-
-  if PresetTypes and Params.FindParam(CurrentName, dtParams, P) then NestedParams := P.AsParams
-  else begin
-
-    NestedParams := TParamsClass(Params.ClassType).Create(Params.PathSeparator);
-    NestedParams.SaveToStringOptions := Params.SaveToStringOptions;
-    with Params.AddList(CurrentName) do
-      P := Items[Append];
-
-    BeforeReadParam(P);
-
-    P.SetAsParams(NestedParams);
-
-  end;
-
-  with TParamsReaderClass(ClassType).CreateNested(Self) do
-
-    try
-
-      SetSource(Source);
-      SetParams(NestedParams);
-      Read;
-      AfterReadParams(P);
-      { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
-      RetrieveControl(Self);
-
-    finally
-      Free;
-    end;
-
-  AfterReadParam(P);
-
-  FCurrentName := '';
-  FCurrentType := dtUnknown;
-
-end;
-
-function TParamsReader.IsParamsType: Boolean;
-begin
-  CheckPresetType(False);
-  Result := FCurrentType = dtParams;
-end;
-
-procedure TParamsReader.BeforeReadParam(_Param: TParam);
-begin
-end;
-
-procedure TParamsReader.AfterReadParam(_Param: TParam);
-begin
-end;
-
-procedure TParamsReader.AfterReadParams(_Param: TParam);
-begin
 end;
 
 end.

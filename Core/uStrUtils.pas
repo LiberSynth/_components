@@ -25,8 +25,6 @@
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO -oVasilyevSM -cuStrUtils: Проискать на лишние функции }
-
 interface
 
 uses
@@ -91,6 +89,7 @@ function ReadStrTo(var Value: String; const Pattern: String; WithPattern: Boolea
 function LastPos(const Pattern, Value: String): Integer;
 function StringReplicate(const Pattern: String; Count: Cardinal): String;
 function SpaceReplicate(Count: Cardinal): String;
+{ Для табличного выравнивания }
 function CompleteStr(const Value: String; Completer: Char; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function CompleteStr(const Value: String; Count: Integer; Before: Boolean = False; Cut: Boolean = True): String; overload;
 function StrCount(const Value: String; Pattern: String): Integer;
