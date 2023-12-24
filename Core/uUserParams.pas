@@ -30,18 +30,6 @@ unit uUserParams;
 { TODO 5 -oVasilyevSM -cTUserFormatParams: Нужны параметры, хранящие исходное форматирование. Всю строку между
   элементами запоминать в объект и потом выбрасывать в обратно строку в исходном виде, что бы там ни было. }
 
-{
-
-TLSIni.StoreFormat -> LSNI format    ( reading location support yes/no )
-                   -> Classic        ( reading location support yes/no )
-                   -> BLOB
-
-TLSIni.Destination -> File
-                   -> Registry ( structured / single param <- StoreFormat )
-                   -> Abstract ( saving and loading implement by event <- StoreFormat )
-
-}
-
 interface
 
 uses

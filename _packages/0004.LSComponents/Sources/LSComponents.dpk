@@ -26,9 +26,11 @@ package LSComponents;
 {$IMPLICITBUILD OFF}
 
 requires
-  rtl;
+  rtl,
+  LSCore;
 
 contains
-  uLSIni in '..\..\..\Components\uLSIni.pas';
+  uLSIni in '..\..\..\Components\uLSIni.pas',
+  uComponentTypes in '..\..\..\Components\uComponentTypes.pas';
 
 end.

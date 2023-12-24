@@ -3,13 +3,13 @@
 			<ProjectGuid>{31BA45E7-D876-439B-98A9-0D001647FC80}</ProjectGuid>
 		</PropertyGroup>
 		<ItemGroup>
-			<Projects Include="0001.VCore\Sources\LSCore.dproj">
+			<Projects Include="0001.LSCore\Sources\LSCore.dproj">
 				<Dependencies/>
 			</Projects>
-			<Projects Include="0002.VUtils\Sources\LSUtils.dproj">
+			<Projects Include="0002.LSUtils\Sources\LSUtils.dproj">
 				<Dependencies/>
 			</Projects>
-			<Projects Include="0003.VDebug\Sources\LSDebug.dproj">
+			<Projects Include="0003.LSDebug\Sources\LSDebug.dproj">
 				<Dependencies/>
 			</Projects>
 			<Projects Include="0004.LSComponents\Sources\LSComponents.dproj">
@@ -24,31 +24,31 @@
 			</BorlandProject>
 		</ProjectExtensions>
 		<Target Name="LSCore">
-			<MSBuild Projects="0001.VCore\Sources\LSCore.dproj"/>
+			<MSBuild Projects="0001.LSCore\Sources\LSCore.dproj"/>
 		</Target>
 		<Target Name="LSCore:Clean">
-			<MSBuild Projects="0001.VCore\Sources\LSCore.dproj" Targets="Clean"/>
+			<MSBuild Projects="0001.LSCore\Sources\LSCore.dproj" Targets="Clean"/>
 		</Target>
 		<Target Name="LSCore:Make">
-			<MSBuild Projects="0001.VCore\Sources\LSCore.dproj" Targets="Make"/>
+			<MSBuild Projects="0001.LSCore\Sources\LSCore.dproj" Targets="Make"/>
 		</Target>
 		<Target Name="LSUtils">
-			<MSBuild Projects="0002.VUtils\Sources\LSUtils.dproj"/>
+			<MSBuild Projects="0002.LSUtils\Sources\LSUtils.dproj"/>
 		</Target>
 		<Target Name="LSUtils:Clean">
-			<MSBuild Projects="0002.VUtils\Sources\LSUtils.dproj" Targets="Clean"/>
+			<MSBuild Projects="0002.LSUtils\Sources\LSUtils.dproj" Targets="Clean"/>
 		</Target>
 		<Target Name="LSUtils:Make">
-			<MSBuild Projects="0002.VUtils\Sources\LSUtils.dproj" Targets="Make"/>
+			<MSBuild Projects="0002.LSUtils\Sources\LSUtils.dproj" Targets="Make"/>
 		</Target>
 		<Target Name="LSDebug">
-			<MSBuild Projects="0003.VDebug\Sources\LSDebug.dproj"/>
+			<MSBuild Projects="0003.LSDebug\Sources\LSDebug.dproj"/>
 		</Target>
 		<Target Name="LSDebug:Clean">
-			<MSBuild Projects="0003.VDebug\Sources\LSDebug.dproj" Targets="Clean"/>
+			<MSBuild Projects="0003.LSDebug\Sources\LSDebug.dproj" Targets="Clean"/>
 		</Target>
 		<Target Name="LSDebug:Make">
-			<MSBuild Projects="0003.VDebug\Sources\LSDebug.dproj" Targets="Make"/>
+			<MSBuild Projects="0003.LSDebug\Sources\LSDebug.dproj" Targets="Make"/>
 		</Target>
 		<Target Name="LSComponents">
 			<MSBuild Projects="0004.LSComponents\Sources\LSComponents.dproj"/>

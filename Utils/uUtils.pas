@@ -31,12 +31,34 @@ uses
   { LiberSynth }
   uTypes, uDataUtils;
 
+function RangeValue(var Value: Integer; MinValue, MaxValue: Integer): Boolean;
 function IntArrayMin(const _Array: TIntegerArray): Integer;
 
 function CheckRange(Index, Lo, Hi: Integer): Boolean;
 function CheckListRange(Index, Count: Integer): Boolean;
 
 implementation
+
+function RangeValue(var Value: Integer; MinValue, MaxValue: Integer): Boolean;
+begin
+
+  if Value < MinValue then begin
+
+    Value := MinValue;
+    Exit(True);
+
+  end;
+
+  if Value > MaxValue then begin
+
+    Value := MaxValue;
+    Exit(True);
+
+  end;
+
+  Result := False;
+
+end;
 
 function IntArrayMin(const _Array: TIntegerArray): Integer;
 var
