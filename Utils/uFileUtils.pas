@@ -127,8 +127,10 @@ function FindTopNearest(const InitPath: String): String;
 function DeleteFileToRecycle(const FileName: String): Boolean;
 function DeleteFileToTemp(const FileName, TempDir: String): Boolean;
 
-{ TODO 3 -oVasilyevSM -cuFileUtils: Эта функция оставляет какой-то хвост в файле иногда. }
-procedure StrToFile(const Value, FileName: String; Append: Boolean = False);
+procedure DataToFile(const FilePath: String; const Data: TData);
+function FileToData(const FilePath: String): TData;
+
+procedure StrToFile(const Value, FileName: String);
 function FileToStr(const FileName: String): String;
 
 implementation
@@ -144,12 +146,10 @@ end;
 function CheckDir(const Path: String): String;
 begin
 
-  if Length(Path) = 0 then
-    raise EFileException.Create('Specify folder');
+  if Length(Path) = 0 then raise EFileException.Create('Specify folder');
   Result := Path;
   AddSlash(Result);
-  if not DirectoryExists(Result) then
-    raise EFileException.CreateFmt('Folder ''%s'' not found', [Result]);
+  if not DirectoryExists(Result) then raise EFileException.CreateFmt('Folder ''%s'' not found', [Result]);
 
 end;
 
@@ -885,27 +885,51 @@ begin
   else Result := Result or fmCreate;
 end;
 
-procedure StrToFile(const Value, FileName: String; Append: Boolean);
-const
-  Signature_UTF8: RawByteString = AnsiChar($EF) + AnsiChar($BB) + AnsiChar($BF);
+procedure DataToFile(const FilePath: String; const Data: TData);
+begin
+
+  with TBytesStream.Create(Data) do
+
+    try
+
+      SaveToFile(FilePath);
+
+    finally
+      Free;
+    end;
+
+end;
+
+function FileToData(const FilePath: String): TData;
+begin
+
+  with TBytesStream.Create(nil) do
+
+    try
+
+      LoadFromFile(FilePath);
+      Result := Copy(Bytes, 0, Size);
+
+    finally
+      Free;
+    end;
+
+end;
+
+procedure StrToFile(const Value, FileName: String);
 var
-  RBS: RawByteString;
+  B: BLOB;
 begin
 
   with TFileStream.Create(FileName, GetStreamMode(FileName, fmShareDenyWrite)) do
 
     try
 
-      if Append then Seek(0, soEnd);
-      RBS := Signature_UTF8 + UTF8Encode(Value);
-      Write(Pointer(RBS)^, Length(RBS));
+      B := BOM_UTF8 + UTF8Encode(Value);
+      Size := Length(B);
+      Position := 0;
 
-      if Append then begin
-
-        RBS := UTF8Encode(CRLF);
-        Write(Pointer(RBS)^, 2);
-
-      end;
+      Write(Pointer(B)^, Length(B));
 
     finally
       Free;
@@ -921,7 +945,7 @@ var
 begin
 
   { TODO 5 -oVasilyevSM -cFileUtils: Это плохо, что он тихо ничего не возвращает без опций. Так можно долго думать, что
-    произошло когда просто нет такого файла всего лишь. }
+    произошло. Нужен опциональный вызов, выламываться или нет. }
   if FileExists(FileName) then
 
     with TFileStream.Create(FileName, fmOpenRead) do

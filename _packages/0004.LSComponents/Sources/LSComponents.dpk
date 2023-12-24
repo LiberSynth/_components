@@ -32,8 +32,8 @@ requires
   LSUtils;
 
 contains
-  uLSIni in '..\..\..\Components\uLSIni.pas',
-  uComponentTypes in '..\..\..\Components\uComponentTypes.pas';
+  uComponentTypes in '..\..\..\Components\uComponentTypes.pas',
+  uLSIni in '..\..\..\Components\uLSIni.pas';
 
 end.
 

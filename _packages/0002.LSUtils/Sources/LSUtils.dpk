@@ -34,9 +34,10 @@ requires
 
 contains
   uUtils in '..\..\..\Utils\uUtils.pas',
-  uSomeParams in '..\..\..\Utils\uSomeParams.pas',
   uFileUtils in '..\..\..\Utils\uFileUtils.pas',
   uPathRunner in '..\..\..\Utils\uPathRunner.pas',
-  uLog in '..\..\..\Utils\uLog.pas';
+  uStackTracing in '..\..\..\Utils\uStackTracing.pas',
+  uLog in '..\..\..\Utils\uLog.pas',
+  uSomeParams in '..\..\..\Utils\uSomeParams.pas';
 
 end.

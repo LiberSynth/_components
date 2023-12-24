@@ -37,9 +37,9 @@ contains
   uCore in '..\..\..\Core\uCore.pas',
   uGUID in '..\..\..\Core\uGUID.pas',
   uParams in '..\..\..\Core\uParams.pas',
-  uCustomStringParser in '..\..\..\Core\uCustomStringParser.pas',
-  uParamsStringParser in '..\..\..\Core\uParamsStringParser.pas',
   uUserParams in '..\..\..\Core\uUserParams.pas',
-  uCustomParser in '..\..\..\Core\uCustomParser.pas';
+  uCustomParser in '..\..\..\Core\uCustomParser.pas',
+  uCustomStringParser in '..\..\..\Core\uCustomStringParser.pas',
+  uParamsStringParser in '..\..\..\Core\uParamsStringParser.pas';
 
 end.

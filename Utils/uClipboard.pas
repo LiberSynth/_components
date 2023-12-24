@@ -1,10 +1,9 @@
-unit vClipboard;
+unit uClipboard;
 
 interface
 
-{ TODO -oVasilyevSM -cdeprecatred unit : -> vUtils }
+{ TODO 5 -oVasilyevSM -cuClipboard: BitmapToClipboard etc }
 procedure StrToClipboard(const Value: String);
-//procedure BitmapToClipboard..
 
 implementation
 
@@ -16,34 +15,41 @@ var
   Size: Integer;
   Data: THandle;
   DataPtr: Pointer;
-  Str: String;
 begin
-  if Length(Value) > 0 then begin
-    Str := String(Value);
+
+  if Length(Value) > 0 then
+
     if not IsClipboardFormatAvailable(CF_UNICODETEXT) then
-      { Вставить обычный текст }
-      Clipboard.AsText:= Str
+
+      Clipboard.AsText:= Value
+
     else begin
-      Size := Length(Str) shl 1 + 2;
+
+      Size := Length(Value) shl 1 + 2;
       Data := GlobalAlloc(GMEM_MOVEABLE + GMEM_DDESHARE, Size);
       try
+
         DataPtr := GlobalLock(Data);
         try
-          Move(Pointer(Str)^, DataPtr^, Size);
+
+          Move(Pointer(Value)^, DataPtr^, Size);
           { Вставка кодовой страницы }
           Clipboard.Open;
           { Вставка Unicode текста }
           Clipboard.SetAsHandle(CF_UNICODETEXT, Data);
           { Вставка кодовой страницы }
           Clipboard.Close;
+
         finally
           GlobalUnlock(Data);
         end;
+
       except
         GlobalFree(Data);
       end;
+
     end;
-  end;
+
 end;
 
 end.

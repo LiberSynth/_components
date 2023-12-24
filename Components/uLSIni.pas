@@ -57,6 +57,7 @@ type
     procedure InitProperties;
     function ParamsClass: TParamsClass;
     function ReaderClass: TCustomParserClass;
+    function SourceFile: String;
     procedure SetReaderLocated(_Reader: TCustomParser);
     procedure SetReaderSource(_Reader: TCustomParser);
     procedure RetrieveReaderSource(_Reader: TCustomParser; const _Source: String);
@@ -107,7 +108,7 @@ end;
 
 procedure TLSIni.Save;
 begin
-
+  StrToFile(Params.SaveToString, SourceFile);
 end;
 
 procedure TLSIni.SetCommentSupport(const _Value: Boolean);
@@ -179,7 +180,7 @@ begin
 
     { TODO 2 -oVasilyevSM -cuLSIni: Если путь не указан - это ини рядом с экзешником. Или раздел реестра приложения из
       неких общих параметров проекта (где-то вычислялось). }
-    stFile: StringSource := FileToStr(SourcePath);
+    stFile: StringSource := FileToStr(SourceFile);
 //    stRegistryStructured: ;
 //    stRegistrySingleParam: ;
 //    stCustom: DoGetCustomSource(что именно?);
@@ -226,6 +227,12 @@ begin
 
   end;
 
+end;
+
+function TLSIni.SourceFile: String;
+begin
+  if Length(SourcePath) = 0 then Result := Format('%s\%s.ini', [ExeDir, ExeName])
+  else Result := SourcePath;
 end;
 
 constructor TLSIni.Create(_Owner: TComponent);
