@@ -51,7 +51,7 @@ implementation
 
 uses
   { Utils }
-  vDataUtils,
+  uStrUtils,
   { VDebugPackage }
   uProjectConsts, uCommon;
 

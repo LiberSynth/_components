@@ -273,7 +273,6 @@ type
       property AsBLOB[_Index: Integer]: BLOB read GetAsBLOB write SetAsBLOB;
       property AsData[_Index: Integer]: TData read GetAsData write SetAsData;
 
-
     end;
 
     TParamsListHolder = class(TObjectList<TMultiParamList>)
@@ -298,11 +297,9 @@ type
 
     FPathSeparator: Char;
     FSaveToStringOptions: TSaveToStringOptions;
-    FStringReaderClass: TCustomStringParserClass;
 
     FItems: TParamList;
     FListHolder: TParamsListHolder;
-    FLocation: Boolean;
     FNested: Boolean;
 
     function Add(const _Name: String): TParam;
@@ -313,8 +310,6 @@ type
 
     function GetList(const _Path: String): TMultiParamList;
     function GetCount: Integer;
-
-    procedure SetParserParams(_Parser: TCustomStringParser);
 
   private
 
@@ -401,9 +396,10 @@ type
     procedure DeleteValue(const _Path: String);
     procedure Clear;
 
+    { TODO 5 -oVasilyevSM -cuParams: Похоже, тут не место этим методам. Параметры ничего не должны знать о считывателях.
+      Это задача внешней функции, лежащей в юните каждого считывателя. }
     function SaveToString: String;
-    procedure LoadFromString(const _Value: String);
-    { TODO 5 -oVasilyevSM -cuParams: SaveToStream/LoadFromStream }
+    procedure LoadFromString(const _Value: String); virtual;
 
     property IsNull[const _Path: String]: Boolean read GetIsNull write SetIsNull;
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
@@ -421,16 +417,14 @@ type
     property List[const _Path: String]: TMultiParamList read GetList;
 
     property PathSeparator: Char read FPathSeparator;
-    property StringReaderClass: TCustomStringParserClass read FStringReaderClass write FStringReaderClass;
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions write FSaveToStringOptions;
     property Count: Integer read GetCount;
-    property Location: Boolean read FLocation write FLocation;
 
   end;
 
   TParamsClass = class of TParams;
 
-  ISetParams = interface ['{5324B88D-A724-4E0B-9797-5004FE975287}']
+  IParamsReader = interface ['{5324B88D-A724-4E0B-9797-5004FE975287}']
 
     procedure SetParams(_Value: TParams);
 
@@ -438,7 +432,7 @@ type
 
   { Этот класс нужен только для обращения к здешним объектам без циркулярной ссылки. Также, благодаря этому свойства
     и методы для изменения данных в обход установленного протокола (As... :=) остаются в прайват. }
-  TParamsReader = class(TParamsStringParser, ISetParams)
+  TParamsReader = class(TParamsStringParser, IParamsReader)
 
   strict private
 
@@ -451,9 +445,6 @@ type
     procedure CheckPresetType(_Strict: Boolean);
     function TrimDigital(const _Value: String): String;
     function UndoubleSymbols(const _Value: String): String;
-
-    { ISetParams }
-    procedure SetParams(_Value: TParams);
 
   private
 
@@ -476,6 +467,9 @@ type
     property CurrentType: TParamDataType read FCurrentType;
 
   public
+
+    { ISetParams }
+    procedure SetParams(_Value: TParams);
 
     property Params: TParams read FParams;
 
@@ -926,7 +920,6 @@ begin
 
           P := TParamsClass(_Host.ClassType).Create(_Host.PathSeparator);
           P.SaveToStringOptions := _Host.SaveToStringOptions;
-          P.StringReaderClass   := _Host.StringReaderClass;
           SetAsParams(P);
           P.Assign(_Source.AsParams, _ForceAdding);
 
@@ -1766,7 +1759,6 @@ begin
         SetAsParams(TParams.Create(PathSeparator));
         Result := AsParams;
         Result.SaveToStringOptions := SaveToStringOptions;
-        Result.StringReaderClass   := StringReaderClass;
 
       end;
 
@@ -1873,19 +1865,6 @@ end;
 procedure TParams.SetIsNull(const _Path: String; const _Value: Boolean);
 begin
   GetParam(_Path).IsNull := _Value;
-end;
-
-procedure TParams.SetParserParams(_Parser: TCustomStringParser);
-var
-  SetParamsIntf: ISetParams;
-begin
-
-  if _Parser.GetInterface(ISetParams, SetParamsIntf) then
-
-    SetParamsIntf.SetParams(Self)
-
-  else raise EParamsException.CreateFmt('Reader class %s does not support params reading.', [_Parser.ClassName]);
-
 end;
 
 procedure TParams.SetAsBoolean(const _Path: String; _Value: Boolean);
@@ -2312,32 +2291,21 @@ end;
 
 procedure TParams.LoadFromString(const _Value: String);
 var
-  Parser: TCustomStringParser;
-  Locator: TLocator;
+  Parser: TParamsReader;
 begin
 
-  if Assigned(StringReaderClass) then begin
+  Parser := TParamsReader.Create;
+  try
 
-    Parser := StringReaderClass.Create(_Value);
-    try
+    Parser.Located := True;
+    Parser.NativeException := True;
+    Parser.SetSource(_Value);
+    Parser.SetParams(Self);
+    Parser.Read;
 
-      SetParserParams(Parser);
-
-      if Location then Locator := TLocator.Create(Parser)
-      else Locator := nil;
-      try
-
-        Parser.Read;
-
-      finally
-        Locator.Free;
-      end;
-
-    finally
-      Parser.Free;
-    end;
-
-  end else raise EParamsException.Create('Specify reader class to loading.');
+  finally
+    Parser.Free;
+  end;
 
 end;
 
@@ -2349,10 +2317,8 @@ begin
   inherited CreateNested(_MasterParser);
 
   FPresetTypes := _MasterParser.PresetTypes;
-  { При попытке уничтожить владельца событий будет исключение. }
-  OnRead       := _MasterParser.OnRead;
-  OnCheckPoint := _MasterParser.OnCheckPoint;
-  { Вложенный объект НЕ должен вызывать OnDestroy. }
+  Located := _MasterParser.Located;
+  Locator := _MasterParser.Locator;
 
 end;
 
@@ -2423,7 +2389,7 @@ begin
 
   Value := ReadElement(False);
 
-  { TODO 4 -oVasilyevSM -cuParams: При попытке чтения нетипизованных параметров не выламывается и читает неправильно. }
+  { TODO 3 -oVasilyevSM -cuParams: При попытке чтения нетипизованных параметров не выламывается и читает неправильно. }
   if PresetTypes then
     CheckPresetType(True);
 
@@ -2480,7 +2446,6 @@ begin
 
     NestedParams := TParamsClass(Params.ClassType).Create(Params.PathSeparator);
     NestedParams.SaveToStringOptions := Params.SaveToStringOptions;
-    NestedParams.StringReaderClass   := Params.StringReaderClass;
     with Params.AddList(CurrentName) do
       P := Items[Append];
 
@@ -2494,6 +2459,7 @@ begin
 
     try
 
+      SetSource(Source);
       SetParams(NestedParams);
       Read;
       AfterReadParams(P);

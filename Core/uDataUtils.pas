@@ -163,35 +163,6 @@ procedure Invert(var Value: Byte); overload;
 procedure Invert(var Value: Word); overload;
 procedure Invert(var Value: Integer); overload;
 
-type
-
-  { TODO 3 -oVasilyevSM -cuDataUtils: Точно нельзя без класса никак? }
-  { TODO 3 -oVasilyevSM -cuDataUtils: Еще похимичить. Не вполне универсально. }
-  Matrix<TKey, TReply> = class abstract
-
-  public
-
-    class function PackKey(Index: TKey): Integer; virtual;
-    class function Get(Index: TKey; const Map: array of TReply): TReply;
-
-  end;
-
-  MatrixR<TReply> = class abstract
-
-  public
-
-    class function Get<TKey>(Index: TKey; const Map: array of TReply): TReply;
-
-  end;
-
-  StrMatrix = class abstract
-
-  public
-
-    class function Get<T>(Index: T; const Map: array of String): String;
-
-  end;
-
 implementation
 
 function BooleanToInt(Value: Boolean): Integer;
@@ -1059,59 +1030,6 @@ begin
   for i := 0 to 31 do
     Result := Result xor (1 shl i);
   Value := Result;
-end;
-
-{ Matrix<TReply, TKey> }
-
-class function Matrix<TKey, TReply>.PackKey(Index: TKey): Integer;
-begin
-  Move(Index, Result, 4);
-end;
-
-class function Matrix<TKey, TReply>.Get(Index: TKey; const Map: array of TReply): TReply;
-var
-  I: Integer;
-begin
-
-  I := PackKey(Index);
-
-  if I > High(Map) then
-    raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [I, Low(Map), High(Map)]);
-
-  Result := Map[I];
-
-end;
-
-{ MatrixR<TReply> }
-
-class function MatrixR<TReply>.Get<TKey>(Index: TKey; const Map: array of TReply): TReply;
-var
-  B: Byte;
-begin
-
-  Move(Index, B, 1);
-
-  if B > High(Map) then
-    raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [B, Low(Map), High(Map)]);
-
-  Result := Map[B];
-
-end;
-
-{ StrMatrix }
-
-class function StrMatrix.Get<T>(Index: T; const Map: array of String): String;
-var
-  B: Byte;
-begin
-
-  Move(Index, B, 1);
-
-  if B > High(Map) then
-    raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [B, Low(Map), High(Map)]);
-
-  Result := Map[B];
-
 end;
 
 end.

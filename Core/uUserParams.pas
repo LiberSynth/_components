@@ -159,6 +159,10 @@ type
     function ParamClass: TParamClass; override;
     function FormatParam(_Param: TParam; _Value: String; _FirstParam, _LastParam: Boolean): String; override;
 
+  public
+
+    procedure LoadFromString(const _Value: string); override;
+
   end;
 
   TUserParamsReader = class(TParamsReader)
@@ -388,7 +392,7 @@ var
   Search: TUserParam.TCommentList;
 begin
 
-  { TODO 1 -oVasilyevSM -cFormatParam: В режиме Untyped комментарии типа должны складываться в BeforeValue. }
+  { TODO 5 -oVasilyevSM -cFormatParam: В режиме Untyped комментарии типа должны складываться в BeforeValue. }
 
   Result        := '';
   Splitter      := '';
@@ -615,6 +619,26 @@ begin
 end;
 
 { TUserParam }
+
+procedure TUserParams.LoadFromString(const _Value: string);
+var
+  Parser: TUserParamsReader;
+begin
+
+  Parser := TUserParamsReader.Create;
+  try
+
+    Parser.Located := True;
+    Parser.NativeException := True;
+    Parser.SetSource(_Value);
+    Parser.SetParams(Self);
+    Parser.Read;
+
+  finally
+    Parser.Free;
+  end;
+
+end;
 
 function TUserParams.ParamClass: TParamClass;
 begin

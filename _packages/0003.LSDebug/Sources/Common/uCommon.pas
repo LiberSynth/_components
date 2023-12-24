@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils,
   { Utils }
-  vParams;
+  uParams;
 
 { Сохраняемые параметры пакета }
 function PackageParams: TParams;
@@ -50,15 +50,12 @@ function ClearExpressionKey(const Expression: String): String;
 
 { Преобразует строку из вида эвалюатора в обычный вид }
 function PureValueText(const Value: String): String;
-function Max(const Args: array of Integer): Integer; overload;
 
 implementation
 
 uses
-  { VCL }
-  {}Math,{}
   { Utils }
-  vFileUtils, vLog,
+  uFileUtils, uLog,
   { VDebugPackage }
   uProjectConsts;
 
@@ -86,7 +83,7 @@ begin
   Params := TParams.Create;
   try
 
-    Params.LoadFromFile(ParamsFilePath);
+    Params.LoadFromString(FileToStr(ParamsFilePath));
 
   except
     on E: Exception do
@@ -105,7 +102,7 @@ begin
     FN := ParamsFilePath;
     CheckDirExisting(ExtractFileDir(FN));
     if FileExists(FN) then DeleteFile(FN);
-    Params.SaveToFile(FN);
+    StrToFile(Params.SaveToString, FN);
 
   except
     on E: Exception do
@@ -225,17 +222,6 @@ begin
     Result := Result + '...';
 
   end;
-
-end;
-
-function Max(const Args: array of Integer): Integer;
-var
-  I: Integer;
-begin
-
-  Result := - MaxInt;
-  for I in Args do
-    Result := Max(I, Result);
 
 end;
 

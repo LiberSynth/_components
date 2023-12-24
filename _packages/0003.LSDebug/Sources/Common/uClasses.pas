@@ -131,7 +131,7 @@ implementation
 
 uses
   { Utils }
-  vLog,
+  uLog,
   { VDebugPackage }
   uProjectConsts, uCommon;
 

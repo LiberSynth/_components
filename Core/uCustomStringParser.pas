@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections, Windows,
   { LiberSynth }
-  uConsts, uTypes, uCore, uDataUtils;
+  uConsts, uTypes, uCore, uCustomParser, uDataUtils;
 
 type
 
@@ -126,14 +126,43 @@ type
     { На данный момент повода здесь что-то добавить нет. }
   end;
 
-  TCustomStringParser = class abstract (TIntfObject)
+  ICustomStringParser = interface ['{2BFFF59C-28FF-40A6-A42A-DA4AB854ECB4}']
+
+    procedure SetSource(const _Source: String);
+    procedure SetLocated;
+
+  end;
+
+  TLocation = record
+
+    Line: Int64;
+    Column: Int64;
+    Position: Int64;
+
+    constructor Create(_Line, _Column, _Position: Int64);
+
+    function Text: String;
+
+  end;
+
+  TLocator = class
 
   strict private
 
-  type
+    FLastElementStart: Int64;
 
-    TReadEvent = procedure (InternalRead: TObjProc; Nested: Boolean) of object;
-    TCursorEvent = procedure (Cursor: Int64) of object;
+  private
+
+    procedure CheckPoint(_Cursor: Int64);
+    function Location(const _Source: String): TLocation;
+
+  public
+
+    constructor Create;
+
+  end;
+
+  TCustomStringParser = class abstract (TCustomParser, ICustomStringParser)
 
   strict private
 
@@ -146,35 +175,29 @@ type
 
     FTerminated: Boolean;
     FNestedLevel: Word;
+    FLocated: Boolean;
+    FNativeException: Boolean;
+
     FKeyWords: TKeyWordList;
     FRegions: TRegionList;
-
-    FOnRead: TReadEvent;
-    FOnCheckPoint: TCursorEvent;
-    FOnDestroy: TObjProc;
+    FLocator: TLocator;
 
     (*****************************)
     (*                           *)
     (*   Главный рабочий метод   *)
     (*                           *)
     (*****************************)
-    procedure InternalRead;
+    procedure ReadInternal;
     function GetCursorKey(var _Value: TKeyWord): Boolean; inline;
     procedure ToggleStanding(_To: TStanding);
     function CheckRegions: Boolean;
     function RegionActive: Boolean; inline;
-    procedure CheckPoint(_Cursor: Int64);
+    procedure CheckPoint;
     procedure DoSyntaxCheck(const _KeyWord: TKeyWord);
     procedure CheckUnterminated(_KeyType: TKeyType);
-    procedure DoOnCheckPoint(_Cursor: Int64);
-    procedure DoOnDestroy;
 
     function GetEof: Boolean;
     function GetRest: Int64; inline;
-
-    procedure SetOnRead(const _Value: TReadEvent);
-    procedure SetOnCheckPoint(const _Value: TCursorEvent);
-    procedure SetOnDestroy(const _Value: TObjProc);
 
     property NestedLevel: Word read FNestedLevel;
 
@@ -200,16 +223,18 @@ type
     procedure CheckSyntax(const _KeyWord: TKeyWord); virtual;
 
     property KeyWords: TKeyWordList read FKeyWords;
-    property OnRead: TReadEvent read FOnRead write SetOnRead;
-    property OnCheckPoint: TCursorEvent read FOnCheckPoint write SetOnCheckPoint;
-    property OnDestroy: TObjProc read FOnDestroy write SetOnDestroy;
+    property Locator: TLocator read FLocator write FLocator;
 
   public
 
-    constructor Create(const _Source: String); virtual;
+    constructor Create; override;
     constructor CreateNested(_Master: TCustomStringParser); virtual;
 
     destructor Destroy; override;
+
+    { ICustomStringParser }
+    procedure SetSource(const _Source: String);
+    procedure SetLocated;
 
     { События для потомков }
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
@@ -220,8 +245,8 @@ type
     procedure Terminate;
     function Nested: Boolean;
 
-    (* Основной внешний рабочий метод *)
-    procedure Read;
+    { Главный внешний метод }
+    procedure Read; override;
 
     property Source: String read FSource;
     property Cursor: Int64 read FCursor;
@@ -232,39 +257,8 @@ type
     property ElementStart: Int64 read FElementStart;
     property RegionStart: Int64 read FRegionStart;
     property Terminated: Boolean read FTerminated;
-
-  end;
-
-  TCustomStringParserClass = class of TCustomStringParser;
-
-  TLocation = record
-
-    Line: Int64;
-    Column: Int64;
-    Position: Int64;
-
-    constructor Create(_Line, _Column, _Position: Int64);
-
-  end;
-
-  TLocator = class
-
-  strict private
-
-    FParser: TCustomStringParser;
-    FNativeException: Boolean;
-    FLastElementStart: Int64;
-
-    procedure ParserOnRead(_InternalRead: TObjProc; _Nested: Boolean);
-    procedure ParserOnCheckPoint(_Cursor: Int64);
-    procedure ParserOnDestroy;
-
-    function Location: TLocation;
-
-  public
-
-    constructor Create(_Parser: TCustomStringParser; _NativeException: Boolean = True);
-    destructor Destroy; override;
+    property Located: Boolean read FLocated write FLocated;
+    property NativeException: Boolean read FNativeException write FNativeException;
 
   end;
 
@@ -272,19 +266,21 @@ type
 
   strict private
 
-    FCheckPoint: Boolean;
+    FWithCheckPoint: Boolean;
 
   private
 
-    property CheckPoint: Boolean read FCheckPoint;
+    property WithCheckPoint: Boolean read FWithCheckPoint;
 
   public
 
-    constructor Create(const _Message: String; _CheckPoint: Boolean = True);
-    constructor CreateFmt(const _Message: String; const _Args: array of const; _CheckPoint: Boolean = True);
+    constructor Create(const _Message: String; _WithCheckPoint: Boolean = True);
+    constructor CreateFmt(const _Message: String; const _Args: array of const; _WithCheckPoint: Boolean = True);
 
   end;
 
+  { Этот класс используется, когда CustomStringParser.NativeException = False. Он позволит спозиционировать курсор в
+   контроле с источником, чтобы указать на место ошибки. }
   ELocatedException = class(ECoreException)
 
   strict private
@@ -499,17 +495,77 @@ begin
     FActiveRegion.CheckUnterminated;
 end;
 
+{ TLocation }
+
+constructor TLocation.Create(_Line, _Column, _Position: Int64);
+begin
+
+  Line     := _Line;
+  Column   := _Column;
+  Position := _Position;
+
+end;
+
+function TLocation.Text: String;
+begin
+  Result := Format('Line = %d, Column = %d, Position = %d', [Line, Column, Position]);
+end;
+
+{ TLocator }
+
+constructor TLocator.Create;
+begin
+  inherited Create;
+  FLastElementStart := 1;
+end;
+
+procedure TLocator.CheckPoint(_Cursor: Int64);
+begin
+  FLastElementStart := _Cursor;
+end;
+
+function TLocator.Location(const _Source: String): TLocation;
+var
+  i, LineStart: Int64;
+begin
+
+  { Локация должна полностью совпадать с Notepad и Notepad++. }
+
+  Result.Position := FLastElementStart;
+  Result.Line := 1;
+  LineStart := 1;
+
+  i := 2;
+  while i <= Result.Position do begin
+
+    if
+
+        CharInSet(_Source[i - 1], [CR, LF]) and
+        (Copy(_Source, i - 1, 2) <> CRLF)
+
+    then begin
+
+      Inc(Result.Line);
+      LineStart := i;
+
+    end;
+
+    Inc(i);
+
+  end;
+
+  Result.Column := Result.Position - LineStart + 1;
+
+end;
+
 { TCustomStringParser }
 
-constructor TCustomStringParser.Create(const _Source: String);
+constructor TCustomStringParser.Create;
 begin
 
   inherited Create;
 
-  FSource := _Source;
-  FSrcLen := Length(_Source);
-  FCursor   := 1;
-
+  FCursor := 1;
   InitParser;
 
   {$IFDEF DEBUG}
@@ -536,20 +592,14 @@ end;
 destructor TCustomStringParser.Destroy;
 begin
 
-  DoOnDestroy;
-
   FreeAndNil(FRegions);
   FreeAndNil(FKeyWords);
-
-  FOnRead       := nil;
-  FOnCheckPoint := nil;
-  FOnDestroy    := nil;
 
   inherited Destroy;
 
 end;
 
-procedure TCustomStringParser.InternalRead;
+procedure TCustomStringParser.ReadInternal;
 
 (*                   Имеем три точки переключения CursorStanding:                   *)
 (*                                                                                  *)
@@ -621,7 +671,7 @@ begin
   else FElementStart := 0;
 
   if (CursorStanding > stBefore) and not Eof then
-    CheckPoint(Cursor);
+    CheckPoint;
 
 end;
 
@@ -663,9 +713,10 @@ begin
   Result := Regions.Active;
 end;
 
-procedure TCustomStringParser.CheckPoint(_Cursor: Int64);
+procedure TCustomStringParser.CheckPoint;
 begin
-  DoOnCheckPoint(_Cursor);
+  if Located then
+    Locator.CheckPoint(Cursor);
 end;
 
 procedure TCustomStringParser.DoSyntaxCheck(const _KeyWord: TKeyWord);
@@ -679,14 +730,14 @@ begin
 
     on E: EStringParserException do begin
 
-      if E.CheckPoint then
-        CheckPoint(Cursor);
+      if E.WithCheckPoint then
+        CheckPoint;
        raise;
 
     end;
 
   else
-    CheckPoint(Cursor);
+    CheckPoint;
     raise;
   end;
 
@@ -704,18 +755,6 @@ begin
 
 end;
 
-procedure TCustomStringParser.DoOnCheckPoint(_Cursor: Int64);
-begin
-  if Assigned(FOnCheckPoint) then
-    FOnCheckPoint(_Cursor);
-end;
-
-procedure TCustomStringParser.DoOnDestroy;
-begin
-  if Assigned(FOnDestroy) then
-    FOnDestroy;
-end;
-
 function TCustomStringParser.GetEof: Boolean;
 begin
   Result := Cursor > SrcLen;
@@ -724,27 +763,6 @@ end;
 function TCustomStringParser.GetRest: Int64;
 begin
   Result := SrcLen - Cursor + 1;
-end;
-
-procedure TCustomStringParser.SetOnRead(const _Value: TReadEvent);
-begin
-  if Assigned(FOnRead) and Assigned(_Value) then
-    raise EStringParserException.Create('Multiple signing to an exclusive event.');
-  FOnRead := _Value;
-end;
-
-procedure TCustomStringParser.SetOnCheckPoint(const _Value: TCursorEvent);
-begin
-  if Assigned(FOnCheckPoint) and Assigned(_Value) then
-    raise EStringParserException.Create('Multiple signing to an exclusive event.');
-  FOnCheckPoint := _Value;
-end;
-
-procedure TCustomStringParser.SetOnDestroy(const _Value: TObjProc);
-begin
-  if Assigned(FOnDestroy) and Assigned(_Value) then
-    raise EStringParserException.Create('Multiple signing to an exclusive event.');
-  FOnDestroy := _Value;
 end;
 
 function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
@@ -835,13 +853,24 @@ end;
 
 procedure TCustomStringParser.RetrieveControl(_Master: TCustomStringParser);
 begin
-  CheckPoint(_Master.Cursor);
   _Master.Move(Cursor - _Master.Cursor);
+  _Master.CheckPoint;
 end;
 
 procedure TCustomStringParser.CheckSyntax(const _KeyWord: TKeyWord);
 begin
   CheckUnterminated(_KeyWord.KeyType);
+end;
+
+procedure TCustomStringParser.SetSource(const _Source: String);
+begin
+  FSource := _Source;
+  FSrcLen := Length(FSource);
+end;
+
+procedure TCustomStringParser.SetLocated;
+begin
+  Located := True;
 end;
 
 procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);
@@ -901,11 +930,7 @@ end;
 
 procedure TCustomStringParser.Terminate;
 begin
-
   FTerminated   := True;
-  FOnRead       := nil;
-  FOnCheckPoint := nil;
-
 end;
 
 function TCustomStringParser.Nested: Boolean;
@@ -914,149 +939,55 @@ begin
 end;
 
 procedure TCustomStringParser.Read;
-begin
-  if Assigned(FOnRead) then FOnRead(InternalRead, Nested)
-  else InternalRead;
-end;
-
-{ TLocation }
-
-constructor TLocation.Create(_Line, _Column, _Position: Int64);
+var
+  Location: TLocation;
 begin
 
-  Line     := _Line;
-  Column   := _Column;
-  Position := _Position;
-
-end;
-
-{ TLocator }
-
-constructor TLocator.Create(_Parser: TCustomStringParser; _NativeException: Boolean);
-begin
-
-  inherited Create;
-
-  FParser           := _Parser;
-  FNativeException  := _NativeException;
-  FLastElementStart := 1;
-
-  with FParser do begin
-
-    OnRead       := ParserOnRead;
-    OnCheckPoint := ParserOnCheckPoint;
-    OnDestroy    := ParserOnDestroy;
-
-  end;
-
-end;
-
-destructor TLocator.Destroy;
-begin
-
-  if Assigned(FParser) then begin
-
-    if not FParser.Terminated then
-      raise EStringParserException.Create('Unexpected events host destroying.');
-
-    with FParser do begin
-
-      OnRead       := nil;
-      OnCheckPoint := nil;
-      OnDestroy    := nil;
-
-    end;
-
-  end;
-
-  inherited Destroy;
-
-end;
-
-procedure TLocator.ParserOnRead(_InternalRead: TObjProc; _Nested: Boolean);
-begin
-
+  if Located and not Nested then
+    Locator := TLocator.Create;
   try
 
-    _InternalRead;
+    try
 
-  except
+      ReadInternal;
 
-    on E: Exception do begin
+    except
 
-      if _Nested then raise
-      else
+      on E: Exception do begin
 
-        if FNativeException then
+        if not Located or Nested then
+          raise;
 
-          { Локация должна полностью совпадать с Notepad и Notepad++. }
-          with Location do
-            raise ExceptClass(E.ClassType).CreateFmt('%s. Line: %d, Column: %d, Position: %d', [
-                E.Message, Line, Column, Position])
+        Location := Locator.Location(Source);
+        if NativeException then
+
+          { TODO 4 -oVasilyevSM -cuCustomStringParser: Утечка. }
+          raise ExceptClass(E.ClassType).CreateFmt('%s. %s', [E.Message, Location.Text])
 
         else raise ELocatedException.Create(ExceptClass(E.ClassType), E.Message, Location);
 
-    end;
-
-  end;
-
-end;
-
-procedure TLocator.ParserOnCheckPoint(_Cursor: Int64);
-begin
-  FLastElementStart := _Cursor;
-end;
-
-procedure TLocator.ParserOnDestroy;
-begin
-  FParser := nil;
-end;
-
-function TLocator.Location: TLocation;
-var
-  i, LineStart: Int64;
-  Source: String;
-begin
-
-  Result.Position := FLastElementStart;
-  Result.Line := 1;
-  LineStart := 1;
-
-  Source := FParser.Source;
-  i := 2;
-  while i <= Result.Position do begin
-
-    if
-
-        CharInSet(Source[i - 1], [CR, LF]) and
-        (Copy(Source, i - 1, 2) <> CRLF)
-
-    then begin
-
-      Inc(Result.Line);
-      LineStart := i;
+      end;
 
     end;
 
-    Inc(i);
-
+  finally
+    if Located and not Nested then
+      FreeAndNil(FLocator);
   end;
-
-  Result.Column := Result.Position - LineStart + 1;
 
 end;
 
 { EStringParserException }
 
-constructor EStringParserException.Create(const _Message: String; _CheckPoint: Boolean);
+constructor EStringParserException.Create(const _Message: String; _WithCheckPoint: Boolean);
 begin
   inherited Create(_Message);
-  FCheckPoint := _CheckPoint;
+  FWithCheckPoint := _WithCheckPoint;
 end;
 
-constructor EStringParserException.CreateFmt(const _Message: String; const _Args: array of const; _CheckPoint: Boolean);
+constructor EStringParserException.CreateFmt(const _Message: String; const _Args: array of const; _WithCheckPoint: Boolean);
 begin
-  Create(Format(_Message, _Args), _CheckPoint);
+  Create(Format(_Message, _Args), _WithCheckPoint);
 end;
 
 { ELocatedException }
@@ -1064,11 +995,17 @@ end;
 constructor ELocatedException.Create;
 begin
 
-  inherited Create('Parser read exception was occured.');
-
   FInitExceptionClass := _InitExceptionClass;
   FInitMessage        := _InitMessage;
   FLocation           := _Location;
+
+  inherited CreateFmt('Parser read exception was occured. ExceptionClass: %s, Message: %s, Location: %s.', [
+
+      FInitExceptionClass.ClassName,
+      FInitMessage,
+      FLocation.Text
+
+  ]);
 
 end;
 

@@ -155,7 +155,7 @@ type
 
   public
 
-    constructor Create(const _Source: String); override;
+    constructor Create; override;
     constructor CreateNested(_Master: TCustomStringParser); override;
 
     destructor Destroy; override;
@@ -308,7 +308,7 @@ begin
   FExcludingSyntax := TSyntaxInfoList.Create;
   FStrictSyntax    := TSyntaxInfoList.Create;
 
-  inherited Create(_Source);
+  inherited Create;
 
 end;
 

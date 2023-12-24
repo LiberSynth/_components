@@ -33,6 +33,7 @@ uses
 
 function RangeValue(var Value: Integer; MinValue, MaxValue: Integer): Boolean;
 function IntArrayMin(const _Array: TIntegerArray): Integer;
+function IntArrayMax(const _Array: TIntegerArray): Integer;
 
 function CheckRange(Index, Lo, Hi: Integer): Boolean;
 function CheckListRange(Index, Count: Integer): Boolean;
@@ -62,11 +63,20 @@ end;
 
 function IntArrayMin(const _Array: TIntegerArray): Integer;
 var
-  i: Integer;
+  I: Integer;
 begin
   Result := MaxInt;
-  for i in _Array do
-    Result := Min(Result, i);
+  for I in _Array do
+    Result := Min(Result, I);
+end;
+
+function IntArrayMax(const _Array: TIntegerArray): Integer;
+var
+  I: Integer;
+begin
+  Result := - MaxInt - 1;
+  for I in _Array do
+    Result := Max(Result, I);
 end;
 
 function CheckRange(Index, Lo, Hi: Integer): Boolean;

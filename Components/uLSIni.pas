@@ -25,17 +25,7 @@ unit uLSIni;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{
-
-TLSIni.StoreFormat -> LSNI format ( reading location support yes/no )
-                   -> Classic     ( reading location support yes/no )
-                   -> BLOB
-
-TLSIni.Destination -> File
-                   -> Registry ( structured / single param <- StoreFormat )
-                   -> Custom   ( saving and loading implement by event <- StoreFormat )
-
-}
+{ TODO 4 -oVasilyevSM -cuLSIni: Иконка }
 
 interface
 
@@ -43,7 +33,7 @@ uses
   { VCL }
   SysUtils, Classes,
   { LiberSynth }
-  uParams, uUserParams, uComponentTypes;
+  uCore, uParams, uFileUtils, uUserParams, uCustomParser, uCustomStringParser, uComponentTypes;
 
 type
 
@@ -58,28 +48,39 @@ type
     FSourceType: TIniSourceType;
     FAutoSave: Boolean;
     FAutoLoad: Boolean;
+    FSourcePath: String;
+    FErrorsLocating: Boolean;
     FCommentSupport: Boolean;
-    FErrorLocation: Boolean;
 
     FParams: TParams;
 
-    procedure InitComponent;
     procedure InitProperties;
     function ParamsClass: TParamsClass;
+    function ReaderClass: TCustomParserClass;
+    procedure SetReaderLocated(_Reader: TCustomParser);
+    procedure SetReaderSource(_Reader: TCustomParser);
+    procedure RetrieveReaderSource(_Reader: TCustomParser; const _Source: String);
+    procedure SetReaderParams(_Reader: TCustomParser);
 
     procedure SetCommentSupport(const _Value: Boolean);
     procedure SetSourceType(const _Value: TIniSourceType);
     procedure SetStoreMethod(const _Value: TIniStoreMethod);
+    procedure SetErrorsLocating(const _Value: Boolean);
+
+  protected
+
+    procedure Loaded; override;
+  published
 
   public
 
     constructor Create(_Owner: TComponent); override;
-
-    procedure AfterConstruction; override;
-    procedure BeforeDestruction; override;
+    destructor Destroy; override;
 
     procedure Save;
     procedure Load;
+
+    property Params: TParams read FParams write FParams;
 
   published
 
@@ -87,8 +88,9 @@ type
     property SourceType: TIniSourceType read FSourceType write SetSourceType;
     property AutoSave: Boolean read FAutoSave write FAutoSave;
     property AutoLoad: Boolean read FAutoLoad write FAutoLoad;
+    property ErrorsLocating: Boolean read FErrorsLocating write SetErrorsLocating;
     property CommentSupport: Boolean read FCommentSupport write SetCommentSupport;
-    property ErrorLocation: Boolean read FErrorLocation write FErrorLocation;
+    property SourcePath: String read FSourcePath write FSourcePath;
 
   end;
 
@@ -114,12 +116,86 @@ begin
   if _Value <> FCommentSupport then begin
 
     if _Value and (StoreMethod = smBLOB) then
-      raise EComponentException.Create('Invalid combination of properties. Comments are only supported when saving to a string.');
+      raise EComponentException.Create('Invalid combination of properties. Comments are only supported for the string sources.');
     if _Value and (SourceType in [stRegistryStructured, stRegistrySingleParam] ) then
-      raise EComponentException.Create('Invalid combination of properties. Comments are not supported when saving to the registry.');
+      raise EComponentException.Create('Invalid combination of properties. Comments are not supported for the registry stored source.');
 
     FCommentSupport := _Value;
 
+  end;
+
+end;
+
+procedure TLSIni.SetErrorsLocating(const _Value: Boolean);
+begin
+
+  if _Value <> FErrorsLocating then begin
+
+    if _Value and (SourceType = stRegistryStructured) then
+      raise EComponentException.Create('Invalid combination of properties. Error locating are not supported for the registry structured source.');
+
+    FErrorsLocating := _Value;
+
+  end;
+
+end;
+
+procedure TLSIni.SetReaderLocated;
+var
+  CustomStringParser: ICustomStringParser;
+begin
+
+  if ErrorsLocating then
+
+    if _Reader.GetInterface(ICustomStringParser, CustomStringParser) then
+
+      CustomStringParser.SetLocated
+
+    else raise EParamsException.CreateFmt('Reader class %s does not support string reading.', [_Reader.ClassName]);
+
+end;
+
+procedure TLSIni.SetReaderParams(_Reader: TCustomParser);
+var
+  ParamsReader: IParamsReader;
+begin
+
+  if _Reader.GetInterface(IParamsReader, ParamsReader) then
+
+    ParamsReader.SetParams(Params)
+
+  else raise EParamsException.CreateFmt('Reader class %s does not support params reading.', [_Reader.ClassName]);
+
+end;
+
+procedure TLSIni.SetReaderSource(_Reader: TCustomParser);
+var
+  StringSource: String;
+begin
+
+  StringSource := '';
+
+  case SourceType of
+
+    { TODO 2 -oVasilyevSM -cuLSIni: Если путь не указан - это ини рядом с экзешником. Или раздел реестра приложения из
+      неких общих параметров проекта (где-то вычислялось). }
+    stFile: StringSource := FileToStr(SourcePath);
+//    stRegistryStructured: ;
+//    stRegistrySingleParam: ;
+//    stCustom: DoGetCustomSource(что именно?);
+
+  else
+    raise EUncompletedMethod.Create;
+  end;
+
+  case StoreMethod of
+
+    smLSNIString: RetrieveReaderSource(_Reader, StringSource);
+//    smClassicIni: RetrieveReaderSource(_Reader, StringSource);
+//    smBLOB: RetrieveReaderSource(_Reader, BLOBSource);
+
+  else
+    raise EUncompletedMethod.Create;
   end;
 
 end;
@@ -152,23 +228,17 @@ begin
 
 end;
 
-procedure TLSIni.AfterConstruction;
-begin
-  inherited AfterConstruction;
-  InitComponent;
-end;
-
-procedure TLSIni.BeforeDestruction;
-begin
-  FreeAndNil(FParams);
-  inherited BeforeDestruction;
-end;
-
 constructor TLSIni.Create(_Owner: TComponent);
 begin
   inherited Create(_Owner);
   if csDesigning in ComponentState then
     InitProperties;
+end;
+
+destructor TLSIni.Destroy;
+begin
+  FreeAndNil(FParams);
+  inherited Destroy;
 end;
 
 function TLSIni.ParamsClass: TParamsClass;
@@ -177,15 +247,47 @@ begin
   else Result := TParams;
 end;
 
-procedure TLSIni.InitComponent;
+function TLSIni.ReaderClass: TCustomParserClass;
+const
+
+  MapA: array [TIniStoreMethod] of TCustomParserClass = (
+
+      { smLSNIString } TParamsReader,
+      { smClassicIni } nil,
+      { smBLOB       } nil
+
+  );
+
+  MapB: array [TIniStoreMethod] of TCustomParserClass = (
+
+      { smLSNIString } TUserParamsReader,
+      { smClassicIni } nil,
+      { smBLOB       } nil
+
+  );
+
 begin
 
-  if not (csDesigning in ComponentState) then begin
+  { TODO 2 -oVasilyevSM -cuLSIni: Поддержка комментариев должна включать формат их сохранения - канонический / исходный.
+    2 потому что лучше сразу задать свойство с тройным типом. И тогда здесь будет матрица. }
+  if CommentSupport then Result := MapB[StoreMethod]
+  else Result := MapA[StoreMethod];
 
-    FParams := ParamsClass.Create;
-    if AutoLoad then Load;
+  if not Assigned(Result) then
+    raise EUncompletedMethod.Create;
 
-  end;
+end;
+
+procedure TLSIni.RetrieveReaderSource(_Reader: TCustomParser; const _Source: String);
+var
+  CustomStringParser: ICustomStringParser;
+begin
+
+  if _Reader.GetInterface(ICustomStringParser, CustomStringParser) then
+
+    CustomStringParser.SetSource(_Source)
+
+  else raise EParamsException.CreateFmt('Reader class %s does not support string reading.', [_Reader.ClassName]);
 
 end;
 
@@ -196,12 +298,40 @@ begin
   FSourceType     := stFile;
   FAutoLoad       := True;
   FCommentSupport := True;
-  FErrorLocation  := True;
+  FErrorsLocating := True;
 
 end;
 
 procedure TLSIni.Load;
+var
+  Reader: TCustomParser;
 begin
+
+  Reader := ReaderClass.Create;
+  try
+
+    SetReaderLocated(Reader);
+    SetReaderSource (Reader);
+    SetReaderParams (Reader);
+    Reader.Read;
+
+  finally
+    Reader.Free;
+  end;
+
+end;
+
+procedure TLSIni.Loaded;
+begin
+
+  inherited Loaded;
+
+  if not (csDesigning in ComponentState) then begin
+
+    FParams := ParamsClass.Create;
+    if AutoLoad then Load;
+
+  end;
 
 end;
 

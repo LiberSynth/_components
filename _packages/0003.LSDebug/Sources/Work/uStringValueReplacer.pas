@@ -52,7 +52,7 @@ uses
   { VCL }
   SysUtils,
   { Utils }
-  vTypes, vLog,
+  uConsts, uTypes, uLog,
   { VDebugPackage }
   uProjectConsts, uCommon;
 

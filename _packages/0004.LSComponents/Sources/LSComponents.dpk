@@ -27,10 +27,13 @@ package LSComponents;
 
 requires
   rtl,
-  LSCore;
+  vcl,
+  LSCore,
+  LSUtils;
 
 contains
   uLSIni in '..\..\..\Components\uLSIni.pas',
   uComponentTypes in '..\..\..\Components\uComponentTypes.pas';
 
 end.
+

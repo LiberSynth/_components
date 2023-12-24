@@ -1,14 +1,37 @@
-unit vFileUtils;
+unit uFileUtils;
+
+(*******************************************************************************************)
+(*            _____          _____          _____          _____          _____            *)
+(*           /\    \        /\    \        /\    \        /\    \        /\    \           *)
+(*          /::\____\      /::\    \      /::\    \      /::\    \      /::\    \          *)
+(*         /:::/    /      \:::\    \    /::::\    \    /::::\    \    /::::\    \         *)
+(*        /:::/    /        \:::\    \  /::::::\    \  /::::::\    \  /::::::\    \        *)
+(*       /:::/    /          \:::\    \ :::/\:::\    \ :::/\:::\    \ :::/\:::\    \       *)
+(*      /:::/    /            \:::\    \ :/__\:::\    \ :/__\:::\    \ :/__\:::\    \      *)
+(*     /:::/    /             /::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \     *)
+(*    /:::/    /     _____   /::::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \    *)
+(*   /:::/    /     /\    \ /:::/\:::\    \ \   \:::\ ___\ \   \:::\    \ \   \:::\____\   *)
+(*  /:::/____/     /::\    /:::/  \:::\____\ \   \:::|    | \   \:::\____\ \   \:::|    |  *)
+(*  \:::\    \     \:::\  /:::/    \::/    / :\  /:::|____| :\   \::/    / :\  /:::|____|  *)
+(*   \:::\    \     \:::\/:::/    / \/____/ :::\/:::/    / :::\   \/____/ :::\/:::/    /   *)
+(*    \:::\    \     \::::::/    /  \:::\   \::::::/    /  \:::\    \  |:::::::::/    /    *)
+(*     \:::\    \     \::::/____/    \:::\   \::::/    /    \:::\____\ |::|\::::/    /     *)
+(*      \:::\    \     \:::\    \     \:::\  /:::/    / :\   \::/    / |::| \::/____/      *)
+(*       \:::\    \     \:::\    \     \:::\/:::/    / :::\   \/____/  |::|  ~|            *)
+(*        \:::\    \     \:::\    \     \::::::/    /  \:::\    \      |::|   |            *)
+(*         \:::\____\     \:::\____\     \::::/    /    \:::\____\     \::|   |            *)
+(*          \::/    /      \::/    /      \::/____/      \::/    /      \:|   |            *)
+(*           \/____/        \/____/        ~~             \/____/        \|___|            *)
+(*                                                                                         *)
+(*******************************************************************************************)
 
 interface
 
-{ TODO -oVasilyevSM -cdeprecatred unit : -> Core }
-
 uses
   { VCL }
-  Windows, Controls,
-  { Utils }
-  vTypes;
+  Windows, Controls, SysUtils, ShlObj, ActiveX, ShellAPI, Forms, Classes, IOUtils,
+  { LeberSynth }
+  uConsts, uTypes, uStrUtils, uCore, uPathRunner;
 
 type
 
@@ -104,32 +127,29 @@ function FindTopNearest(const InitPath: String): String;
 function DeleteFileToRecycle(const FileName: String): Boolean;
 function DeleteFileToTemp(const FileName, TempDir: String): Boolean;
 
+{ TODO 3 -oVasilyevSM -cuFileUtils: Эта функция оставляет какой-то хвост в файле иногда. }
 procedure StrToFile(const Value, FileName: String; Append: Boolean = False);
 function FileToStr(const FileName: String): String;
 
 implementation
-
-uses
-  { VCL }
-  SysUtils, ShlObj, ActiveX, ShellAPI, Forms, Classes, IOUtils,
-  { Utils }
-  vStrUtils, vPathRunner;
 
 function CheckFileType(const FileName, Extension: String): Boolean;
 var
   p: Integer;
 begin
   p := LastPos('.', FileName);
-  Result := (p > 0) and AnsiSameText(Copy(FileName, p, Length(FileName)), '.' + Extension);
+  Result := (p > 0) and SameText(Copy(FileName, p, Length(FileName)), '.' + Extension);
 end;
 
 function CheckDir(const Path: String): String;
 begin
 
-  if Length(Path) = 0 then raise EFileError.Create(SC_FileError_SpecifyDirectory);
+  if Length(Path) = 0 then
+    raise EFileException.Create('Specify folder');
   Result := Path;
   AddSlash(Result);
-  if not DirectoryExists(Result) then raise EFileError.CreateFmt(SC_FileError_DirectoryNotFound, [Result]);
+  if not DirectoryExists(Result) then
+    raise EFileException.CreateFmt('Folder ''%s'' not found', [Result]);
 
 end;
 
@@ -873,14 +893,18 @@ var
 begin
 
   with TFileStream.Create(FileName, GetStreamMode(FileName, fmShareDenyWrite)) do
+
     try
 
       if Append then Seek(0, soEnd);
       RBS := Signature_UTF8 + UTF8Encode(Value);
       Write(Pointer(RBS)^, Length(RBS));
+
       if Append then begin
+
         RBS := UTF8Encode(CRLF);
         Write(Pointer(RBS)^, 2);
+
       end;
 
     finally
@@ -896,7 +920,8 @@ var
   ESize: Integer;
 begin
 
-  { TODO 5 -oVasilyevSM -cFileUtils: Это плохо, что он тихо ничего не возвращает без опций. Так можно долго думать, что произошло. }
+  { TODO 5 -oVasilyevSM -cFileUtils: Это плохо, что он тихо ничего не возвращает без опций. Так можно долго думать, что
+    произошло когда просто нет такого файла всего лишь. }
   if FileExists(FileName) then
 
     with TFileStream.Create(FileName, fmOpenRead) do

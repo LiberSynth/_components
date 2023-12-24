@@ -115,10 +115,10 @@ procedure TViewerFormHelper.FormOnDestroy(_Sender: TObject);
 
     with _Sender as TForm, PackageParams do begin
 
-      GetParam(FParamsSectionName + '.Form.Width').AsInteger := Width;
-      GetParam(FParamsSectionName + '.Form.Height').AsInteger := Height;
-      GetParam(FParamsSectionName + '.Form.Left').AsInteger := Left;
-      GetParam(FParamsSectionName + '.Form.Top').AsInteger := Top;
+      AsInteger[FParamsSectionName + '.Form.Width' ] := Width;
+      AsInteger[FParamsSectionName + '.Form.Height'] := Height;
+      AsInteger[FParamsSectionName + '.Form.Left'  ] := Left;
+      AsInteger[FParamsSectionName + '.Form.Top'   ] := Top;
       _SaveFrame;
 
     end;
@@ -174,10 +174,10 @@ begin
 
     with PackageParams do begin
 
-      Width := CheckParam(FParamsSectionName + '.Form.Width', Screen.WorkAreaWidth div 3).AsInteger;
-      Height := CheckParam(FParamsSectionName + '.Form.Height', Screen.WorkAreaHeight div 2).AsInteger;
-      Left := Max(0, CheckParam(FParamsSectionName + '.Form.Left', Screen.WorkAreaWidth div 3).AsInteger);
-      Top := Max(0, CheckParam(FParamsSectionName + '.Form.Top', Screen.WorkAreaHeight div 4).AsInteger);
+      Width  :=        AsIntegerDef(FParamsSectionName + '.Form.Width',  Screen.WorkAreaWidth  div 3);
+      Height :=        AsIntegerDef(FParamsSectionName + '.Form.Height', Screen.WorkAreaHeight div 2);
+      Left   := Max(0, AsIntegerDef(FParamsSectionName + '.Form.Left',   Screen.WorkAreaWidth  div 3));
+      Top    := Max(0, AsIntegerDef(FParamsSectionName + '.Form.Top',    Screen.WorkAreaHeight div 4));
 
     end;
 

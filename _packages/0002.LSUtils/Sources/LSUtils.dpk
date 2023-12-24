@@ -24,7 +24,7 @@ package LSUtils;
 {$IMAGEBASE $400000}
 {$DESCRIPTION '#LS Utils'}
 {$DESIGNONLY}
-{$IMPLICITBUILD ON}
+{$IMPLICITBUILD OFF}
 {$DEFINE DELPHIXE}
 
 requires
@@ -35,18 +35,8 @@ requires
 contains
   uUtils in '..\..\..\Utils\uUtils.pas',
   uSomeParams in '..\..\..\Utils\uSomeParams.pas',
-  vClipboard in '..\..\..\Utils\vClipboard.pas',
-  vConsts in '..\..\..\Utils\vConsts.pas',
-  vDataUtils in '..\..\..\Utils\vDataUtils.pas',
-  vFileUtils in '..\..\..\Utils\vFileUtils.pas',
-  vFormModel in '..\..\..\Utils\vFormModel.pas',
-  vLog in '..\..\..\Utils\vLog.pas',
-  vParams in '..\..\..\Utils\vParams.pas',
-  vPathRunner in '..\..\..\Utils\vPathRunner.pas',
-  vProjUtils in '..\..\..\Utils\vProjUtils.pas',
-  vRegistry in '..\..\..\Utils\vRegistry.pas',
-  vStrUtils in '..\..\..\Utils\vStrUtils.pas',
-  vTable in '..\..\..\Utils\vTable.pas',
-  vTypes in '..\..\..\Utils\vTypes.pas';
+  uFileUtils in '..\..\..\Utils\uFileUtils.pas',
+  uPathRunner in '..\..\..\Utils\uPathRunner.pas',
+  uLog in '..\..\..\Utils\uLog.pas';
 
 end.
