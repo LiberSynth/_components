@@ -142,6 +142,8 @@ type
 
   strict private
 
+  strict private
+
     FLastElementStart: Int64;
 
   private
@@ -398,11 +400,6 @@ begin
 
 end;
 
-procedure TRegion.CheckUnterminated;
-begin
-  raise EStringParserException.CreateFmt('Unterminated %s', [Caption], False);
-end;
-
 function TRegion.CanOpen(_Parser: TCustomStringParser): Boolean;
 begin
   Result := _Parser.IsCursorKey(OpeningKey);
@@ -427,6 +424,11 @@ procedure TRegion.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
 begin
   _Handled := False;
   Executed := True;
+end;
+
+procedure TRegion.CheckUnterminated;
+begin
+  raise EStringParserException.CreateFmt('Unterminated %s', [Caption], False);
 end;
 
 { TRegionList }

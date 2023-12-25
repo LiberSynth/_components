@@ -29,21 +29,30 @@ interface
 
 uses
   { VCL }
-  SysUtils,
+  SysUtils, Generics.Collections,
   { LiberSynth }
   uLSNIStringParser, uParams, uStrUtils;
 
 type
+
+  TListStarter = class(TList<String>)
+
+  private
+
+    function Started(const _Name: String): Boolean;
+
+  end;
 
   TLSNIParamsReader = class(TLSNIStringParser, IParamsReader)
 
   strict private
 
     FParams: TParams;
-    FPresetTypes: Boolean;
 
     FCurrentName: String;
     FCurrentType: TParamDataType;
+
+    FListStarter: TListStarter;
 
     procedure CheckPresetType(_Strict: Boolean);
     function TrimDigital(const _Value: String): String;
@@ -53,7 +62,7 @@ type
 
     constructor CreateNested(_MasterParser: TLSNIParamsReader); reintroduce;
 
-    property PresetTypes: Boolean read FPresetTypes write FPresetTypes;
+    property ListStarter: TListStarter read FListStarter;
 
   protected
 
@@ -61,7 +70,7 @@ type
     procedure ReadType; override;
     procedure ReadValue; override;
     procedure ReadParams; override;
-    function IsParamsType: Boolean; override;
+    function IsNestedParams: Boolean; override;
     procedure BeforeReadParam(_Param: TParam); virtual;
     procedure AfterReadParam(_Param: TParam); virtual;
     procedure AfterReadParams(_Param: TParam); virtual;
@@ -70,6 +79,10 @@ type
     property CurrentType: TParamDataType read FCurrentType;
 
   public
+
+    constructor Create; override;
+
+    destructor Destroy; override;
 
     { IParamsReader }
     procedure SetParams(_Value: TParams);
@@ -80,11 +93,11 @@ type
 
   TParamsLSNIReaderClass = class of TLSNIParamsReader;
 
-procedure LSNIStrToParams(const Source: String; Params: TParams);
+procedure LSNIStrToParams(const Source: String; Params: TParams; PresetTypes: Boolean = False);
 
 implementation
 
-procedure LSNIStrToParams(const Source: String; Params: TParams);
+procedure LSNIStrToParams(const Source: String; Params: TParams; PresetTypes: Boolean);
 var
   Reader: TLSNIParamsReader;
 begin
@@ -104,37 +117,59 @@ begin
 
 end;
 
+{ TListStarter }
+
+function TListStarter.Started(const _Name: String): Boolean;
+var
+  S: String;
+begin
+
+  for S in Self do
+    if SameText(S, _Name) then
+      Exit(True);
+
+  Add(_Name);
+  Result := False;
+
+end;
+
 { TLSNIParamsReader }
+
+constructor TLSNIParamsReader.Create;
+begin
+  inherited Create;
+  FListStarter := TListStarter.Create;
+end;
 
 constructor TLSNIParamsReader.CreateNested;
 begin
 
   inherited CreateNested(_MasterParser);
 
-  FPresetTypes := _MasterParser.PresetTypes;
   Located := _MasterParser.Located;
   Locator := _MasterParser.Locator;
 
 end;
 
-procedure TLSNIParamsReader.SetParams(_Value: TParams);
+destructor TLSNIParamsReader.Destroy;
 begin
-  FParams := _Value;
+  FreeAndNil(FListStarter);
+  inherited Destroy;
 end;
 
 procedure TLSNIParamsReader.CheckPresetType(_Strict: Boolean);
 var
-  P: TParam;
+  DataType: TParamDataType;
 begin
 
   { Определенный заранее тип данных }
   if
 
       (CurrentType = dtUnknown) and
-      Params.FindParam(CurrentName, P) and
-      (P.DataType <> dtUnknown)
+      Params.FindDataType(CurrentName, DataType) and
+      (DataType <> dtUnknown)
 
-  then FCurrentType := P.DataType;
+  then FCurrentType := DataType;
 
   if _Strict and (CurrentType = dtUnknown) then
     raise EParamsReadException.Create('Unknown param data type');
@@ -184,18 +219,16 @@ begin
 
   Value := ReadElement(False);
 
-  { TODO 3 -oVasilyevSM -cuLSNIParamsReader: При попытке чтения нетипизованных параметров не выламывается и читает неправильно. }
-  if PresetTypes then
-    CheckPresetType(True);
+  CheckPresetType(True);
 
-  { Считывание с зарегистрированными типами должно исполнятся в потомках с помощью отдельных свойств (Registered итд). }
-  { TODO 3 -oVasilyevSM -cuLSNIParamsReader: Использование не по назначению. Нужно сформировать явную схему. }
+  { Чтобы предопределить структуру листа для нетипизованного хранения, достаточно создать одну его строку в параметрах
+    до считывания. }
   with Params.AddList(CurrentName) do begin
 
-    if PresetTypes and (Count > 0) then Index := 0
-    else Index := Append;
+    if ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
+    else Index := 0;
 
-    BeforeReadParam(Items[Index]);
+//    BeforeReadParam(Items[Index]);
 
     if Length(Value) > 0 then
 
@@ -222,7 +255,7 @@ begin
 
     end;
 
-    AfterReadParam(Items[Index]);
+//    AfterReadParam(Items[Index]);
 
   end;
 
@@ -233,28 +266,27 @@ end;
 
 procedure TLSNIParamsReader.ReadParams;
 var
-  Param: TParam;
+//  Param: TParam;
   NestedParams: TParams;
 begin
 
-  if PresetTypes then begin
+//  if PresetTypes then begin
 
-    Params.FindParam(CurrentName, dtParams, Param);
-    NestedParams := Params.AsParams[CurrentName]
+//    Params.FindParam(CurrentName, dtParams, Param);
+//    NestedParams := Params.AsParams[CurrentName]
 
-  end else begin
+//  end else begin
 
     NestedParams := TParamsClass(Params.ClassType).Create(Params.PathSeparator);
     NestedParams.SaveToStringOptions := Params.SaveToStringOptions;
-    { TODO 3 -oVasilyevSM -cuLSNIParamsReader: Использование не по назначению. Нужно сформировать явную схему. }
-    with Params.AddList(CurrentName) do
-      Param := Items[Append];
+//    with Params.AddList(CurrentName) do
+//      Param := Items[Append];
 
-    BeforeReadParam(Param);
+//    BeforeReadParam(Param);
 
     Params.AsParams[CurrentName] := NestedParams;
 
-  end;
+//  end;
 
   with TParamsLSNIReaderClass(ClassType).CreateNested(Self) do
 
@@ -263,7 +295,7 @@ begin
       SetSource(Source);
       SetParams(NestedParams);
       Read;
-      AfterReadParams(Param);
+//      AfterReadParams(Param);
       { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
       RetrieveControl(Self);
 
@@ -271,14 +303,14 @@ begin
       Free;
     end;
 
-  AfterReadParam(Param);
+//  AfterReadParam(Param);
 
   FCurrentName := '';
   FCurrentType := dtUnknown;
 
 end;
 
-function TLSNIParamsReader.IsParamsType: Boolean;
+function TLSNIParamsReader.IsNestedParams: Boolean;
 begin
   CheckPresetType(False);
   Result := FCurrentType = dtParams;
@@ -294,6 +326,11 @@ end;
 
 procedure TLSNIParamsReader.AfterReadParams(_Param: TParam);
 begin
+end;
+
+procedure TLSNIParamsReader.SetParams(_Value: TParams);
+begin
+  FParams := _Value;
 end;
 
 end.

@@ -33,8 +33,7 @@ requires
 
 contains
   uComponentTypes in '..\..\..\Components\uComponentTypes.pas',
-  uLSIni in '..\..\..\Components\uLSIni.pas',
-  uTypes in 'uTypes.pas';
+  uLSIni in '..\..\..\Components\uLSIni.pas';
 
 end.
 

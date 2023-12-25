@@ -239,6 +239,8 @@ type
       function InternalIndex(_Index: Integer): Integer;
       function ExternalIndex(_InternalIndex: Integer): Integer;
 
+      property Items[_Index: Integer]: TParam read GetItems; default;
+
     private
 
       constructor Create(const _Name: String; _Params: TParams);
@@ -253,7 +255,6 @@ type
       function Append: Integer;
       procedure Delete(_Index: Integer);
 
-      property Items[_Index: Integer]: TParam read GetItems; default;
       property Count: Integer read GetCount;
 
       property DataType[_Index: Integer]: TParamDataType read GetDataType write SetDataType;
@@ -304,6 +305,8 @@ type
 
     function FindPath(var _Path: String; var _Params: TParams): Boolean;
     function GetPath(var _Path: String): TParams;
+    function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
+    function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
     function ParamByName(const _Path: String): TParam;
 
     function GetList(const _Path: String): TMultiParamList;
@@ -313,6 +316,7 @@ type
 
     function CreateNewParam(const _Name: String): TParam;
 
+    function GetDataType(const _Path: String): TParamDataType;
     function GetIsNull(const _Path: String): Boolean;
     function GetAsBoolean(const _Path: String): Boolean;
     function GetAsInteger(const _Path: String): Integer;
@@ -359,12 +363,9 @@ type
 
     destructor Destroy; override;
 
-    { TODO 5 -oVasilyevSM -cuParams: Против идеи, что управлять значениями можно только через TParams.As... Надо
-      подумать, что тут можно сделать. }
-    function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
-    function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
-
     { v Функции и свойства для основной работы v }
+    function FindDataType(const _Path: String; var _Value: TParamDataType): Boolean;
+    function FindIsNull(const _Path: String; var _Value: Boolean): Boolean;
     function FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
     function FindInteger(const _Path: String; var _Value: Integer): Boolean;
     function FindBigInt(const _Path: String; var _Value: Int64): Boolean;
@@ -402,6 +403,7 @@ type
       Это задача внешней функции, лежащей в юните каждого считывателя. }
     function SaveToString: String;
 
+    property DataType[const _Path: String]: TParamDataType read GetDataType;
     property IsNull[const _Path: String]: Boolean read GetIsNull write SetIsNull;
     property AsBoolean[const _Path: String]: Boolean read GetAsBoolean write SetAsBoolean;
     property AsInteger[const _Path: String]: Integer read GetAsInteger write SetAsInteger;
@@ -1587,8 +1589,20 @@ begin
 end;
 
 function TParams.TMultiParamList.Append: Integer;
+var
+  i, Index: Integer;
 begin
-  Result := ExternalIndex(FParams.Items.Add(CreateNewParam));
+
+  Index := -1;
+  for i := 0 to FParams.Count - 1 do
+    if SameText(FParams.Items[i].Name, Name) then
+      Index := i + 1;
+
+  if Index = -1 then Index := FParams.Items.Add(CreateNewParam)
+  else FParams.Items.Insert(Index, CreateNewParam);
+
+  Result := ExternalIndex(Index);
+
 end;
 
 procedure TParams.TMultiParamList.Delete(_Index: Integer);
@@ -1747,6 +1761,11 @@ end;
 function TParams.CreateNewParam(const _Name: String): TParam;
 begin
   Result := ParamClass.Create(_Name, PathSeparator);
+end;
+
+function TParams.GetDataType(const _Path: String): TParamDataType;
+begin
+  Result := ParamByName(_Path).DataType;
 end;
 
 function TParams.GetIsNull(const _Path: String): Boolean;
@@ -1970,6 +1989,22 @@ begin
 
 end;
 
+function TParams.FindDataType(const _Path: String; var _Value: TParamDataType): Boolean;
+var
+  P: TParam;
+begin
+  Result := FindParam(_Path, P);
+  if Result then _Value := P.DataType;
+end;
+
+function TParams.FindIsNull(const _Path: String; var _Value: Boolean): Boolean;
+var
+  P: TParam;
+begin
+  Result := FindParam(_Path, P);
+  if Result then _Value := P.IsNull;
+end;
+
 function TParams.FindBoolean(const _Path: String; var _Value: Boolean): Boolean;
 var
   P: TParam;
@@ -2165,7 +2200,7 @@ begin
 
   with Params.ListHolder do
     if not Find(PathRest, Result) then
-      Result:= Add(PathRest, Params);
+      Result := Add(PathRest, Params);
 
 end;
 

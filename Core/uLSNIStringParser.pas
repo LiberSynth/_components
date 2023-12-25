@@ -150,7 +150,7 @@ type
     procedure ReadType; virtual; abstract;
     procedure ReadValue; virtual; abstract;
     procedure ReadParams; virtual; abstract;
-    function IsParamsType: Boolean; virtual; abstract;
+    function IsNestedParams: Boolean; virtual; abstract;
 
     property Reading: TReadInfoList read FReading;
     property DoublingChar: Char read FDoublingChar write FDoublingChar;
@@ -499,7 +499,7 @@ begin
 
       (ElementType = etValue) and
       (CursorStanding = stInside) and
-      IsParamsType and
+      IsNestedParams and
       (Source[Cursor] <> '(')
 
   then raise EParamsReadException.Create(_GetMessage);
@@ -637,7 +637,7 @@ begin
         (ElementType = etValue) and
         (CursorStanding = stBefore) and
         inherited and
-        IsParamsType;
+        IsNestedParams;
 
 end;
 
