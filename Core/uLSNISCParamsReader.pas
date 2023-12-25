@@ -90,6 +90,8 @@ type
 
   end;
 
+procedure LSNIStrToParams(const Source: String; Params: TParams);
+
 implementation
 
 const
@@ -152,6 +154,26 @@ type
     property KeyType: TKeyType read GetKeyType write SetKeyType;
 
   end;
+
+procedure LSNIStrToParams(const Source: String; Params: TParams);
+var
+  Reader: TLSNISCParamsReader;
+begin
+
+  Reader := TLSNISCParamsReader.Create;
+  try
+
+    Reader.Located := True;
+    Reader.NativeException := True;
+    Reader.SetSource(Source);
+    Reader.SetParams(Params);
+    Reader.Read;
+
+  finally
+    Reader.Free;
+  end;
+
+end;
 
 { TLSNISCParamsReader }
 

@@ -184,11 +184,12 @@ begin
 
   Value := ReadElement(False);
 
-  { TODO 3 -oVasilyevSM -cuParams: При попытке чтения нетипизованных параметров не выламывается и читает неправильно. }
+  { TODO 3 -oVasilyevSM -cuLSNIParamsReader: При попытке чтения нетипизованных параметров не выламывается и читает неправильно. }
   if PresetTypes then
     CheckPresetType(True);
 
   { Считывание с зарегистрированными типами должно исполнятся в потомках с помощью отдельных свойств (Registered итд). }
+  { TODO 3 -oVasilyevSM -cuLSNIParamsReader: Использование не по назначению. Нужно сформировать явную схему. }
   with Params.AddList(CurrentName) do begin
 
     if PresetTypes and (Count > 0) then Index := 0
@@ -245,6 +246,7 @@ begin
 
     NestedParams := TParamsClass(Params.ClassType).Create(Params.PathSeparator);
     NestedParams.SaveToStringOptions := Params.SaveToStringOptions;
+    { TODO 3 -oVasilyevSM -cuLSNIParamsReader: Использование не по назначению. Нужно сформировать явную схему. }
     with Params.AddList(CurrentName) do
       Param := Items[Append];
 

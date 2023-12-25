@@ -343,7 +343,7 @@ type
 
     function GetParam(_Path: String): TParam;
 
-    property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cTParams: —делать бы default, а то бесит это Items повсюду. }
+    property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cuParams: —делать бы default, а то бесит это Items повсюду. }
     property ListHolder: TParamsListHolder read FListHolder;
 
   protected

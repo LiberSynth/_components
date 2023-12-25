@@ -34,6 +34,8 @@ type
 
   TCustomWriterClass = class of TCustomReader;
 
+  ECustomReadWriteException = class(ECoreException);
+
 implementation
 
 { TCustomReader }

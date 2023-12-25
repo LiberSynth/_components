@@ -25,10 +25,10 @@ unit uUserParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 2 -oVasilyevSM -cTuUserParams: Уборка. Господи, как теперь убираться - ваще хз. Надо uses чистить... }
-{ TODO 3 -oVasilyevSM -cTuUserParams: Есть еще один кейс - пустой файл только с комментариями }
-{ TODO 5 -oVasilyevSM -cTUserFormatParams: Нужны параметры, хранящие исходное форматирование. Всю строку между
-  элементами запоминать в объект и потом выбрасывать в обратно строку в исходном виде, что бы там ни было. }
+{ TODO 2 -oVasilyevSM -cuUserParams: Уборка. Господи, как теперь убираться - ваще хз. Надо uses чистить... }
+{ TODO 3 -oVasilyevSM -cuUserParams: Есть еще один кейс - пустой файл только с комментариями }
+{ TODO 5 -oVasilyevSM -cuUserParams: Нужны параметры, хранящие исходное форматирование. Всю строку между
+  элементами запоминать в объект и потом выбрасывать обратно в строку в исходном виде, что бы там ни было. }
 
 interface
 
@@ -272,7 +272,7 @@ var
   Search: TUserParam.TCommentList;
 begin
 
-  { TODO 5 -oVasilyevSM -cFormatParam: В режиме Untyped комментарии типа должны складываться в BeforeValue. }
+  { TODO 5 -oVasilyevSM -cuUserParams: В режиме Untyped комментарии типа должны складываться в BeforeValue. }
 
   Result        := '';
   Splitter      := '';

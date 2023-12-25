@@ -37,41 +37,41 @@ unit uLSIni;
 
 (*
 
-  Парсер знает, что считывать, но не знает, куда.
-  Ридер - знает куда.
-  Корневой класс - ридер, потому что ради этого вообще вся ветка создана. Хотя строго говоря, он и не ридер и не парсер
-  еще. Не знает, откуда и куда.
+  Парсер знает, из чего считывать, но не знает, во что.
+  Ридер - знает во что.
+  Корневой класс - ридер, потому что ради этого вообще вся ветка создана. Хотя, строго говоря, он и не ридер и не парсер
+  еще. Не знает, ни откуда, ни куда.
 
   Масштаб трагедии (без учета Typed и Untyped):
 
-  CustomReader
-    CustomStringParser
-      LSNIStringParser
-        LSNIParamsReader
-          LSNISCParamsReader
-          LSNIUFParamsReader
-      INIStringParser
-        INIParamsReader
-          INISCParamsReader
-          INIUFParamsReader
-    CustomBLOBParser
-      BLOBParamsReader
-    CustomRegistryParser
-      StructuredRegistryParser
-        StructuredRegistryParamsReader
-      SingleParamRegistryParser
-        SingleParamRegistryParamsReader
+  CustomReader +
+    CustomStringParser +
+      LSNIStringParser +
+        LSNIParamsReader +
+          LSNISCParamsReader +
+          LSNIUFParamsReader -
+      INIStringParser -
+        INIParamsReader -
+          INISCParamsReader -
+          INIUFParamsReader -
+    CustomBLOBParser -
+      BLOBParamsReader -
+    CustomRegistryParser -
+      StructuredRegistryParser -
+        StructuredRegistryParamsReader -
+      SingleParamRegistryParser -
+        SingleParamRegistryParamsReader -
 
-  CustomWriter
-    CustomStringWriter
-      LSNIParamsWriter
-        LSNISCParamsWriter
-        LSNIUFParamsWriter
-      INIParamsWriter
-        INISCParamsWriter
-        INIUFParamsWriter
-    CustomBLOBWriter
-      ParamsBLOBWriter
+  CustomWriter +
+    CustomStringWriter -
+      LSNIParamsWriter -
+        LSNISCParamsWriter -
+        LSNIUFParamsWriter -
+      INIParamsWriter -
+        INISCParamsWriter -
+        INIUFParamsWriter -
+    CustomBLOBWriter -
+      ParamsBLOBWriter -
     CustomRegistryWriter~
       CustomParamsRegistryWriter~
         ParamsStructuredRegistryWriter~
@@ -206,7 +206,7 @@ begin
 
       CustomStringParser.SetLocated
 
-    else raise EParamsException.CreateFmt('Reader class %s does not support string reading.', [_Reader.ClassName]);
+    else raise EComponentException.CreateFmt('Reader class %s does not support string reading.', [_Reader.ClassName]);
 
 end;
 
@@ -219,7 +219,7 @@ begin
 
     ParamsReader.SetParams(Params)
 
-  else raise EParamsException.CreateFmt('Reader class %s does not support params reading.', [_Reader.ClassName]);
+  else raise EComponentException.CreateFmt('Reader class %s does not support params reading.', [_Reader.ClassName]);
 
 end;
 
@@ -232,8 +232,6 @@ begin
 
   case SourceType of
 
-    { TODO 2 -oVasilyevSM -cuLSIni: Если путь не указан - это ини рядом с экзешником. Или раздел реестра приложения из
-      неких общих параметров проекта (где-то вычислялось). }
     stFile: StringSource := FileToStr(SourceFile);
 //    stRegistryStructured: ;
 //    stRegistrySingleParam: ;
@@ -323,9 +321,9 @@ const
   Map: array [TIniStoreMethod, TCommentSupport] of TCustomParserClass = (
 
                        { csNone,            csStockFormat,       csUserFormat }
-      { smLSNIString } ( TLSNIParamsReader, TLSNISCParamsReader, nil          ),
-      { smClassicIni } ( nil,               nil,                 nil          ),
-      { smBLOB       } ( nil,               nil,                 nil          )
+      { smLSNIString } ( TLSNIParamsReader, TLSNISCParamsReader, TCustomReader),
+      { smClassicIni } ( TCustomReader,     TCustomReader,       TCustomReader),
+      { smBLOB       } ( TCustomReader,     nil,                 nil          )
 
   );
 
@@ -333,8 +331,10 @@ begin
 
   Result := Map[StoreMethod, CommentSupport];
 
-  if not Assigned(Result) then
+  if Result = TCustomReader then
     raise EUncompletedMethod.Create;
+  if not Assigned(Result) then
+    raise ECustomReadWriteException.Create('Impossible combination of properties. There are no blobs with comments.');
 
 end;
 
@@ -347,7 +347,7 @@ begin
 
     CustomStringParser.SetSource(_Source)
 
-  else raise EParamsException.CreateFmt('Reader class %s does not support string reading.', [_Reader.ClassName]);
+  else raise ECustomReadWriteException.CreateFmt('Reader class %s does not support string reading.', [_Reader.ClassName]);
 
 end;
 

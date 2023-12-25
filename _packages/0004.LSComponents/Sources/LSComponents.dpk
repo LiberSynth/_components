@@ -22,7 +22,7 @@ package LSComponents;
 {$WRITEABLECONST OFF}
 {$MINENUMSIZE 1}
 {$IMAGEBASE $400000}
-{$DESCRIPTION '#LS Components'}
+{$DESCRIPTION '# 0004 LS Components'}
 {$IMPLICITBUILD ON}
 
 requires
@@ -33,7 +33,8 @@ requires
 
 contains
   uComponentTypes in '..\..\..\Components\uComponentTypes.pas',
-  uLSIni in '..\..\..\Components\uLSIni.pas';
+  uLSIni in '..\..\..\Components\uLSIni.pas',
+  uTypes in 'uTypes.pas';
 
 end.
 
