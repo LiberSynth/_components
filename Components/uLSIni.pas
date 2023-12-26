@@ -206,7 +206,7 @@ begin
 
       CustomStringParser.SetLocated
 
-    else raise EComponentException.CreateFmt('Reader class %s does not support string reading.', [_Reader.ClassName]);
+    else raise EComponentException.CreateFmt('Reader class %s does not support string parsing.', [_Reader.ClassName]);
 
 end;
 

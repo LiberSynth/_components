@@ -37,6 +37,7 @@ uses
 { TODO -oVasilyevSM -cuStrUtils: Продолжение следует: Integer, BigInt, Float, Extended, DateTime, AnsiString, String, BLOB, Data }
 function StrIsBoolean(const S: String): Boolean;
 function StrIsGUID(const Value: String): Boolean;
+function IsHexStr(const Value: String): Boolean;
 { ^ Проверка ^ }
 
 { v Преобразование основных типов данных в визуальную строку и обратно. Полный набор. v }
@@ -175,6 +176,11 @@ begin
       SameText(S, '0') or
       SameText(S, '1');
 
+end;
+
+function IsHexStr(const Value: String): Boolean;
+begin
+  Result := (Length(Value) > 2) and (Copy(Value, 1, 2) = '0x');
 end;
 
 function StrIsGUID(const Value: String): Boolean;
@@ -535,6 +541,9 @@ var
   i: Integer;
   B: Byte;
 begin
+
+  if not IsHexStr(Value) then
+    raise EConvertError.CreateFmt('''%s'' is not a hex string', [Value]);
 
   SetLength(Result, (Length(Value) - 2) div 2);
 

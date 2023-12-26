@@ -102,28 +102,13 @@ type
 
     procedure Clear;
 
-    property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
-
-    (*
-    { Если хэлпер надоест, чтобы далеко не лазить за этими свойствами. }
-    property AsBoolean: Boolean read GetAsBoolean write SetAsBoolean;
-    property AsInteger: Integer read GetAsInteger write SetAsInteger;
-    property AsBigInt: Int64 read GetAsBigInt write SetAsBigInt;
-    property AsFloat: Double read GetAsFloat write SetAsFloat;
-    property AsExtended: Extended read GetAsExtended write SetAsExtended;
-    property AsDateTime: TDateTime read GetAsDateTime write SetAsDateTime;
-    property AsGUID: TGUID read GetAsGUID write SetAsGUID;
-    property AsAnsiString: AnsiString read GetAsAnsiString write SetAsAnsiString;
-    property AsString: String read GetAsString write SetAsString;
-    property AsBLOB: BLOB read GetAsBLOB write SetAsBLOB;
-    property AsData: TData read GetAsData write SetAsData;
-    *)
+    property StrictDataType: Boolean read FStrictDataType;
 
     property AsParams: TParams read GetAsParams;
 
   protected
 
-    constructor Create(const _Name: String; const _PathSeparator: Char = '.'); virtual;
+    constructor Create(const _Name: String; const _PathSeparator: Char = '.'; _StrictDataType: Boolean = False); virtual;
 
     { Для передачи без разбора типов }
     procedure AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean); virtual;
@@ -296,6 +281,7 @@ type
 
     FPathSeparator: Char;
     FSaveToStringOptions: TSaveToStringOptions;
+    FStrictDataTypes: Boolean;
 
     FItems: TParamList;
     FListHolder: TParamsListHolder;
@@ -308,13 +294,12 @@ type
     function FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean; overload;
     function FindParam(_Path: String; var _Value: TParam): Boolean; overload;
     function ParamByName(const _Path: String): TParam;
+    function CreateNewParam(const _Name: String): TParam;
 
     function GetList(const _Path: String): TMultiParamList;
     function GetCount: Integer;
 
   private
-
-    function CreateNewParam(const _Name: String): TParam;
 
     function GetDataType(const _Path: String): TParamDataType;
     function GetIsNull(const _Path: String): Boolean;
@@ -329,7 +314,6 @@ type
     function GetAsString(const _Path: String): String;
     function GetAsBLOB(const _Path: String): BLOB;
     function GetAsData(const _Path: String): TData;
-    function GetAsParams(const _Path: String): TParams;
 
     procedure SetIsNull(const _Path: String; const _Value: Boolean);
     procedure SetAsBoolean(const _Path: String; _Value: Boolean);
@@ -343,7 +327,6 @@ type
     procedure SetAsString(const _Path: String; const _Value: String);
     procedure SetAsBLOB(const _Path: String; const _Value: BLOB);
     procedure SetAsData(const _Path: String; const _Value: TData);
-    procedure SetAsParams(const _Path: String; _Value: TParams);
 
     function GetParam(_Path: String): TParam;
 
@@ -359,7 +342,7 @@ type
 
   public
 
-    constructor Create(const _PathSeparator: Char = '.');
+    constructor Create(const _PathSeparator: Char = '.'; _StrictDataTypes: Boolean = False);
 
     destructor Destroy; override;
 
@@ -377,7 +360,6 @@ type
     function FindString(const _Path: String; var _Value: String): Boolean;
     function FindBLOB(const _Path: String; var _Value: BLOB): Boolean;
     function FindData(const _Path: String; var _Value: TData): Boolean;
-    function FindParams(const _Path: String; var _Value: TParams): Boolean;
 
     function AsBooleanDef(const _Path: String; _Default: Boolean): Boolean;
     function AsIntegerDef(const _Path: String; _Default: Integer): Integer;
@@ -416,24 +398,18 @@ type
     property AsString[const _Path: String]: String read GetAsString write SetAsString;
     property AsBLOB[const _Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
     property AsData[const _Path: String]: TData read GetAsData write SetAsData;
-    { TODO 5 -oVasilyevSM -cuParams: Против идеи, что управлять значениями можно только через TParams.As... Надо
-      подумать, что тут можно сделать. }
-    property AsParams[const _Path: String]: TParams read GetAsParams write SetAsParams;
     property List[const _Path: String]: TMultiParamList read GetList;
 
     property PathSeparator: Char read FPathSeparator;
+    { TODO 3 -oVasilyevSM -cuParams: В рендерер. }
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions write FSaveToStringOptions;
+    { TODO 3 -oVasilyevSM -cuParams: StrictDataTypes не работает, лупит в новый тип. }
+    property StrictDataTypes: Boolean read FStrictDataTypes;
     property Count: Integer read GetCount;
 
   end;
 
   TParamsClass = class of TParams;
-
-  IParamsReader = interface ['{5324B88D-A724-4E0B-9797-5004FE975287}']
-
-    procedure SetParams(_Value: TParams);
-
-  end;
 
   EParamsException = class(ECoreException);
 
@@ -493,8 +469,9 @@ begin
 
   inherited Create;
 
-  FIsNull        := True;
-  FPathSeparator := _PathSeparator;
+  FIsNull         := True;
+  FPathSeparator  := _PathSeparator;
+  FStrictDataType := _StrictDataType;
 
   ValidateName(_Name, FPathSeparator);
   FName := _Name;
@@ -1653,12 +1630,13 @@ end;
 
 { TParams }
 
-constructor TParams.Create(const _PathSeparator: Char);
+constructor TParams.Create;
 begin
 
   inherited Create;
 
-  FPathSeparator       := _PathSeparator;
+  FPathSeparator   := _PathSeparator;
+  FStrictDataTypes := _StrictDataTypes;
 
   FItems      := TParamList.Create;
   FListHolder := TParamsListHolder.Create;
@@ -1760,7 +1738,7 @@ end;
 
 function TParams.CreateNewParam(const _Name: String): TParam;
 begin
-  Result := ParamClass.Create(_Name, PathSeparator);
+  Result := ParamClass.Create(_Name, PathSeparator, StrictDataTypes);
 end;
 
 function TParams.GetDataType(const _Path: String): TParamDataType;
@@ -1828,11 +1806,6 @@ begin
   Result := ParamByName(_Path).AsData;
 end;
 
-function TParams.GetAsParams(const _Path: String): TParams;
-begin
-  Result := ParamByName(_Path).AsParams;
-end;
-
 procedure TParams.SetIsNull(const _Path: String; const _Value: Boolean);
 begin
   GetParam(_Path).IsNull := _Value;
@@ -1891,11 +1864,6 @@ end;
 procedure TParams.SetAsData(const _Path: String; const _Value: TData);
 begin
   GetParam(_Path).AsData := _Value;
-end;
-
-procedure TParams.SetAsParams(const _Path: String; _Value: TParams);
-begin
-  GetParam(_Path).SetAsParams(_Value);
 end;
 
 function TParams.FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean;
@@ -2091,14 +2059,6 @@ var
 begin
   Result := FindParam(_Path, dtData, P);
   if Result then _Value := P.AsData;
-end;
-
-function TParams.FindParams(const _Path: String; var _Value: TParams): Boolean;
-var
-  P: TParam;
-begin
-  Result := FindParam(_Path, dtParams, P);
-  if Result then _Value := P.AsParams;
 end;
 
 function TParams.AsBooleanDef(const _Path: String; _Default: Boolean): Boolean;

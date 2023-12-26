@@ -36,11 +36,11 @@ contains
   uCore in '..\..\..\Core\uCore.pas',
   uGUID in '..\..\..\Core\uGUID.pas',
   uParams in '..\..\..\Core\uParams.pas',
-  uUserParams in '..\..\..\Core\uUserParams.pas',
   uCustomReadWrite in '..\..\..\Core\uCustomReadWrite.pas',
   uCustomStringParser in '..\..\..\Core\uCustomStringParser.pas',
   uLSNIStringParser in '..\..\..\Core\uLSNIStringParser.pas',
-  uLSNIParamsReader in '..\..\..\Core\uLSNIParamsReader.pas',
-  uLSNISCParamsReader in '..\..\..\Core\uLSNISCParamsReader.pas';
+  uParamsReader in '..\..\..\Core\uParamsReader.pas',
+  uStub in '..\..\..\Core\uStub.pas',
+  uReadWriteCommon in '..\..\..\Core\uReadWriteCommon.pas';
 
 end.

@@ -1,4 +1,4 @@
-unit uLSNIParamsReader;
+unit uParamsReader;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { LiberSynth }
-  uLSNIStringParser, uParams, uStrUtils;
+  uCustomReadWrite, uReadWriteCommon, uParams, uStrUtils;
 
 type
 
@@ -43,7 +43,13 @@ type
 
   end;
 
-  TLSNIParamsReader = class(TLSNIStringParser, IParamsReader)
+  IParamsReader = interface ['{5324B88D-A724-4E0B-9797-5004FE975287}']
+
+    procedure SetParams(_Value: TParams);
+
+  end;
+
+  TParamsReader = class(TCustomReader, IParamsReader, INTVParser)
 
   strict private
 
@@ -56,21 +62,24 @@ type
 
     procedure CheckPresetType(_Strict: Boolean);
     function TrimDigital(const _Value: String): String;
-    function UndoubleSymbols(const _Value: String): String;
+
+    { INTVParser }
+    procedure ReadName(const _Element: String);
+    procedure ReadType(const _Element: String);
+    procedure ReadValue(const _Element: String);
+    function IsNestedValue: Boolean;
+    procedure ReadNestedBlock;
+
+    { IParamsReader }
+    procedure SetParams(_Value: TParams);
 
   private
-
-    constructor CreateNested(_MasterParser: TLSNIParamsReader); reintroduce;
 
     property ListStarter: TListStarter read FListStarter;
 
   protected
 
-    procedure ReadName; override;
-    procedure ReadType; override;
-    procedure ReadValue; override;
-    procedure ReadParams; override;
-    function IsNestedParams: Boolean; override;
+    procedure ReadParams;
     procedure BeforeReadParam(_Param: TParam); virtual;
     procedure AfterReadParam(_Param: TParam); virtual;
     procedure AfterReadParams(_Param: TParam); virtual;
@@ -84,38 +93,13 @@ type
 
     destructor Destroy; override;
 
-    { IParamsReader }
-    procedure SetParams(_Value: TParams);
-
     property Params: TParams read FParams;
 
   end;
 
-  TParamsLSNIReaderClass = class of TLSNIParamsReader;
-
-procedure LSNIStrToParams(const Source: String; Params: TParams; PresetTypes: Boolean = False);
+  EParamsReadException = class(ECustomReadWriteException);
 
 implementation
-
-procedure LSNIStrToParams(const Source: String; Params: TParams; PresetTypes: Boolean);
-var
-  Reader: TLSNIParamsReader;
-begin
-
-  Reader := TLSNIParamsReader.Create;
-  try
-
-    Reader.Located := True;
-    Reader.NativeException := True;
-    Reader.SetSource(Source);
-    Reader.SetParams(Params);
-    Reader.Read;
-
-  finally
-    Reader.Free;
-  end;
-
-end;
 
 { TListStarter }
 
@@ -133,31 +117,21 @@ begin
 
 end;
 
-{ TLSNIParamsReader }
+{ TParamsReader }
 
-constructor TLSNIParamsReader.Create;
+constructor TParamsReader.Create;
 begin
   inherited Create;
   FListStarter := TListStarter.Create;
 end;
 
-constructor TLSNIParamsReader.CreateNested;
-begin
-
-  inherited CreateNested(_MasterParser);
-
-  Located := _MasterParser.Located;
-  Locator := _MasterParser.Locator;
-
-end;
-
-destructor TLSNIParamsReader.Destroy;
+destructor TParamsReader.Destroy;
 begin
   FreeAndNil(FListStarter);
   inherited Destroy;
 end;
 
-procedure TLSNIParamsReader.CheckPresetType(_Strict: Boolean);
+procedure TParamsReader.CheckPresetType(_Strict: Boolean);
 var
   DataType: TParamDataType;
 begin
@@ -176,48 +150,78 @@ begin
 
 end;
 
-function TLSNIParamsReader.TrimDigital(const _Value: String): String;
+function TParamsReader.TrimDigital(const _Value: String): String;
 begin
   Result := StringReplace(_Value, ' ', '', [rfReplaceAll]);
 end;
 
-function TLSNIParamsReader.UndoubleSymbols(const _Value: String): String;
+procedure TParamsReader.ReadName(const _Element: String);
+begin
+  TParam.ValidateName(_Element, Params.PathSeparator);
+  FCurrentName := _Element;
+end;
+
+procedure TParamsReader.ReadNestedBlock;
+{var
+  Param: TParam;
+  NestedParams: TParams;}
 begin
 
-  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
-    условии, что значение считывается регионом. Поэтому, символ задается событием региона. Но! Здесь будет нужна отмена,
-    потому что дублирование не нужно в комментариях совсем. }
+  {if PresetTypes then begin
 
-  if DoublingChar > #0 then Result := UndoubleStr(_Value, DoublingChar)
-  else Result := _Value;
+    Params.FindParam(CurrentName, dtParams, Param);
+    NestedParams := Params.AsParams[CurrentName]
+
+  end else begin
+
+    NestedParams := TParamsClass(Params.ClassType).Create(Params.PathSeparator);
+    NestedParams.SaveToStringOptions := Params.SaveToStringOptions;
+    with Params.AddList(CurrentName) do
+      Param := Items[Append];
+
+    BeforeReadParam(Param);
+
+    Params.AsParams[CurrentName] := NestedParams;
+
+  end;}
+
+//  with TParamsReaderClass(ClassType).CreateNested(Self) do
+//
+//    try
+//
+//      SetSource(Source);
+//      SetParams(Params);
+//      Read;
+//{      AfterReadParams(Param);}
+//      { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
+//      RetrieveControl(Self);
+//
+//    finally
+//      Free;
+//    end;
+
+{  AfterReadParam(Param);}
+
+//  FCurrentName := '';
+//  FCurrentType := dtUnknown;
 
 end;
 
-procedure TLSNIParamsReader.ReadName;
-var
-  Value: String;
+procedure TParamsReader.ReadParams;
 begin
-
-  Value := ReadElement(True);
-
-  TParam.ValidateName(Value, Params.PathSeparator);
-  FCurrentName := Value;
 
 end;
 
-procedure TLSNIParamsReader.ReadType;
+procedure TParamsReader.ReadType(const _Element: String);
 begin
-  FCurrentType := StrToParamDataType(ReadElement(True));
+  FCurrentType := StrToParamDataType(_Element);
   CheckPresetType(True);
 end;
 
-procedure TLSNIParamsReader.ReadValue;
+procedure TParamsReader.ReadValue(const _Element: String);
 var
-  Value: String;
   Index: Integer;
 begin
-
-  Value := ReadElement(False);
 
   CheckPresetType(True);
 
@@ -230,21 +234,21 @@ begin
 
 //    BeforeReadParam(Items[Index]);
 
-    if Length(Value) > 0 then
+    if Length(_Element) > 0 then
 
       case CurrentType of
 
-        dtBoolean:    AsBoolean   [Index] := StrToBoolean(Value);
-        dtInteger:    AsInteger   [Index] := StrToInt(TrimDigital(Value));
-        dtBigInt:     AsBigInt    [Index] := StrToBigInt(TrimDigital(Value));
-        dtFloat:      AsFloat     [Index] := StrToFloat (TrimDigital(Value));
-        dtExtended:   AsExtended  [Index] := StrToExtended(TrimDigital(Value));
-        dtDateTime:   AsDateTime  [Index] := StrToDateTime(Value);
-        dtGUID:       AsGUID      [Index] := StrToGUID(Value);
-        dtAnsiString: AsAnsiString[Index] := StrToAnsiStr(Value);
-        dtString:     AsString    [Index] := UndoubleSymbols(Value);
-        dtBLOB:       AsBLOB      [Index] := HexStrToBLOB(Value);
-        dtData:       AsData      [Index] := ByteStrToData(Value);
+        dtBoolean:    AsBoolean   [Index] := StrToBoolean(_Element);
+        dtInteger:    AsInteger   [Index] := StrToInt(TrimDigital(_Element));
+        dtBigInt:     AsBigInt    [Index] := StrToBigInt(TrimDigital(_Element));
+        dtFloat:      AsFloat     [Index] := StrToFloat (TrimDigital(_Element));
+        dtExtended:   AsExtended  [Index] := StrToExtended(TrimDigital(_Element));
+        dtDateTime:   AsDateTime  [Index] := StrToDateTime(_Element);
+        dtGUID:       AsGUID      [Index] := StrToGUID(_Element);
+        dtAnsiString: AsAnsiString[Index] := StrToAnsiStr(_Element);
+        dtString:     AsString    [Index] := _Element;
+        dtBLOB:       AsBLOB      [Index] := HexStrToBLOB(_Element);
+        dtData:       AsData      [Index] := ByteStrToData(_Element);
 
       end
 
@@ -264,71 +268,25 @@ begin
 
 end;
 
-procedure TLSNIParamsReader.ReadParams;
-var
-//  Param: TParam;
-  NestedParams: TParams;
-begin
-
-//  if PresetTypes then begin
-
-//    Params.FindParam(CurrentName, dtParams, Param);
-//    NestedParams := Params.AsParams[CurrentName]
-
-//  end else begin
-
-    NestedParams := TParamsClass(Params.ClassType).Create(Params.PathSeparator);
-    NestedParams.SaveToStringOptions := Params.SaveToStringOptions;
-//    with Params.AddList(CurrentName) do
-//      Param := Items[Append];
-
-//    BeforeReadParam(Param);
-
-    Params.AsParams[CurrentName] := NestedParams;
-
-//  end;
-
-  with TParamsLSNIReaderClass(ClassType).CreateNested(Self) do
-
-    try
-
-      SetSource(Source);
-      SetParams(NestedParams);
-      Read;
-//      AfterReadParams(Param);
-      { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
-      RetrieveControl(Self);
-
-    finally
-      Free;
-    end;
-
-//  AfterReadParam(Param);
-
-  FCurrentName := '';
-  FCurrentType := dtUnknown;
-
-end;
-
-function TLSNIParamsReader.IsNestedParams: Boolean;
+function TParamsReader.IsNestedValue: Boolean;
 begin
   CheckPresetType(False);
   Result := FCurrentType = dtParams;
 end;
 
-procedure TLSNIParamsReader.BeforeReadParam(_Param: TParam);
+procedure TParamsReader.BeforeReadParam(_Param: TParam);
 begin
 end;
 
-procedure TLSNIParamsReader.AfterReadParam(_Param: TParam);
+procedure TParamsReader.AfterReadParam(_Param: TParam);
 begin
 end;
 
-procedure TLSNIParamsReader.AfterReadParams(_Param: TParam);
+procedure TParamsReader.AfterReadParams(_Param: TParam);
 begin
 end;
 
-procedure TLSNIParamsReader.SetParams(_Value: TParams);
+procedure TParamsReader.SetParams(_Value: TParams);
 begin
   FParams := _Value;
 end;

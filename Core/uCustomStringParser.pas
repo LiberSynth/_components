@@ -157,14 +157,20 @@ type
 
   end;
 
-  IStringParser = interface ['{2BFFF59C-28FF-40A6-A42A-DA4AB854ECB4}']
+  ICustomStringParser = interface ['{2BFFF59C-28FF-40A6-A42A-DA4AB854ECB4}']
 
     procedure SetSource(const _Source: String);
-    procedure SetLocated;
+    function GetLocated: Boolean;
+    procedure SetLocated(_Value: Boolean);
+    function GetNativeException: Boolean;
+    procedure SetNativeException(_Value: Boolean);
+
+    property Located: Boolean read GetLocated write SetLocated;
+    property NativeException: Boolean read GetNativeException write SetNativeException;
 
   end;
 
-  TCustomStringParser = class abstract (TCustomReader, IStringParser)
+  TCustomStringParser = class abstract (TCustomParser, ICustomStringParser)
 
   strict private
 
@@ -201,6 +207,12 @@ type
     function GetEof: Boolean;
     function GetRest: Int64; inline;
 
+    { ICustomStringParser }
+    function GetLocated: Boolean;
+    procedure SetLocated(_Value: Boolean);
+    function GetNativeException: Boolean;
+    procedure SetNativeException(_Value: Boolean);
+
     property NestedLevel: Word read FNestedLevel;
 
   private
@@ -217,7 +229,7 @@ type
     function ElementProcessingKey(_KeyWord: TKeyWord): Boolean; virtual;
     function ElementTerminatingKey(_KeyWord: TKeyWord): Boolean; virtual;
     procedure ProcessElement; virtual;
-    function ReadElement(_Trim: Boolean): String; virtual;
+    function ReadElement: String;
     procedure ElementTerminated(_KeyWord: TKeyWord); virtual;
     procedure AddRegion(const _RegionClass: TRegionClass; const _OpeningKey, _ClosingKey: TKeyWord; const _Caption: String);
     function ExecuteRegion: Boolean;
@@ -234,9 +246,8 @@ type
 
     destructor Destroy; override;
 
-    { IStringParser }
+    { ICustomStringParser }
     procedure SetSource(const _Source: String);
-    procedure SetLocated;
 
     { События для потомков }
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
@@ -259,12 +270,12 @@ type
     property ElementStart: Int64 read FElementStart;
     property RegionStart: Int64 read FRegionStart;
     property Terminated: Boolean read FTerminated;
-    property Located: Boolean read FLocated write FLocated;
-    property NativeException: Boolean read FNativeException write FNativeException;
+    property Located: Boolean read GetLocated write SetLocated;
+    property NativeException: Boolean read GetNativeException write SetNativeException;
 
   end;
 
-  EStringParserException = class(ECoreException)
+  EStringParserException = class(ECustomReadWriteException)
 
   strict private
 
@@ -283,7 +294,7 @@ type
 
   { Этот класс используется, когда CustomStringParser.NativeException = False. Он позволит спозиционировать курсор в
    контроле с источником, чтобы указать на место ошибки. }
-  ELocatedException = class(ECoreException)
+  ELocatedException = class(ECustomReadWriteException)
 
   strict private
 
@@ -767,6 +778,26 @@ begin
   Result := SrcLen - Cursor + 1;
 end;
 
+function TCustomStringParser.GetLocated: Boolean;
+begin
+  Result := FLocated;
+end;
+
+procedure TCustomStringParser.SetLocated(_Value: Boolean);
+begin
+  FLocated := _Value;
+end;
+
+function TCustomStringParser.GetNativeException: Boolean;
+begin
+  Result := FNativeException;
+end;
+
+procedure TCustomStringParser.SetNativeException(_Value: Boolean);
+begin
+  FNativeException := _Value;
+end;
+
 function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
 begin
   with _KeyWord do
@@ -809,16 +840,12 @@ begin
   ToggleStanding(stAfter); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 2 (ProcessElement) }
 end;
 
-function TCustomStringParser.ReadElement(_Trim: Boolean): String;
+function TCustomStringParser.ReadElement: String;
 begin
 
   if ElementStart > 0 then
 
-    if _Trim then
-      { Все SysUtils.Trim обрезают все, что <= ' '. Все табы, ритерны итд. }
-      Result := Trim(Copy(Source, ElementStart, Cursor - ElementStart))
-    else
-      Result := Copy(Source, ElementStart, Cursor - ElementStart)
+    Result := Copy(Source, ElementStart, Cursor - ElementStart)
 
   else Result := '';
 
@@ -868,11 +895,6 @@ procedure TCustomStringParser.SetSource(const _Source: String);
 begin
   FSource := _Source;
   FSrcLen := Length(FSource);
-end;
-
-procedure TCustomStringParser.SetLocated;
-begin
-  Located := True;
 end;
 
 procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);
