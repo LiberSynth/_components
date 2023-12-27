@@ -233,7 +233,6 @@ type
     procedure ElementTerminated(_KeyWord: TKeyWord); virtual;
     procedure AddRegion(const _RegionClass: TRegionClass; const _OpeningKey, _ClosingKey: TKeyWord; const _Caption: String);
     function ExecuteRegion: Boolean;
-    procedure RetrieveControl(_Master: TCustomStringParser);
     procedure CheckSyntax(const _KeyWord: TKeyWord); virtual;
 
     property KeyWords: TKeyWordList read FKeyWords;
@@ -242,9 +241,11 @@ type
   public
 
     constructor Create; override;
-    constructor CreateNested(_Master: TCustomStringParser); virtual;
-
     destructor Destroy; override;
+
+    function Clone: TCustomParser; override;
+
+    procedure Accept(_Sender: TCustomParser); override;
 
     { ICustomStringParser }
     procedure SetSource(const _Source: String);
@@ -587,21 +588,6 @@ begin
 
 end;
 
-constructor TCustomStringParser.CreateNested(_Master: TCustomStringParser);
-begin
-
-  inherited Create;
-
-  FSource := _Master.Source;
-  FSrcLen := Length(Source);
-
-  FCursor      := _Master.Cursor;
-  FNestedLevel := _Master.NestedLevel + 1;
-
-  InitParser;
-
-end;
-
 destructor TCustomStringParser.Destroy;
 begin
 
@@ -726,6 +712,13 @@ begin
   Result := Regions.Active;
 end;
 
+procedure TCustomStringParser.Accept(_Sender: TCustomParser);
+begin
+  inherited Accept(_Sender);
+  Move((_Sender as TCustomStringParser).Cursor - Cursor);
+  CheckPoint;
+end;
+
 procedure TCustomStringParser.CheckPoint;
 begin
   if Located then
@@ -765,6 +758,24 @@ begin
     Regions.CheckUnterminated;
 
   end;
+
+end;
+
+function TCustomStringParser.Clone: TCustomParser;
+begin
+
+  Result := inherited Clone;
+
+  TCustomStringParser(Result).FSource      := Source;
+  TCustomStringParser(Result).FSrcLen      := Length(Source);
+  TCustomStringParser(Result).FCursor      := Cursor;
+  TCustomStringParser(Result).FNestedLevel := NestedLevel + 1;
+
+  TCustomStringParser(Result).Located         := Located;
+  TCustomStringParser(Result).NativeException := NativeException;
+  TCustomStringParser(Result).Locator         := Locator;
+
+  TCustomStringParser(Result).SetSource(Source);
 
 end;
 
@@ -880,12 +891,6 @@ begin
 
 end;
 
-procedure TCustomStringParser.RetrieveControl(_Master: TCustomStringParser);
-begin
-  _Master.Move(Cursor - _Master.Cursor);
-  _Master.CheckPoint;
-end;
-
 procedure TCustomStringParser.CheckSyntax(const _KeyWord: TKeyWord);
 begin
   CheckUnterminated(_KeyWord.KeyType);
@@ -985,7 +990,6 @@ begin
         Location := Locator.Location(Source);
         if NativeException then
 
-          { TODO 4 -oVasilyevSM -cuCustomStringParser: Утечка. }
           raise ExceptClass(E.ClassType).CreateFmt('%s. %s', [E.Message, Location.Text])
 
         else raise ELocatedException.Create(ExceptClass(E.ClassType), E.Message, Location);

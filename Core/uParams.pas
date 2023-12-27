@@ -104,8 +104,6 @@ type
 
     property StrictDataType: Boolean read FStrictDataType;
 
-    property AsParams: TParams read GetAsParams;
-
   protected
 
     constructor Create(const _Name: String; const _PathSeparator: Char = '.'; _StrictDataType: Boolean = False); virtual;
@@ -142,6 +140,7 @@ type
     function _GetAsString: String;
     function _GetAsBLOB: BLOB;
     function _GetAsData: TData;
+    function _GetAsParams: TParams;
 
     procedure _SetAsBoolean(const _Value: Boolean);
     procedure _SetAsInteger(const _Value: Integer);
@@ -154,8 +153,9 @@ type
     procedure _SetAsString(const _Value: String);
     procedure _SetAsBLOB(const _Value: BLOB);
     procedure _SetAsData(const _Value: TData);
+    procedure _SetAsParams(const _Value: TParams);
 
-  private
+  public
 
     property AsBoolean: Boolean read _GetAsBoolean write _SetAsBoolean;
     property AsInteger: Integer read _GetAsInteger write _SetAsInteger;
@@ -168,6 +168,7 @@ type
     property AsString: String read _GetAsString write _SetAsString;
     property AsBLOB: BLOB read _GetAsBLOB write _SetAsBLOB;
     property AsData: TData read _GetAsData write _SetAsData;
+    property AsParams: TParams read _GetAsParams write _SetAsParams;
 
   end;
 
@@ -206,6 +207,7 @@ type
       function GetAsString(_Index: Integer): String;
       function GetAsBLOB(_Index: Integer): BLOB;
       function GetAsData(_Index: Integer): TData;
+      function GetAsParams(_Index: Integer): TParams;
 
       procedure SetIsNull(_Index: Integer; const _Value: Boolean);
 
@@ -220,6 +222,7 @@ type
       procedure SetAsString(_Index: Integer; const _Value: String);
       procedure SetAsBLOB(_Index: Integer; const _Value: BLOB);
       procedure SetAsData(_Index: Integer; const _Value: TData);
+      procedure SetAsParams(_Index: Integer; const _Value: TParams);
 
       function InternalIndex(_Index: Integer): Integer;
       function ExternalIndex(_InternalIndex: Integer): Integer;
@@ -256,6 +259,7 @@ type
       property AsString[_Index: Integer]: String read GetAsString write SetAsString;
       property AsBLOB[_Index: Integer]: BLOB read GetAsBLOB write SetAsBLOB;
       property AsData[_Index: Integer]: TData read GetAsData write SetAsData;
+      property AsParams[_Index: Integer]: TParams read GetAsParams write SetAsParams;
 
     end;
 
@@ -273,7 +277,7 @@ type
 
     protected
 
-      procedure Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification); override;
+      procedure Notify(const _Item: TParam; _Action: TCollectionNotification); override;
 
     end;
 
@@ -314,6 +318,7 @@ type
     function GetAsString(const _Path: String): String;
     function GetAsBLOB(const _Path: String): BLOB;
     function GetAsData(const _Path: String): TData;
+    function GetAsParams(const _Path: String): TParams;
 
     procedure SetIsNull(const _Path: String; const _Value: Boolean);
     procedure SetAsBoolean(const _Path: String; _Value: Boolean);
@@ -327,6 +332,7 @@ type
     procedure SetAsString(const _Path: String; const _Value: String);
     procedure SetAsBLOB(const _Path: String; const _Value: BLOB);
     procedure SetAsData(const _Path: String; const _Value: TData);
+    procedure SetAsParams(const _Path: String; const _Value: TParams);
 
     function GetParam(_Path: String): TParam;
 
@@ -343,8 +349,9 @@ type
   public
 
     constructor Create(const _PathSeparator: Char = '.'; _StrictDataTypes: Boolean = False);
-
     destructor Destroy; override;
+
+    function Clone: TParams;
 
     { v Функции и свойства для основной работы v }
     function FindDataType(const _Path: String; var _Value: TParamDataType): Boolean;
@@ -360,6 +367,7 @@ type
     function FindString(const _Path: String; var _Value: String): Boolean;
     function FindBLOB(const _Path: String; var _Value: BLOB): Boolean;
     function FindData(const _Path: String; var _Value: TData): Boolean;
+    function FindParams(const _Path: String; var _Value: TParams): Boolean;
 
     function AsBooleanDef(const _Path: String; _Default: Boolean): Boolean;
     function AsIntegerDef(const _Path: String; _Default: Integer): Integer;
@@ -372,7 +380,7 @@ type
     function AsStringDef(const _Path: String; _Default: String): String;
     function AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
     function AsDataDef(const _Path: String; _Default: TData): TData;
-    { Параметры снаружи напрямую не берем с дефолтным значением, потому что объект не должен создаваться снаружи. }
+    function AsParamsDef(const _Path: String; _Default: TParams): TParams;
 
     { Для передачи без разбора типов }
     procedure AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
@@ -398,6 +406,7 @@ type
     property AsString[const _Path: String]: String read GetAsString write SetAsString;
     property AsBLOB[const _Path: String]: BLOB read GetAsBLOB write SetAsBLOB;
     property AsData[const _Path: String]: TData read GetAsData write SetAsData;
+    property AsParams[const _Path: String]: TParams read GetAsParams write SetAsParams;
     property List[const _Path: String]: TMultiParamList read GetList;
 
     property PathSeparator: Char read FPathSeparator;
@@ -1103,6 +1112,11 @@ begin
 
 end;
 
+function TParamHelper._GetAsParams: TParams;
+begin
+  Result := GetAsParams;
+end;
+
 procedure TParamHelper._SetAsBoolean(const _Value: Boolean);
 begin
 
@@ -1361,6 +1375,11 @@ begin
 
 end;
 
+procedure TParamHelper._SetAsParams(const _Value: TParams);
+begin
+  SetAsParams(_Value);
+end;
+
 { TParams.TMultiParamList }
 
 constructor TParams.TMultiParamList.Create;
@@ -1461,6 +1480,11 @@ begin
   Result := Items[_Index].AsData;
 end;
 
+function TParams.TMultiParamList.GetAsParams(_Index: Integer): TParams;
+begin
+  Result := Items[_Index].AsParams;
+end;
+
 procedure TParams.TMultiParamList.SetIsNull(_Index: Integer; const _Value: Boolean);
 begin
   Items[_Index].IsNull := _Value;
@@ -1519,6 +1543,11 @@ end;
 procedure TParams.TMultiParamList.SetAsData(_Index: Integer; const _Value: TData);
 begin
   Items[_Index].AsData := _Value;
+end;
+
+procedure TParams.TMultiParamList.SetAsParams(_Index: Integer; const _Value: TParams);
+begin
+  Items[_Index].AsParams := _Value;
 end;
 
 function TParams.TMultiParamList.InternalIndex(_Index: Integer): Integer;
@@ -1621,7 +1650,7 @@ end;
 
 { TParams.TParamList }
 
-procedure TParams.TParamList.Notify(const _Item: TParam; _Action: Generics.Collections.TCollectionNotification);
+procedure TParams.TParamList.Notify(const _Item: TParam; _Action: TCollectionNotification);
 begin
   if (_Action = cnRemoved) and (_Item.DataType = dtParams) then
     _Item.Clear;
@@ -1806,6 +1835,11 @@ begin
   Result := ParamByName(_Path).AsData;
 end;
 
+function TParams.GetAsParams(const _Path: String): TParams;
+begin
+  Result := ParamByName(_Path).AsParams;
+end;
+
 procedure TParams.SetIsNull(const _Path: String; const _Value: Boolean);
 begin
   GetParam(_Path).IsNull := _Value;
@@ -1864,6 +1898,11 @@ end;
 procedure TParams.SetAsData(const _Path: String; const _Value: TData);
 begin
   GetParam(_Path).AsData := _Value;
+end;
+
+procedure TParams.SetAsParams(const _Path: String; const _Value: TParams);
+begin
+  GetParam(_Path).AsParams := _Value;
 end;
 
 function TParams.FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean;
@@ -2061,70 +2100,84 @@ begin
   if Result then _Value := P.AsData;
 end;
 
+function TParams.FindParams(const _Path: String; var _Value: TParams): Boolean;
+var
+  P: TParam;
+begin
+  Result := FindParam(_Path, dtParams, P);
+  if Result then _Value := P.AsParams;
+end;
+
 function TParams.AsBooleanDef(const _Path: String; _Default: Boolean): Boolean;
 begin
-  if not FindBoolean(_Path, Result) then AsBoolean[_Path] := _Default;
-  Result := _Default;
+  if not FindBoolean(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsIntegerDef(const _Path: String; _Default: Integer): Integer;
 begin
-  if not FindInteger(_Path, Result) then AsInteger[_Path] := _Default;
-  Result := _Default;
+  if not FindInteger(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsBigIntDef(const _Path: String; _Default: Int64): Int64;
 begin
-  if not FindBigInt(_Path, Result) then AsBigInt[_Path] := _Default;
-  Result := _Default;
+  if not FindBigInt(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsFloatDef(const _Path: String; _Default: Double): Double;
 begin
-  if not FindFloat(_Path, Result) then AsFloat[_Path] := _Default;
-  Result := _Default;
+  if not FindFloat(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsExtendedDef(const _Path: String; _Default: Extended): Extended;
 begin
-  if not FindExtended(_Path, Result) then AsExtended[_Path] := _Default;
-  Result := _Default;
+  if not FindExtended(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsDateTimeDef(const _Path: String; _Default: TDateTime): TDateTime;
 begin
-  if not FindDateTime(_Path, Result) then AsDateTime[_Path] := _Default;
-  Result := _Default;
+  if not FindDateTime(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsGUIDDef(const _Path: String; _Default: TGUID): TGUID;
 begin
-  if not FindGUID(_Path, Result) then AsGUID[_Path] := _Default;
-  Result := _Default;
+  if not FindGUID(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsAnsiStringDef(const _Path: String; _Default: AnsiString): AnsiString;
 begin
-  if not FindAnsiString(_Path, Result) then AsAnsiString[_Path] := _Default;
-  Result := _Default;
+  if not FindAnsiString(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsStringDef(const _Path: String; _Default: String): String;
 begin
-  if not FindString(_Path, Result) then AsString[_Path] := _Default;
-  Result := _Default;
+  if not FindString(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsBLOBDef(const _Path: String; _Default: BLOB): BLOB;
 begin
-  if not FindBLOB(_Path, Result) then AsBLOB[_Path] := _Default;
-  Result := _Default;
+  if not FindBLOB(_Path, Result) then
+    Result := _Default;
 end;
 
 function TParams.AsDataDef(const _Path: String; _Default: TData): TData;
 begin
-  if not FindData(_Path, Result) then AsData[_Path] := _Default;
-  Result := _Default;
+  if not FindData(_Path, Result) then
+    Result := _Default;
+end;
+
+function TParams.AsParamsDef(const _Path: String; _Default: TParams): TParams;
+begin
+  if not FindParams(_Path, Result) then
+    Result := _Default;
 end;
 
 procedure TParams.AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
@@ -2188,6 +2241,11 @@ end;
 procedure TParams.Clear;
 begin
   Items.Clear;
+end;
+
+function TParams.Clone: TParams;
+begin
+  Result := TParamsClass(ClassType).Create(PathSeparator, StrictDataTypes);
 end;
 
 function TParams.SaveToString: String;

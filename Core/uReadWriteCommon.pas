@@ -27,8 +27,13 @@ unit uReadWriteCommon;
 
 interface
 
+uses
+  { LiberSynth }
+  uCustomReadWrite;
+
 type
 
+  { Name - Type - Value reader interface. Maintains nested reading. }
   INTVParser = interface ['{6585B06A-2103-42FD-8581-9F650B603FD0}']
 
     procedure ReadName(const _Element: String);

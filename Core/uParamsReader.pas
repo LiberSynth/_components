@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { LiberSynth }
-  uCustomReadWrite, uReadWriteCommon, uParams, uStrUtils;
+  uCore, uCustomReadWrite, uReadWriteCommon, uParams, uStrUtils;
 
 type
 
@@ -45,7 +45,8 @@ type
 
   IParamsReader = interface ['{5324B88D-A724-4E0B-9797-5004FE975287}']
 
-    procedure SetParams(_Value: TParams);
+    procedure RetrieveParams(_Value: TParams);
+    procedure RetrieveParser(_Value: TCustomParser);
 
   end;
 
@@ -54,9 +55,11 @@ type
   strict private
 
     FParams: TParams;
+    FParser: TCustomParser;
 
     FCurrentName: String;
     FCurrentType: TParamDataType;
+    FNested: Boolean;
 
     FListStarter: TListStarter;
 
@@ -71,29 +74,24 @@ type
     procedure ReadNestedBlock;
 
     { IParamsReader }
-    procedure SetParams(_Value: TParams);
+    procedure RetrieveParams(_Value: TParams);
+    procedure RetrieveParser(_Value: TCustomParser);
 
   private
 
-    property ListStarter: TListStarter read FListStarter;
-
-  protected
-
-    procedure ReadParams;
-    procedure BeforeReadParam(_Param: TParam); virtual;
-    procedure AfterReadParam(_Param: TParam); virtual;
-    procedure AfterReadParams(_Param: TParam); virtual;
-
     property CurrentName: String read FCurrentName;
     property CurrentType: TParamDataType read FCurrentType;
+    property Nested: Boolean read FNested write FNested;
+    property ListStarter: TListStarter read FListStarter;
+    property Params: TParams read FParams write FParams;
+    property Parser: TCustomParser read FParser write FParser;
 
   public
 
     constructor Create; override;
-
     destructor Destroy; override;
 
-    property Params: TParams read FParams;
+    function Clone: TCustomReader; override;
 
   end;
 
@@ -118,6 +116,16 @@ begin
 end;
 
 { TParamsReader }
+
+function TParamsReader.Clone: TCustomReader;
+begin
+
+  Result := inherited Clone;
+
+  TParamsReader(Result).Params     := Params;
+  TParamsReader(Result).Nested     := True;
+
+end;
 
 constructor TParamsReader.Create;
 begin
@@ -162,53 +170,57 @@ begin
 end;
 
 procedure TParamsReader.ReadNestedBlock;
-{var
-  Param: TParam;
-  NestedParams: TParams;}
+var
+  NestedReader: TParamsReader;
+  NestedParser: TCustomParser;
+  Index: Integer;
 begin
 
-  {if PresetTypes then begin
+//  BeforeReadParam(Items[Index]);
 
-    Params.FindParam(CurrentName, dtParams, Param);
-    NestedParams := Params.AsParams[CurrentName]
+  NestedParser := Parser.Clone;
+  try
 
-  end else begin
+    NestedReader := TParamsReader(Clone);
+    try
 
-    NestedParams := TParamsClass(Params.ClassType).Create(Params.PathSeparator);
-    NestedParams.SaveToStringOptions := Params.SaveToStringOptions;
-    with Params.AddList(CurrentName) do
-      Param := Items[Append];
+      NestedReader.Params := Params.Clone;
+      NestedReader.Parser := NestedParser;
 
-    BeforeReadParam(Param);
+      NestedParser.RetrieveTargerInterface(NestedReader);
+      try
 
-    Params.AsParams[CurrentName] := NestedParams;
 
-  end;}
+        NestedParser.Read;
 
-//  with TParamsReaderClass(ClassType).CreateNested(Self) do
-//
-//    try
-//
-//      SetSource(Source);
-//      SetParams(Params);
-//      Read;
-//{      AfterReadParams(Param);}
-//      { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
-//      RetrieveControl(Self);
-//
-//    finally
-//      Free;
-//    end;
+        with Params.AddList(CurrentName) do begin
 
-{  AfterReadParam(Param);}
+          if Nested or ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
+          else Index := 0;
 
-//  FCurrentName := '';
-//  FCurrentType := dtUnknown;
+          AsParams[Index] := NestedReader.Params;
+          //AfterReadParams(Param);
 
-end;
+        end;
 
-procedure TParamsReader.ReadParams;
-begin
+        { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
+        Parser.Accept(NestedParser);
+
+      finally
+        NestedParser.FreeTargerInterface;
+      end;
+
+    finally
+      NestedReader.Free;
+    end;
+
+  finally
+    NestedParser.Free;
+  end;
+
+//  AfterReadParam(Param);
+  FCurrentName := '';
+  FCurrentType := dtUnknown;
 
 end;
 
@@ -274,21 +286,14 @@ begin
   Result := FCurrentType = dtParams;
 end;
 
-procedure TParamsReader.BeforeReadParam(_Param: TParam);
-begin
-end;
-
-procedure TParamsReader.AfterReadParam(_Param: TParam);
-begin
-end;
-
-procedure TParamsReader.AfterReadParams(_Param: TParam);
-begin
-end;
-
-procedure TParamsReader.SetParams(_Value: TParams);
+procedure TParamsReader.RetrieveParams(_Value: TParams);
 begin
   FParams := _Value;
+end;
+
+procedure TParamsReader.RetrieveParser(_Value: TCustomParser);
+begin
+  FParser := _Value;
 end;
 
 end.

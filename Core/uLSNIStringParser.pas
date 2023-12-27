@@ -140,6 +140,10 @@ type
 
     FDoublingChar: Char;
 
+  private
+
+    property NTVParser: INTVParser read FNTVParser;
+
   protected
 
     procedure InitParser; override;
@@ -154,8 +158,6 @@ type
   public
 
     constructor Create; override;
-    constructor CreateNested(_Master: TCustomStringParser); override;
-
     destructor Destroy; override;
 
     procedure RetrieveTargerInterface(_Receiver: TIntfObject); override;
@@ -164,8 +166,6 @@ type
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
     procedure ProcessElement; override;
     procedure ToggleElement(_KeyWord: TKeyWord); override;
-    function IsNestedValue: Boolean;
-    procedure ReadNestedBlock;
 
     property ElementType: TElementType read FElementType write FElementType;
 
@@ -315,23 +315,12 @@ begin
 
 end;
 
-constructor TLSNIStringParser.CreateNested;
-begin
-
-  FReading := TReadInfoList.Create;
-  FExcludingSyntax := TSyntaxInfoList.Create;
-  FStrictSyntax    := TSyntaxInfoList.Create;
-
-  inherited CreateNested(_Master);
-
-end;
-
 destructor TLSNIStringParser.Destroy;
 begin
 
-  FreeAndNil(FStrictSyntax );
+  FreeAndNil(FStrictSyntax   );
   FreeAndNil(FExcludingSyntax);
-  FreeAndNil(FReading);
+  FreeAndNil(FReading        );
 
   inherited Destroy;
 
@@ -402,20 +391,10 @@ begin
 
 end;
 
-function TLSNIStringParser.IsNestedValue: Boolean;
-begin
-  Result := FNTVParser.IsNestedValue;
-end;
-
-procedure TLSNIStringParser.ReadNestedBlock;
-begin
-  FNTVParser.ReadNestedBlock;
-end;
-
 procedure TLSNIStringParser.RetrieveTargerInterface(_Receiver: TIntfObject);
 begin
   if not _Receiver.GetInterface(INTVParser, FNTVParser) then
-    EStringParserException.CreateFmt('Receiver class %s does not support string parsing.', [_Receiver.ClassName]);
+    raise EStringParserException.CreateFmt('Receiver class %s does not support string parsing.', [_Receiver.ClassName]);
 end;
 
 procedure TLSNIStringParser.KeyEvent(const _KeyWord: TKeyWord);
@@ -521,7 +500,7 @@ begin
 
       (ElementType = etValue) and
       (CursorStanding = stInside) and
-      IsNestedValue and
+      NTVParser.IsNestedValue and
       (Source[Cursor] <> '(')
 
   then raise ELSNIParseException.Create(_GetMessage);
@@ -533,11 +512,11 @@ procedure TLSNIStringParser.ProcessElement;
   function _GetTrimmed: String;
   begin
 
-    { TODO 2 -oVasilyevSM -cUndoubleSymbols: Здесь будет нужна отмена, потому что дублирование не нужно в комментариях
-      совсем. (Просто проверить, уже должно рабоать). }
     { SysUtils.Trim обрезает все, что <= ' '. Все табы, ритёрны итд. }
     Result := Trim(ReadElement);
 
+    { TODO 2 -oVasilyevSM -cUndoubleSymbols: Здесь нужна отмена, потому что в комментариях дублирование не нужно
+      совсем. Можно ли считать отменой условие DoublingChar = #0, надо проверить, когда зарарботают комментарии. }
     { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
       условии, что значение считывается регионом. Поэтому, символ задается событием региона. }
     if DoublingChar > #0 then
@@ -675,15 +654,14 @@ begin
         (ElementType = etValue) and
         (CursorStanding = stBefore) and
         inherited and
-        IsNestedValue;
+        NTVParser.IsNestedValue;
 
 end;
 
 procedure TNestedParamsBlock.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
 begin
 
-  with _Parser as TLSNIStringParser do
-    ReadNestedBlock;
+  (_Parser as TLSNIStringParser).NTVParser.ReadNestedBlock;
 
   inherited Execute(_Parser, _Handled);
   _Handled := True;

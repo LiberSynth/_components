@@ -85,8 +85,7 @@ uses
   { VCL }
   SysUtils, Classes,
   { LiberSynth }
-  uCore, uParams, uFileUtils, uUserParams, uCustomReadWrite, uCustomStringParser, uLSNIParamsReader,
-  uLSNISCParamsReader, uComponentTypes;
+  uCore, uParams, uFileUtils, uUserParams, uCustomReadWrite, uCustomStringParser, uParamsReader, uComponentTypes;
 
 type
 

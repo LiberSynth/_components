@@ -20,6 +20,9 @@ type
     procedure FreeTargerInterface; virtual; abstract;
     procedure Read; virtual; abstract;
 
+    function Clone: TCustomParser; virtual;
+    procedure Accept(_Sender: TCustomParser); virtual;
+
   end;
 
   TCustomParserClass = class of TCustomParser;
@@ -29,6 +32,8 @@ type
   public
 
     constructor Create; virtual;
+
+    function Clone: TCustomReader; virtual;
 
   end;
 
@@ -59,11 +64,25 @@ begin
   inherited Create;
 end;
 
+function TCustomParser.Clone: TCustomParser;
+begin
+  Result := TCustomParserClass(ClassType).Create;
+end;
+
+procedure TCustomParser.Accept(_Sender: TCustomParser);
+begin
+end;
+
 { TCustomReader }
 
 constructor TCustomReader.Create;
 begin
   inherited Create;
+end;
+
+function TCustomReader.Clone: TCustomReader;
+begin
+  Result := TCustomReaderClass(ClassType).Create;
 end;
 
 { TCustomWriter }

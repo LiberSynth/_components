@@ -13,18 +13,18 @@ procedure LSNIStrToParams(const Source: String; Params: TParams);
 var
   Parser: TCustomParser;
   Reader: TCustomReader;
-  CustomStringParser: ICustomStringParser;
   ParamsReader: IParamsReader;
+  CustomStringParser: ICustomStringParser;
 begin
 
   Reader := TParamsReader.Create;
   try
 
     if not Reader.GetInterface(IParamsReader, ParamsReader) then
-      raise ECustomReadWriteException.Create('Parser does not support IParamsReader interface.');
+      raise ECustomReadWriteException.Create('Reader does not support IParamsReader interface.');
     try
 
-      ParamsReader.SetParams(Params);
+      ParamsReader.RetrieveParams(Params);
 
       Parser := TLSNIStringParser.Create;
       try
@@ -36,6 +36,8 @@ begin
           CustomStringParser.Located := True;
           CustomStringParser.NativeException := True;
           CustomStringParser.SetSource(Source);
+
+          ParamsReader.RetrieveParser(Parser);
 
           Parser.RetrieveTargerInterface(Reader);
           try
