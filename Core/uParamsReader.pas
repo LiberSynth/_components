@@ -193,6 +193,7 @@ var
   NestedParser: TCustomParser;
   Index: Integer;
   Param: TParam;
+  HostParams: TParams;
 begin
 
   NestedParser := Parser.Clone;
@@ -204,7 +205,8 @@ begin
       NestedReader.Params := Params.Clone;
       try
 
-        NestedReader.Params.Assign(Params.AsParams[CurrentName]);
+        if Params.FindParams(CurrentName, HostParams) then
+          NestedReader.Params.Assign(HostParams);
         NestedReader.Parser := NestedParser;
 
         NestedParser.RetrieveTargerInterface(NestedReader);
