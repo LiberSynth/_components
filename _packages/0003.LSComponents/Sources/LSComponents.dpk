@@ -22,7 +22,7 @@ package LSComponents;
 {$WRITEABLECONST OFF}
 {$MINENUMSIZE 1}
 {$IMAGEBASE $400000}
-{$DESCRIPTION '# 0004 LS Components'}
+{$DESCRIPTION '# 0003 LS Components'}
 {$IMPLICITBUILD ON}
 
 requires

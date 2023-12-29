@@ -162,6 +162,7 @@ end;
 
 procedure TLSIni.Save;
 begin
+  CheckDirExisting(ExtractFileDir(SourceFile));
   StrToFile(Params.SaveToString, SourceFile);
 end;
 
@@ -251,9 +252,12 @@ end;
 
 constructor TLSIni.Create(_Owner: TComponent);
 begin
+
   inherited Create(_Owner);
+
   if csDesigning in ComponentState then
     InitProperties;
+
 end;
 
 destructor TLSIni.Destroy;
@@ -331,8 +335,6 @@ begin
 
   FStoreMethod    := smLSNIString;
   FSourceType     := stFile;
-  FAutoLoad       := True;
-  FCommentSupport := csStockFormat;
   FErrorsLocating := True;
 
 end;
@@ -402,7 +404,8 @@ begin
   if not (csDesigning in ComponentState) then begin
 
     FParams := ParamsClass.Create;
-    if AutoLoad then Load;
+    if AutoLoad then
+      Load;
 
   end;
 

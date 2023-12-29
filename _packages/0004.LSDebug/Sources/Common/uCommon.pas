@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils,
   { Liber Synth }
-  uParams, uLSNIParamsReader;
+  uParams, uLSIni;
 
 { Сохраняемые параметры пакета }
 function PackageParams: TParams;
@@ -61,9 +61,6 @@ uses
 
 { Сохраняемые параметры пакета }
 
-var
-  Params: TParams;
-
 function ParamsFilePath: String;
 var
   Folder: String;
@@ -71,54 +68,49 @@ begin
 
   if GetSpecialFolder(Folder, sfAppData) then
 
-    Result := Format('%0:s\%1:s\%2:s\%2:s.ini', [Folder, 'VDP', PackageName])
+    Result := Format('%0:s\%1:s\%2:s\%2:s.ini', [Folder, 'LiberSynth', PackageName])
 
   else Result := '';
 
 end;
 
+//var
+//  LSIni: TLSIni = nil;
+
 procedure LoadParams;
 begin
 
-  Params := TParams.Create;
-  try
-
-    LSNIStrToParams(FileToStr(ParamsFilePath), Params);
-
-  except
-    on E: Exception do
-      WriteError(E);
-  end;
+//  try
+//
+//    LSIni.SourcePath := FileToStr(ParamsFilePath);
+//    LSIni.Load;
+//
+//  except
+//    on E: Exception do
+//      WriteError(E);
+//  end;
 
 end;
 
 procedure SaveParams;
-var
-  FN: String;
 begin
 
-  try
-
-    FN := ParamsFilePath;
-    CheckDirExisting(ExtractFileDir(FN));
-    if FileExists(FN) then DeleteFile(FN);
-    StrToFile(Params.SaveToString, FN);
-
-  except
-    on E: Exception do
-      WriteError(E);
-  end;
-
-  Params.Free;
+//  try
+//
+//    LSIni.Save;
+//
+//  except
+//    on E: Exception do
+//      WriteError(E);
+//  end;
 
 end;
 
 function PackageParams: TParams;
-const
-  SC_Message = 'Package parameters not loaded';
 begin
-  if not Assigned(Params) then raise Exception.Create(SC_Message);
-  Result := Params;
+  Result := nil;
+//  if not Assigned(LSIni) or not Assigned(LSIni.Params) then raise Exception.Create('Ini file is not loaded.');
+//  Result := LSIni.Params;
 end;
 
 function FormatException(E: Exception): String;
@@ -227,10 +219,26 @@ end;
 
 initialization
 
-  LoadParams;
+//  try
+//
+//    LSIni := TLSIni.Create(nil);
+//    LoadParams;
+//
+//  except
+//  end;
 
 finalization
 
-  SaveParams;
+//  try
+//
+//    if Assigned(LSIni) then begin
+//
+//      SaveParams;
+//      FreeAndNil(LSIni);
+//
+//    end;
+//
+//  except
+//  end;
 
 end.

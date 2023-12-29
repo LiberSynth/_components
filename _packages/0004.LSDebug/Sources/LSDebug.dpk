@@ -22,7 +22,7 @@ package LSDebug;
 {$WRITEABLECONST OFF}
 {$MINENUMSIZE 1}
 {$IMAGEBASE $400000}
-{$DESCRIPTION '# 0003 LS Debug'}
+{$DESCRIPTION '# 0004 LS Debug'}
 {$DESIGNONLY}
 {$IMPLICITBUILD ON}
 {$DEFINE DELPHIXE}
@@ -30,7 +30,9 @@ package LSDebug;
 requires
   rtl,
   designide,
-  LSUtils;
+  LSCore,
+  LSUtils,
+  LSComponents;
 
 contains
   uProjectConsts in 'Common\uProjectConsts.pas',
