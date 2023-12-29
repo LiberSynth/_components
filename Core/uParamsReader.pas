@@ -204,6 +204,7 @@ begin
       NestedReader.Params := Params.Clone;
       try
 
+        NestedReader.Params.Assign(Params.AsParams[CurrentName]);
         NestedReader.Parser := NestedParser;
 
         NestedParser.RetrieveTargerInterface(NestedReader);
@@ -213,7 +214,7 @@ begin
 
           with Params.AddList(CurrentName) do begin
 
-            if Nested or ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
+            if ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
             else Index := 0;
 
             Param := Items[Index];

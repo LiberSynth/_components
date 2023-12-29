@@ -30,7 +30,7 @@ unit uUserParams;
   и приходится выдавать. А минуса два: 1) глаза сломаешь в объявдении класса; 2) обращение ко вложенному классу имеет
   совершенно совершенно лишний префикс, всегда в строку не влезает выражение. }
 { TODO 2 -oVasilyevSM -cuUserParams: Есть еще один кейс - пустой файл только с комментариями }
-{ TODO 5 -oVasilyevSM -cuUserParams: Нужны параметры, хранящие исходное форматирование. Всю строку между
+{ TODO 5 -oVasilyevSM -cuUserParams: Задача: Нужны параметры, хранящие исходное форматирование. Всю строку между
   элементами запоминать в объект и потом выбрасывать обратно в строку в исходном виде, что бы там ни было. }
 
 interface
@@ -49,6 +49,7 @@ type
       caBeforeValue, caAfterValue, caAfterParam, caInsideEmptyParams
 
   );
+  TCommentAnchors = set of TCommentAnchor;
 
   TUserParam = class(TParam)
 
@@ -94,11 +95,13 @@ type
 
     strict private
 
-      function Filter(_Anchor: TCommentAnchor): TCommentList;
+      function Filter(_Anchors: TCommentAnchors): TCommentList;
+      function TypedAnchors(_Typed: Boolean; _Anchor: TCommentAnchor): TCommentAnchors;
       procedure ProcessOffsets(
 
           var _Value: String;
           _Anchor: TCommentAnchor;
+          _Typed: Boolean;
           _SingleString: Boolean;
           _FirstParam: Boolean;
           _LastParam: Boolean;
@@ -117,11 +120,11 @@ type
           _Short: Boolean
 
       );
-      function GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
+      function GetBlock(_Anchor: TCommentAnchor; _Typed, _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
 
       function LastIsShort: Boolean; overload;
-      function FirstIsShort(_Anchor: TCommentAnchor): Boolean;
-      function LastIsShort(_Anchor: TCommentAnchor): Boolean; overload;
+      function FirstIsShort(_Typed: Boolean; _Anchor: TCommentAnchor): Boolean;
+      function LastIsShort(_Typed: Boolean; _Anchor: TCommentAnchor): Boolean; overload;
 
     end;
 
@@ -231,7 +234,17 @@ begin
   inherited Add(TComment.Create(_Text, _Opening, _Closing, _Anchor, _Short));
 end;
 
-function TUserParam.TCommentList.GetBlock(_Anchor: TCommentAnchor; _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
+function TUserParam.TCommentList.TypedAnchors(_Typed: Boolean; _Anchor: TCommentAnchor): TCommentAnchors;
+begin
+
+  if _Typed then Result := [_Anchor]
+  else if _Anchor = caAfterName then Result := [caAfterName, caBeforeType, caAfterType]
+  else if _Anchor in [caBeforeType, caAfterType] then Result := []
+  else Result := [_Anchor];
+
+end;
+
+function TUserParam.TCommentList.GetBlock(_Anchor: TCommentAnchor; _Typed, _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
 const
 
   LongSplitter = {$IFDEF FORMATCOMMENTDEBUG}'#'{$ELSE}' '{$ENDIF};
@@ -273,35 +286,40 @@ var
 
 var
   Search: TUserParam.TCommentList;
+  Anchors: TCommentAnchors;
 begin
 
-  { TODO 5 -oVasilyevSM -cuUserParams: В режиме Untyped комментарии типа должны складываться в BeforeValue. }
+  Result   := '';
+  Splitter := '';
 
-  Result        := '';
-  Splitter      := '';
+  { В режиме без типа комментарии типа складываются в AfterName. }
+  Anchors := TypedAnchors(_Typed, _Anchor);
+  if Anchors <> [] then begin
 
-  Search := Filter(_Anchor);
-  try
+    Search := Filter(Anchors);
+    try
 
-    for Comment in Search do
-      with Comment do
-        Result := Result + _GetValue(Short);
+      for Comment in Search do
+        with Comment do
+          Result := Result + _GetValue(Short);
 
-  finally
-    Search.Free;
+    finally
+      Search.Free;
+    end;
+
+    { Как раз последний разделитель значений нужно отрезать, неважно, какие были в цикле. }
+    CutStr(Result, Length(Splitter));
+    { Отступы справа и слева всего блока комментариев }
+    ProcessOffsets(Result, _Anchor, _Typed, _SingleString, _FirstParam, _LastParam, _Nested);
+
   end;
-
-  { Как раз последний разделитель значений нужно отрезать, неважно, какие были в цикле. }
-  CutStr(Result, Length(Splitter));
-  { Отступы справа и слева всего блока комментариев }
-  ProcessOffsets(Result, _Anchor, _SingleString, _FirstParam, _LastParam, _Nested);
 
 end;
 
-function TUserParam.TCommentList.LastIsShort(_Anchor: TCommentAnchor): Boolean;
+function TUserParam.TCommentList.LastIsShort(_Typed: Boolean; _Anchor: TCommentAnchor): Boolean;
 begin
 
-  with Filter(_Anchor) do
+  with Filter(TypedAnchors(_Typed, _Anchor)) do
 
     try
 
@@ -444,9 +462,10 @@ begin
 
     if not _SingleString then begin
 
-      if FirstIsShort(_Anchor) and not (_Anchor in [caAfterName, caAfterType, caAfterValue, caInsideEmptyParams]) then
+      if FirstIsShort(_Typed, _Anchor) and not (_Anchor in [caAfterName, caAfterType, caAfterValue, caInsideEmptyParams]) then
         LeftOffset := '';
-      if LastIsShort (_Anchor) then RightOffset := '';
+      if LastIsShort(_Typed, _Anchor) then
+        RightOffset := '';
 
     end;
 
@@ -456,7 +475,7 @@ begin
 
 end;
 
-function TUserParam.TCommentList.Filter(_Anchor: TCommentAnchor): TCommentList;
+function TUserParam.TCommentList.Filter(_Anchors: TCommentAnchors): TCommentList;
 var
   Comment: TComment;
 begin
@@ -464,15 +483,15 @@ begin
   Result := TUserParam.TCommentList.Create;
 
   for Comment in Self do
-    if Comment.Anchor = _Anchor then
+    if Comment.Anchor in _Anchors then
       Result.Add(Comment);
 
 end;
 
-function TUserParam.TCommentList.FirstIsShort(_Anchor: TCommentAnchor): Boolean;
+function TUserParam.TCommentList.FirstIsShort(_Typed: Boolean; _Anchor: TCommentAnchor): Boolean;
 begin
 
-  with Filter(_Anchor) do
+  with Filter(TypedAnchors(_Typed, _Anchor)) do
 
     try
 
@@ -587,15 +606,15 @@ begin
 
   with _Param as TUserParam do begin
 
-    BeforeParam       := Comments.GetBlock(caBeforeParam,       SingleString, _FirstParam, _LastParam, Nested);
-    BeforeName        := Comments.GetBlock(caBeforeName,        SingleString, _FirstParam, _LastParam, Nested);
-    AfterName         := Comments.GetBlock(caAfterName,         SingleString, _FirstParam, _LastParam, Nested);
-    BeforeType        := Comments.GetBlock(caBeforeType,        SingleString, _FirstParam, _LastParam, Nested);
-    AfterType         := Comments.GetBlock(caAfterType,         SingleString, _FirstParam, _LastParam, Nested);
-    BeforeValue       := Comments.GetBlock(caBeforeValue,       SingleString, _FirstParam, _LastParam, Nested);
-    AfterValue        := Comments.GetBlock(caAfterValue,        SingleString, _FirstParam, _LastParam, Nested);
-    AfterParam        := Comments.GetBlock(caAfterParam,        SingleString, _FirstParam, _LastParam, Nested);
-    InsideEmptyParams := Comments.GetBlock(caInsideEmptyParams, SingleString, _FirstParam, _LastParam, Nested);
+    BeforeParam       := Comments.GetBlock(caBeforeParam,       Typed, SingleString, _FirstParam, _LastParam, Nested);
+    BeforeName        := Comments.GetBlock(caBeforeName,        Typed, SingleString, _FirstParam, _LastParam, Nested);
+    AfterName         := Comments.GetBlock(caAfterName,         Typed, SingleString, _FirstParam, _LastParam, Nested);
+    BeforeType        := Comments.GetBlock(caBeforeType,        Typed, SingleString, _FirstParam, _LastParam, Nested);
+    AfterType         := Comments.GetBlock(caAfterType,         Typed, SingleString, _FirstParam, _LastParam, Nested);
+    BeforeValue       := Comments.GetBlock(caBeforeValue,       Typed, SingleString, _FirstParam, _LastParam, Nested);
+    AfterValue        := Comments.GetBlock(caAfterValue,        Typed, SingleString, _FirstParam, _LastParam, Nested);
+    AfterParam        := Comments.GetBlock(caAfterParam,        Typed, SingleString, _FirstParam, _LastParam, Nested);
+    InsideEmptyParams := Comments.GetBlock(caInsideEmptyParams, Typed, SingleString, _FirstParam, _LastParam, Nested);
 
     if _Param.DataType = dtParams then
       _FormatParams(Comments.LastIsShort);

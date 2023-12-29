@@ -30,7 +30,7 @@ interface
 uses
   { VCL }
   SysUtils,
-  { Utils }
+  { Liber Synth }
   uParams, uLSNIParamsReader;
 
 { Сохраняемые параметры пакета }

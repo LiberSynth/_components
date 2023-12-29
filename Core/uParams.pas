@@ -2196,8 +2196,6 @@ procedure TParams.Assign(_Source: TParams; _ForceAdding: Boolean);
 var
   Src: TParam;
 begin
-  { TODO 3 -oVasilyevSM -cuParams: Ошибка. A: Params = (B: String = 'zxc') после нетипизованного присваивания возвращает
-    B: Unknown = }
   for Src in _Source.Items do
     AssignValue(Src.Name, Src, _ForceAdding);
 end;
