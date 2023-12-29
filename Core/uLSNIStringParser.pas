@@ -172,8 +172,6 @@ type
 
   end;
 
-  ELSNIParseException = class(ECustomReadWriteException);
-
 implementation
 
 const
@@ -394,10 +392,8 @@ end;
 
 function TLSNIStringParser.ReadValue: String;
 begin
-  { TODO 2 -oVasilyevSM -cUndoubleSymbols: Здесь нужна отмена, потому что в комментариях дублирование не нужно
-    совсем. Можно ли считать отменой условие DoublingChar = #0, надо проверить, когда зарарботают комментарии. }
   { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
-    условии, что значение считывается регионом. Поэтому, символ задается событием региона. }
+    условии, что значение считывается регионом. Поэтому, символ задается из региона. }
   Result := ReadElement;
   if DoublingChar > #0 then
     Result := UndoubleStr(Result, DoublingChar);
@@ -489,7 +485,7 @@ begin
 
     then begin
 
-      raise ELSNIParseException.Create(_GetMessage);
+      raise EStringParserException.Create(_GetMessage);
 
     end;
 
@@ -504,7 +500,7 @@ begin
 
     then begin
 
-      raise ELSNIParseException.Create(_GetMessage);
+      raise EStringParserException.Create(_GetMessage);
 
     end;
 
@@ -515,7 +511,7 @@ begin
       NTVReader.IsNestedValue and
       (Source[Cursor] <> '(')
 
-  then raise ELSNIParseException.Create(_GetMessage);
+  then raise EStringParserException.Create(_GetMessage);
 
 end;
 

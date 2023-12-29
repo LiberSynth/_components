@@ -40,7 +40,7 @@ contains
   uReadWriteCommon in '..\..\..\Core\uReadWriteCommon.pas',
   uCustomStringParser in '..\..\..\Core\uCustomStringParser.pas',
   uLSNIStringParser in '..\..\..\Core\uLSNIStringParser.pas',
-  uLSNISCStringParser in '..\..\..\Core\uLSNISCStringParser.pas',
+  uLSNIDCStringParser in '..\..\..\Core\uLSNIDCStringParser.pas',
   uParamsReader in '..\..\..\Core\uParamsReader.pas',
   uUserParams in '..\..\..\Core\uUserParams.pas',
   uStub in '..\..\..\Core\uStub.pas',

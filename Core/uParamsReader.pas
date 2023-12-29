@@ -192,6 +192,7 @@ var
   NestedReader: TParamsReader;
   NestedParser: TCustomParser;
   Index: Integer;
+  Param: TParam;
 begin
 
   NestedParser := Parser.Clone;
@@ -201,30 +202,38 @@ begin
     try
 
       NestedReader.Params := Params.Clone;
-      NestedReader.Parser := NestedParser;
-
-      NestedParser.RetrieveTargerInterface(NestedReader);
       try
 
-        NestedParser.Read;
+        NestedReader.Parser := NestedParser;
 
-        with Params.AddList(CurrentName) do begin
+        NestedParser.RetrieveTargerInterface(NestedReader);
+        try
 
-          if Nested or ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
-          else Index := 0;
+          NestedParser.Read;
 
-          BeforeReadParam(Items[Index]);
-          AsParams[Index] := NestedReader.Params;
-          AfterNestedReading(Items[Index], NestedReader);
-          AfterReadParam(Items[Index]);
+          with Params.AddList(CurrentName) do begin
 
+            if Nested or ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
+            else Index := 0;
+
+            Param := Items[Index];
+            BeforeReadParam(Param);
+            AsParams[Index] := NestedReader.Params;
+
+          end;
+
+        finally
+          NestedParser.FreeTargerInterface;
         end;
 
+        AfterNestedReading(Param, NestedReader);
+        AfterReadParam(Param);
         { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
         Parser.AcceptControl(NestedParser);
 
-      finally
-        NestedParser.FreeTargerInterface;
+      except
+        NestedReader.Params.Free;
+        raise;
       end;
 
     finally

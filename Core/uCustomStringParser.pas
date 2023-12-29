@@ -988,10 +988,8 @@ begin
           raise;
 
         Location := Locator.Location(Source);
-        if NativeException then
-
-          raise ExceptClass(E.ClassType).CreateFmt('%s. %s', [E.Message, Location.Text])
-
+        { TODO 5 -oVasilyevSM -cuCustomStringParser: Когда ошибка возникает при считывании из ресурса, здесь утечка. }
+        if NativeException then raise ExceptClass(E.ClassType).CreateFmt('%s. %s', [E.Message, Location.Text])
         else raise ELocatedException.Create(ExceptClass(E.ClassType), E.Message, Location);
 
       end;

@@ -217,8 +217,8 @@ end;
 procedure TLSNIDCStringParser.RetrieveTargerInterface(_Receiver: TIntfObject);
 begin
   inherited RetrieveTargerInterface(_Receiver);
-  if not _Receiver.GetInterface(IUserParamsReader, FUserParamsReader) then
-    {raise EStringParserException.CreateFmt('Receiver class %s does not support comment reading.', [_Receiver.ClassName])};
+  { Проверяем по месту вызова Assigned(UserParamsReader) и получаем возможность чтения с отбросом комментариев. }
+  _Receiver.GetInterface(IUserParamsReader, FUserParamsReader);
 end;
 
 procedure TLSNIDCStringParser.FreeTargerInterface;

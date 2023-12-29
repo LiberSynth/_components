@@ -28,54 +28,50 @@ unit uLSIni;
 { TODO 3 -oVasilyevSM -cuLSIni: Нужен будет еще один контроль - после завершения считывания нельзя менять свойства
   считывателя, экспортера и параметров. Это не адаптер. Если нужен адаптер, можно написать его, используя имеющиеся в
   паблике классы. }
-{ TODO 3 -oVasilyevSM -cuLSIni: Все идет к тому чтобы пакеты назывались с номером в начале. Тогда они будуь правильно
-  сортироваться в списке установленных и можно будет их исходники в один каталог положить, по крайней мере тех, которые
-  без отдельных ДТ-юнитов. С LSDebug надо тоже подумать, возможно его исходники не должны лежать рядом с dpk. И тогда
-  все dpk переедут так, что будут ближе к исходникам в одном общем каталоге _components. Только их тоже надо будет
-  пронумеровать, а то уже куча получается там. }
 { TODO 4 -oVasilyevSM -cuLSIni: Иконка }
 
 (*
 
   Парсер знает, из чего считывать, но не знает, во что.
-  Ридер - знает во что.
-  Корневой класс - ридер, потому что ради этого вообще вся ветка создана. Хотя, строго говоря, он и не ридер и не парсер
-  еще. Не знает, ни откуда, ни куда.
-
+  Ридер - знает во что, но не знает, из чего.
   Масштаб трагедии (без учета Typed и Untyped):
 
-  CustomReader +
+  CustomParser +
     CustomStringParser +
       LSNIStringParser +
-        LSNIParamsReader +
-          LSNISCParamsReader +
-          LSNIUFParamsReader -
+        LSNIDCStringParser +
+        LSNIOFStringParser -
       INIStringParser -
-        INIParamsReader -
-          INISCParamsReader -
-          INIUFParamsReader -
+        INIDCStringParser -
+        INIOFStringParser -
     CustomBLOBParser -
-      BLOBParamsReader -
+      NTVBLOBParser -
     CustomRegistryParser -
       StructuredRegistryParser -
-        StructuredRegistryParamsReader -
-      SingleParamRegistryParser -
-        SingleParamRegistryParamsReader -
+      CustomSingleParamRegistryParser -
+        SingleStringParamRegistryParser -
+        SingleBLOBParamRegistryParser -
+  CustomReader
+    ParamsReader +
+    UserParamsReader +
+    OFParamsReader -
 
   CustomWriter +
     CustomStringWriter -
       LSNIParamsWriter -
-        LSNISCParamsWriter -
-        LSNIUFParamsWriter -
+        LSNIDCParamsWriter -
+        LSNIOFParamsWriter -
       INIParamsWriter -
-        INISCParamsWriter -
-        INIUFParamsWriter -
+        INIDCParamsWriter -
+        INIOFParamsWriter -
     CustomBLOBWriter -
-      ParamsBLOBWriter -
+      NTVBLOBWriter -
     CustomRegistryWriter~
       CustomParamsRegistryWriter~
         ParamsStructuredRegistryWriter~
-        ParamsSingleParamRegistryWriter~
+        CustomParamsSingleParamRegistryWriter~
+          ParamsSingleStringParamRegistryWriter~
+          ParamsSingleBLOBParamRegistryWriter~
 
 *)
 
@@ -85,13 +81,16 @@ uses
   { VCL }
   SysUtils, Classes,
   { LiberSynth }
-  uCore, uParams, uFileUtils, uUserParams, uCustomReadWrite, uCustomStringParser, uParamsReader, uComponentTypes;
+  uCore, uFileUtils, uParams, uUserParams, uCustomReadWrite, uCustomStringParser, uLSNIStringParser, uLSNIDCStringParser,
+  uParamsReader, uUserParamsReader, uComponentTypes;
 
 type
 
   TIniStoreMethod = (smLSNIString, smClassicIni, smBLOB);
   TIniSourceType  = (stFile, stRegistryStructured, stRegistrySingleParam, stCustom);
-  TCommentSupport = (csNone, csStockFormat, csUserFormat);
+  TCommentSupport = (csNone, csStockFormat, csOriginarFormat);
+
+  TGetCustomSourceProc = procedure (var _Value) of object;
 
   TLSIni = class(TComponent)
 
@@ -103,18 +102,19 @@ type
     FAutoLoad: Boolean;
     FSourcePath: String;
     FErrorsLocating: Boolean;
+    FNativeException: Boolean;
     FCommentSupport: TCommentSupport;
+    FGetCustomSource: TGetCustomSourceProc;
 
     FParams: TParams;
 
     procedure InitProperties;
     function ParamsClass: TParamsClass;
-    function ReaderClass: TCustomParserClass;
+    function ReaderClass: TCustomReaderClass;
+    function ParserClass: TCustomParserClass;
     function SourceFile: String;
-    procedure SetReaderLocated(_Reader: TCustomReader);
-    procedure SetReaderSource(_Reader: TCustomReader);
-    procedure RetrieveReaderSource(_Reader: TCustomReader; const _Source: String);
-    procedure SetReaderParams(_Reader: TCustomReader);
+    function GetSourceString: String;
+    function DoGetCustomSourceString: String;
 
     procedure SetCommentSupport(const _Value: TCommentSupport);
     procedure SetSourceType(const _Value: TIniSourceType);
@@ -124,7 +124,6 @@ type
   protected
 
     procedure Loaded; override;
-  published
 
   public
 
@@ -143,8 +142,10 @@ type
     property AutoSave: Boolean read FAutoSave write FAutoSave;
     property AutoLoad: Boolean read FAutoLoad write FAutoLoad;
     property ErrorsLocating: Boolean read FErrorsLocating write SetErrorsLocating;
+    property NativeException: Boolean read FNativeException write FNativeException;
     property CommentSupport: TCommentSupport read FCommentSupport write SetCommentSupport;
     property SourcePath: String read FSourcePath write FSourcePath;
+    property GetCustomSource: TGetCustomSourceProc read FGetCustomSource write FGetCustomSource;
 
   end;
 
@@ -194,57 +195,19 @@ begin
 
 end;
 
-procedure TLSIni.SetReaderLocated;
-var
-  CustomStringParser: IStringParser;
+function TLSIni.GetSourceString: String;
 begin
 
-  if ErrorsLocating then
+  if StoreMethod = smBLOB then
+    raise EComponentException.Create('Impossible combination: blob reading and string source.');
 
-    if _Reader.GetInterface(IStringParser, CustomStringParser) then
-
-      CustomStringParser.SetLocated
-
-    else raise EComponentException.CreateFmt('Reader class %s does not support string parsing.', [_Reader.ClassName]);
-
-end;
-
-procedure TLSIni.SetReaderParams(_Reader: TCustomReader);
-var
-  ParamsReader: IParamsReader;
-begin
-
-  if _Reader.GetInterface(IParamsReader, ParamsReader) then
-
-    ParamsReader.SetParams(Params)
-
-  else raise EComponentException.CreateFmt('Reader class %s does not support params reading.', [_Reader.ClassName]);
-
-end;
-
-procedure TLSIni.SetReaderSource(_Reader: TCustomReader);
-var
-  StringSource: String;
-begin
-
-  StringSource := '';
-
+  Result := '';
   case SourceType of
 
-    stFile: StringSource := FileToStr(SourceFile);
-//    stRegistryStructured: ;
+    stFile:                Result := FileToStr(SourceFile);
+    stRegistryStructured:  raise EComponentException.Create('Impossible combination: registry reading and string source.');
 //    stRegistrySingleParam: ;
-//    stCustom: DoGetCustomSource(что именно?);
-
-  else
-    raise EUncompletedMethod.Create;
-  end;
-
-  case StoreMethod of
-
-    smLSNIString: RetrieveReaderSource(_Reader, StringSource);
-//    smClassicIni: RetrieveReaderSource(_Reader, StringSource);
-//    smBLOB: RetrieveReaderSource(_Reader, BLOBSource);
+    stCustom: Result := DoGetCustomSourceString; { Именно здесь - строка. GetSourceBLOB - BLOB. }
 
   else
     raise EUncompletedMethod.Create;
@@ -299,6 +262,12 @@ begin
   inherited Destroy;
 end;
 
+function TLSIni.DoGetCustomSourceString: String;
+begin
+  if Assigned(FGetCustomSource) then
+    FGetCustomSource(Result);
+end;
+
 function TLSIni.ParamsClass: TParamsClass;
 begin
 
@@ -306,7 +275,7 @@ begin
 
     csNone:        Result := TParams;
     csStockFormat: Result := TUserParams;
-//    csUserFormat:  Result := ;
+//    csOriginalFormat:  Result := ;
 
   else
     raise EUncompletedMethod.Create;
@@ -314,15 +283,35 @@ begin
 
 end;
 
-function TLSIni.ReaderClass: TCustomParserClass;
+function TLSIni.ReaderClass: TCustomReaderClass;
+const
+
+  Map: array [TCommentSupport] of TCustomReaderClass = (
+
+      { csNone           } TParamsReader,
+      { csStockFormat    } TUserParamsReader,
+      { csOriginarFormat } TCustomReader
+
+  );
+
+begin
+
+  Result := Map[CommentSupport];
+
+  if Result = TCustomReader then
+    raise EUncompletedMethod.Create;
+
+end;
+
+function TLSIni.ParserClass: TCustomParserClass;
 const
 
   Map: array [TIniStoreMethod, TCommentSupport] of TCustomParserClass = (
 
-                       { csNone,            csStockFormat,       csUserFormat }
-      { smLSNIString } ( TLSNIParamsReader, TLSNISCParamsReader, TCustomReader),
-      { smClassicIni } ( TCustomReader,     TCustomReader,       TCustomReader),
-      { smBLOB       } ( TCustomReader,     nil,                 nil          )
+                       { csNone,            csStockFormat,       csOriginarFormat }
+      { smLSNIString } ( TLSNIStringParser, TLSNIDCStringParser, TCustomParser    ),
+      { smClassicIni } ( TCustomParser,     TCustomParser,       TCustomParser    ),
+      { smBLOB       } ( TCustomParser,     nil,                 nil              )
 
   );
 
@@ -330,23 +319,10 @@ begin
 
   Result := Map[StoreMethod, CommentSupport];
 
-  if Result = TCustomReader then
+  if Result = TCustomParser then
     raise EUncompletedMethod.Create;
   if not Assigned(Result) then
-    raise ECustomReadWriteException.Create('Impossible combination of properties. There are no blobs with comments.');
-
-end;
-
-procedure TLSIni.RetrieveReaderSource(_Reader: TCustomReader; const _Source: String);
-var
-  CustomStringParser: IStringParser;
-begin
-
-  if _Reader.GetInterface(IStringParser, CustomStringParser) then
-
-    CustomStringParser.SetSource(_Source)
-
-  else raise ECustomReadWriteException.CreateFmt('Reader class %s does not support string reading.', [_Reader.ClassName]);
+    raise EComponentException.Create('Impossible combination of properties. There are no blobs with comments.');
 
 end;
 
@@ -363,16 +339,54 @@ end;
 
 procedure TLSIni.Load;
 var
+  Parser: TCustomParser;
   Reader: TCustomReader;
+  ParamsReader: IParamsReader;
+  CustomStringParser: ICustomStringParser;
 begin
 
   Reader := ReaderClass.Create;
   try
 
-    SetReaderLocated(Reader);
-    SetReaderSource (Reader);
-    SetReaderParams (Reader);
-    Reader.Read;
+    if not Reader.GetInterface(IParamsReader, ParamsReader) then
+      raise EComponentException.Create('Reader does not support IParamsReader interface.');
+    try
+
+      ParamsReader.RetrieveParams(Params);
+
+      Parser := ParserClass.Create;
+      try
+
+        if Parser.GetInterface(ICustomStringParser, CustomStringParser) then
+
+          try
+
+            CustomStringParser.Located         := ErrorsLocating;
+            CustomStringParser.NativeException := NativeException;
+            CustomStringParser.SetSource(GetSourceString);
+
+            ParamsReader.RetrieveParser(Parser);
+
+            Parser.RetrieveTargerInterface(Reader);
+            try
+
+              Parser.Read;
+
+            finally
+              Parser.FreeTargerInterface;
+            end;
+
+          finally
+            CustomStringParser := nil;
+          end;
+
+      finally
+        Parser.Free;
+      end;
+
+    finally
+      ParamsReader := nil;
+    end;
 
   finally
     Reader.Free;

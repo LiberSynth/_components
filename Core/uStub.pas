@@ -13,9 +13,9 @@ implementation
 
 procedure LSNIStrToParams(const Source: String; Params: TParams);
 var
-  Parser: TCustomParser;
   Reader: TCustomReader;
   ParamsReader: IParamsReader;
+  Parser: TCustomParser;
   CustomStringParser: ICustomStringParser;
 begin
 
