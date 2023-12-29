@@ -130,7 +130,7 @@ type
 
   strict private
 
-    FNTVParser: INTVParser;
+    FNTVReader: INTVReader;
 
     FElementType: TElementType;
 
@@ -142,7 +142,7 @@ type
 
   private
 
-    property NTVParser: INTVParser read FNTVParser;
+    property NTVReader: INTVReader read FNTVReader;
 
   protected
 
@@ -151,6 +151,7 @@ type
     function ElementProcessingKey(_KeyWord: TKeyWord): Boolean; override;
     function ElementTerminatingKey(_KeyWord: TKeyWord): Boolean; override;
     procedure CheckSyntax(const _KeyWord: TKeyWord); override;
+    function ReadValue: String; virtual;
 
     property Reading: TReadInfoList read FReading;
     property DoublingChar: Char read FDoublingChar write FDoublingChar;
@@ -363,24 +364,24 @@ begin
   with FExcludingSyntax do begin
 
     {   ElementType  CursorStanding  Nested      Keys         }
-    Add(etName,      stInside,       nsNoMatter, [ktSourceEnd]);
-    Add(etName,      stAfter,        nsNoMatter, [ktSourceEnd]);
-    Add(etType,      stInside,       nsNoMatter, [ktSourceEnd]);
-    Add(etType,      stAfter,        nsNoMatter, [ktSourceEnd]);
+    Add(etName,      scInside,       nsNoMatter, [ktSourceEnd]);
+    Add(etName,      csAfter,        nsNoMatter, [ktSourceEnd]);
+    Add(etType,      scInside,       nsNoMatter, [ktSourceEnd]);
+    Add(etType,      csAfter,        nsNoMatter, [ktSourceEnd]);
 
   end;
 
   with FStrictSyntax do begin
 
     {   ElementType  CursorStanding Nested       Keys                                                                           }
-    Add(etName,      stBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                                              );
-    Add(etName,      stBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]                             );
-    Add(etName,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktTypeIdent, ktAssigning]                                 );
-    Add(etType,      stAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktAssigning]                                              );
-    Add(etValue,     stBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]                 );
-    Add(etValue,     stBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktNestedClosing, ktSplitter]);
-    Add(etValue,     stAfter,       nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                                  );
-    Add(etValue,     stAfter,       nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing, ktSplitter]);
+    Add(etName,      csBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd]                                              );
+    Add(etName,      csBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing]                             );
+    Add(etName,      csAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktTypeIdent, ktAssigning]                                 );
+    Add(etType,      csAfter,       nsNoMatter,  [ktSpace, ktLineEnd, ktAssigning]                                              );
+    Add(etValue,     csBefore,      nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktSplitter]                 );
+    Add(etValue,     csBefore,      nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedOpening, ktNestedClosing, ktSplitter]);
+    Add(etValue,     csAfter,       nsNotNested, [ktSpace, ktLineEnd, ktSourceEnd, ktSplitter]                                  );
+    Add(etValue,     csAfter,       nsNested,    [ktSpace, ktLineEnd, ktSourceEnd, ktNestedClosing, ktSplitter]);
 
   end;
 
@@ -391,9 +392,20 @@ begin
 
 end;
 
+function TLSNIStringParser.ReadValue: String;
+begin
+  { TODO 2 -oVasilyevSM -cUndoubleSymbols: Здесь нужна отмена, потому что в комментариях дублирование не нужно
+    совсем. Можно ли считать отменой условие DoublingChar = #0, надо проверить, когда зарарботают комментарии. }
+  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
+    условии, что значение считывается регионом. Поэтому, символ задается событием региона. }
+  Result := ReadElement;
+  if DoublingChar > #0 then
+    Result := UndoubleStr(Result, DoublingChar);
+end;
+
 procedure TLSNIStringParser.RetrieveTargerInterface(_Receiver: TIntfObject);
 begin
-  if not _Receiver.GetInterface(INTVParser, FNTVParser) then
+  if not _Receiver.GetInterface(INTVReader, FNTVReader) then
     raise EStringParserException.CreateFmt('Receiver class %s does not support string parsing.', [_Receiver.ClassName]);
 end;
 
@@ -446,7 +458,7 @@ end;
 
 procedure TLSNIStringParser.FreeTargerInterface;
 begin
-  FNTVParser := nil;
+  FNTVReader := nil;
 end;
 
 procedure TLSNIStringParser.CheckSyntax(const _KeyWord: TKeyWord);
@@ -499,8 +511,8 @@ begin
   if
 
       (ElementType = etValue) and
-      (CursorStanding = stInside) and
-      NTVParser.IsNestedValue and
+      (CursorStanding = scInside) and
+      NTVReader.IsNestedValue and
       (Source[Cursor] <> '(')
 
   then raise ELSNIParseException.Create(_GetMessage);
@@ -508,29 +520,14 @@ begin
 end;
 
 procedure TLSNIStringParser.ProcessElement;
-
-  function _GetTrimmed: String;
-  begin
-
-    { SysUtils.Trim обрезает все, что <= ' '. Все табы, ритёрны итд. }
-    Result := Trim(ReadElement);
-
-    { TODO 2 -oVasilyevSM -cUndoubleSymbols: Здесь нужна отмена, потому что в комментариях дублирование не нужно
-      совсем. Можно ли считать отменой условие DoublingChar = #0, надо проверить, когда зарарботают комментарии. }
-    { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
-      условии, что значение считывается регионом. Поэтому, символ задается событием региона. }
-    if DoublingChar > #0 then
-      Result := UndoubleStr(Result, DoublingChar);
-
-  end;
-
 begin
 
   case ElementType of
 
-    etName:  FNTVParser.ReadName(ReadElement);
-    etType:  FNTVParser.ReadType(ReadElement);
-    etValue: FNTVParser.ReadValue(_GetTrimmed);
+    { SysUtils.Trim обрезает все, что <= ' '. Все табы, ритёрны итд. }
+    etName:  NTVReader.ReadName(Trim(ReadElement));
+    etType:  NTVReader.ReadType(Trim(ReadElement));
+    etValue: NTVReader.ReadValue(ReadValue);
 
   end;
 
@@ -614,7 +611,7 @@ begin
 
     Result :=
 
-        (CursorStanding = stBefore) and
+        (CursorStanding = csBefore) and
         (ElementType = etValue) and
         inherited;
 
@@ -652,16 +649,16 @@ begin
     Result :=
 
         (ElementType = etValue) and
-        (CursorStanding = stBefore) and
+        (CursorStanding = csBefore) and
         inherited and
-        NTVParser.IsNestedValue;
+        NTVReader.IsNestedValue;
 
 end;
 
 procedure TNestedParamsBlock.Execute(_Parser: TCustomStringParser; var _Handled: Boolean);
 begin
 
-  (_Parser as TLSNIStringParser).NTVParser.ReadNestedBlock;
+  (_Parser as TLSNIStringParser).NTVReader.ReadNestedBlock;
 
   inherited Execute(_Parser, _Handled);
   _Handled := True;

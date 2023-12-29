@@ -37,7 +37,7 @@ type
 
   { TODO 5 -oVasilyevSM -cuCustomStringParser: Section }
 
-  TStanding = (stBefore, stInside, stAfter);
+  TStanding = (csBefore, scInside, csAfter);
 
   TKeyType = (ktNone, ktSourceEnd, ktLineEnd);
   TKeyTypes = set of TKeyType;
@@ -245,7 +245,7 @@ type
 
     function Clone: TCustomParser; override;
 
-    procedure Accept(_Sender: TCustomParser); override;
+    procedure AcceptControl(_Sender: TCustomParser); override;
 
     { ICustomStringParser }
     procedure SetSource(const _Source: String);
@@ -666,10 +666,10 @@ begin
 
   FCursorStanding := _To;
 
-  if _To = stInside then FElementStart := Cursor
+  if _To = scInside then FElementStart := Cursor
   else FElementStart := 0;
 
-  if (CursorStanding > stBefore) and not Eof then
+  if (CursorStanding > csBefore) and not Eof then
     CheckPoint;
 
 end;
@@ -697,7 +697,7 @@ begin
       { Move до переключения, потому что ключ не должен войти в регион. Начало после ключа. }
       Move(OpeningKey.KeyLength);
       if not CancelToggling then
-        ToggleStanding(stInside); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 1 (RegionOpened) }
+        ToggleStanding(scInside); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 1 (RegionOpened) }
 
     end;
 
@@ -712,9 +712,9 @@ begin
   Result := Regions.Active;
 end;
 
-procedure TCustomStringParser.Accept(_Sender: TCustomParser);
+procedure TCustomStringParser.AcceptControl(_Sender: TCustomParser);
 begin
-  inherited Accept(_Sender);
+  inherited AcceptControl(_Sender);
   Move((_Sender as TCustomStringParser).Cursor - Cursor);
   CheckPoint;
 end;
@@ -833,7 +833,7 @@ end;
 
 procedure TCustomStringParser.ToggleElement(_KeyWord: TKeyWord);
 begin
-  ToggleStanding(stBefore); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 3 (ToggleElement) }
+  ToggleStanding(csBefore); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 3 (ToggleElement) }
 end;
 
 function TCustomStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
@@ -848,7 +848,7 @@ end;
 
 procedure TCustomStringParser.ProcessElement;
 begin
-  ToggleStanding(stAfter); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 2 (ProcessElement) }
+  ToggleStanding(csAfter); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 2 (ProcessElement) }
 end;
 
 function TCustomStringParser.ReadElement: String;
@@ -884,7 +884,7 @@ begin
 
   if Result and not Regions.ActiveRegion.CancelToggling then begin
 
-    ToggleStanding(stAfter); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 2 (after RegionExecute) }
+    ToggleStanding(csAfter); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 2 (after RegionExecute) }
     FRegionStart := 0;
 
   end;
@@ -908,17 +908,17 @@ begin
   DoSyntaxCheck(_KeyWord);
 
   { Обработка (считывание) по признаку завершения тела. Например, пробел для непрерывных элементов. }
-  if (CursorStanding = stInside) and ElementProcessingKey(_KeyWord) then
+  if (CursorStanding = scInside) and ElementProcessingKey(_KeyWord) then
     ProcessElement;
 
   { Завершение. Элемент закончен вместе со последующим пространством. }
   if ElementTerminatingKey(_KeyWord) then begin
 
     { В случае пустого значения элемента мы окажемся здесь. Обработка пустого элемента. }
-    if CursorStanding < stAfter then
+    if CursorStanding < csAfter then
       ProcessElement;
 
-    { Переключение абстрактного типа элемента. }
+    { Переключение типа элемента. }
     if _KeyWord.KeyType <> ktSourceEnd then
       ToggleElement(_KeyWord);
 
@@ -934,8 +934,8 @@ begin
 
   if not RegionActive then begin
 
-    if CursorStanding = stBefore then
-      ToggleStanding(stInside); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 1 (MoveEvent) }
+    if CursorStanding = csBefore then
+      ToggleStanding(scInside); { ТОЧКА ПЕРЕКЛЮЧЕНИЯ 1 (MoveEvent) }
 
     DoSyntaxCheck(KWR_EMPTY);
 

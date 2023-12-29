@@ -31,16 +31,19 @@ requires
 contains
   uConsts in '..\..\..\Core\uConsts.pas',
   uTypes in '..\..\..\Core\uTypes.pas',
-  uDataUtils in '..\..\..\Core\uDataUtils.pas',
-  uStrUtils in '..\..\..\Core\uStrUtils.pas',
   uCore in '..\..\..\Core\uCore.pas',
+  uDataUtils in '..\..\..\Core\uDataUtils.pas',
   uGUID in '..\..\..\Core\uGUID.pas',
+  uStrUtils in '..\..\..\Core\uStrUtils.pas',
   uParams in '..\..\..\Core\uParams.pas',
   uCustomReadWrite in '..\..\..\Core\uCustomReadWrite.pas',
+  uReadWriteCommon in '..\..\..\Core\uReadWriteCommon.pas',
   uCustomStringParser in '..\..\..\Core\uCustomStringParser.pas',
   uLSNIStringParser in '..\..\..\Core\uLSNIStringParser.pas',
+  uLSNISCStringParser in '..\..\..\Core\uLSNISCStringParser.pas',
   uParamsReader in '..\..\..\Core\uParamsReader.pas',
+  uUserParams in '..\..\..\Core\uUserParams.pas',
   uStub in '..\..\..\Core\uStub.pas',
-  uReadWriteCommon in '..\..\..\Core\uReadWriteCommon.pas';
+  uUserParamsReader in '..\..\..\Core\uUserParamsReader.pas';
 
 end.

@@ -50,7 +50,7 @@ type
 
   end;
 
-  TParamsReader = class(TCustomReader, IParamsReader, INTVParser)
+  TParamsReader = class(TCustomReader, IParamsReader, INTVReader)
 
   strict private
 
@@ -66,16 +66,12 @@ type
     procedure CheckPresetType(_Strict: Boolean);
     function TrimDigital(const _Value: String): String;
 
-    { INTVParser }
+    { INTVReader }
     procedure ReadName(const _Element: String);
     procedure ReadType(const _Element: String);
     procedure ReadValue(const _Element: String);
     function IsNestedValue: Boolean;
     procedure ReadNestedBlock;
-
-    { IParamsReader }
-    procedure RetrieveParams(_Value: TParams);
-    procedure RetrieveParser(_Value: TCustomParser);
 
   private
 
@@ -85,6 +81,16 @@ type
     property ListStarter: TListStarter read FListStarter;
     property Params: TParams read FParams write FParams;
     property Parser: TCustomParser read FParser write FParser;
+
+  protected
+
+    { IParamsReader }
+    procedure RetrieveParams(_Value: TParams); virtual;
+    procedure RetrieveParser(_Value: TCustomParser);
+
+    procedure BeforeReadParam(_Param: TParam); virtual;
+    procedure AfterReadParam(_Param: TParam); virtual;
+    procedure AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader); virtual;
 
   public
 
@@ -139,6 +145,18 @@ begin
   inherited Destroy;
 end;
 
+procedure TParamsReader.AfterReadParam(_Param: TParam);
+begin
+end;
+
+procedure TParamsReader.AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader);
+begin
+end;
+
+procedure TParamsReader.BeforeReadParam(_Param: TParam);
+begin
+end;
+
 procedure TParamsReader.CheckPresetType(_Strict: Boolean);
 var
   DataType: TParamDataType;
@@ -176,8 +194,6 @@ var
   Index: Integer;
 begin
 
-//  BeforeReadParam(Items[Index]);
-
   NestedParser := Parser.Clone;
   try
 
@@ -190,7 +206,6 @@ begin
       NestedParser.RetrieveTargerInterface(NestedReader);
       try
 
-
         NestedParser.Read;
 
         with Params.AddList(CurrentName) do begin
@@ -198,13 +213,15 @@ begin
           if Nested or ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
           else Index := 0;
 
+          BeforeReadParam(Items[Index]);
           AsParams[Index] := NestedReader.Params;
-          //AfterReadParams(Param);
+          AfterNestedReading(Items[Index], NestedReader);
+          AfterReadParam(Items[Index]);
 
         end;
 
         { Возврат управления мастеру. Если помощник выломался, не возвращать, иначе локация вернется в начало помощника. }
-        Parser.Accept(NestedParser);
+        Parser.AcceptControl(NestedParser);
 
       finally
         NestedParser.FreeTargerInterface;
@@ -218,7 +235,6 @@ begin
     NestedParser.Free;
   end;
 
-//  AfterReadParam(Param);
   FCurrentName := '';
   FCurrentType := dtUnknown;
 
@@ -244,7 +260,7 @@ begin
     if ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
     else Index := 0;
 
-//    BeforeReadParam(Items[Index]);
+    BeforeReadParam(Items[Index]);
 
     if Length(_Element) > 0 then
 
@@ -271,7 +287,7 @@ begin
 
     end;
 
-//    AfterReadParam(Items[Index]);
+    AfterReadParam(Items[Index]);
 
   end;
 

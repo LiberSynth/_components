@@ -227,8 +227,6 @@ type
       function InternalIndex(_Index: Integer): Integer;
       function ExternalIndex(_InternalIndex: Integer): Integer;
 
-      property Items[_Index: Integer]: TParam read GetItems; default;
-
     private
 
       constructor Create(const _Name: String; _Params: TParams);
@@ -260,6 +258,8 @@ type
       property AsBLOB[_Index: Integer]: BLOB read GetAsBLOB write SetAsBLOB;
       property AsData[_Index: Integer]: TData read GetAsData write SetAsData;
       property AsParams[_Index: Integer]: TParams read GetAsParams write SetAsParams;
+
+      property Items[_Index: Integer]: TParam read GetItems; default;
 
     end;
 
@@ -2209,7 +2209,7 @@ var
 begin
 
   PathRest := _Path;
-  Params := GetPath(PathRest);
+  Params   := GetPath(PathRest);
 
   with Params.ListHolder do
     if not Find(PathRest, Result) then

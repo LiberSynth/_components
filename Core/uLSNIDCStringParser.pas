@@ -1,4 +1,4 @@
-unit uLSNISCParamsReader;
+unit uLSNIDCStringParser;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -25,7 +25,7 @@ unit uLSNISCParamsReader;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ LSNI Strong Commented Params Reader }
+{ LSNI Direct Commented Parser }
 
 interface
 
@@ -33,7 +33,7 @@ uses
   { VCL }
   SysUtils,
   { LiberSynth }
-  uConsts, uCustomStringParser, uLSNIStringParser, uLSNIParamsReader, uParams, uUserParams, uDataUtils, uStrUtils;
+  uConsts, uCore, uCustomStringParser, uLSNIStringParser, uReadWriteCommon, uDataUtils, uStrUtils;
 
 type
 
@@ -45,18 +45,17 @@ type
   );
   TKeyTypes = set of TKeyType;
 
-  { LSNI Strong Commented Params Reader }
-  TLSNISCParamsReader = class(TLSNIParamsReader)
+  TLSNIDCStringParser = class(TLSNIStringParser)
 
   strict private
 
-    FCurrentParam: TUserParam;
-    FCurrentComments: TUserParam.TCommentList;
     FCommentTerminatedValue: Boolean;
+    FUserParamsReader: IUserParamsReader;
+
+    procedure LineEnd;
 
   private
 
-    function ReadComment: String;
     procedure AddComment(
 
         const _Value: String;
@@ -65,32 +64,24 @@ type
         _Short: Boolean
 
     );
-    procedure DetachBeforeParam;
-    procedure SaveTail;
+    function ReadComment: String;
 
-    property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
-    property CurrentComments: TUserParam.TCommentList read FCurrentComments;
     property CommentTerminatedValue: Boolean read FCommentTerminatedValue write FCommentTerminatedValue;
+    property UserParamsReader: IUserParamsReader read FUserParamsReader write FUserParamsReader;
 
   protected
 
     procedure InitParser; override;
-
-    procedure BeforeReadParam(_Param: TParam); override;
-    procedure AfterReadParam(_Param: TParam); override;
-    procedure AfterReadParams(_Param: TParam); override;
+    procedure ElementTerminated(_KeyWord: TKeyWord); override;
+    function ReadValue: String; override;
 
   public
 
-    destructor Destroy; override;
-
     procedure KeyEvent(const _KeyWord: TKeyWord); override;
-    function ReadElement(_Trim: Boolean): String; override;
-    procedure ElementTerminated(_KeyWord: TKeyWord); override;
+    procedure RetrieveTargerInterface(_Receiver: TIntfObject); override;
+    procedure FreeTargerInterface; override;
 
   end;
-
-procedure LSNIStrToParams(const Source: String; Params: TParams);
 
 implementation
 
@@ -155,95 +146,34 @@ type
 
   end;
 
-procedure LSNIStrToParams(const Source: String; Params: TParams);
-var
-  Reader: TLSNISCParamsReader;
+{ TLSNIDCStringParser }
+
+procedure TLSNIDCStringParser.AddComment(const _Value, _Opening, _Closing: String; _Short: Boolean);
 begin
 
-  Reader := TLSNISCParamsReader.Create;
-  try
+  if Assigned(UserParamsReader) then
 
-    Reader.Located := True;
-    Reader.NativeException := True;
-    Reader.SetSource(Source);
-    Reader.SetParams(Params);
-    Reader.Read;
+    case ElementType of
 
-  finally
-    Reader.Free;
-  end;
+      etName:  UserParamsReader.AddNameComment (_Value, _Opening, _Closing, _Short, CursorStanding = csBefore);
+      etType:  UserParamsReader.AddTypeComment (_Value, _Opening, _Closing, _Short, CursorStanding = csBefore);
+      etValue: UserParamsReader.AddValueComment(_Value, _Opening, _Closing, _Short, CursorStanding = csBefore);
+
+    else
+      raise EStringParserException.Create('Unexpected content element');
+    end;
 
 end;
 
-{ TLSNISCParamsReader }
-
-destructor TLSNISCParamsReader.Destroy;
-begin
-  FreeAndNil(FCurrentComments);
-  inherited Destroy;
-end;
-
-function TLSNISCParamsReader.ReadComment: String;
+function TLSNIDCStringParser.ReadComment: String;
 begin
   Result := Trim(Copy(Source, RegionStart, Cursor - RegionStart));
 end;
 
-procedure TLSNISCParamsReader.AddComment;
-var
-  Anchor: TCommentAnchor;
-begin
-
-  case ElementType of
-
-    etName:  if Length(CurrentName) > 0   then Anchor := caAfterName  else Anchor := caBeforeName;
-    etType:  if (CurrentType > dtUnknown) then Anchor := caAfterType  else Anchor := caBeforeType;
-    etValue: if Length(CurrentName) = 0   then Anchor := caAfterValue else Anchor := caBeforeValue;
-
-  else
-    raise EParamsReadException.Create('Unexpected content element');
-  end;
-
-  CurrentComments.AddComment(_Value, _Opening, _Closing, Anchor, _Short);
-
-end;
-
-procedure TLSNISCParamsReader.DetachBeforeParam;
-var
-  i: Integer;
-begin
-
-  if (ElementType = etName) and (CursorStanding = stBefore) then
-    for i := 0 to CurrentComments.Count - 1 do
-      with CurrentComments[i] do
-        if Anchor = caBeforeName then
-          CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
-
-end;
-
-procedure TLSNISCParamsReader.SaveTail;
-var
-  i: Integer;
-begin
-
-  if Assigned(CurrentParam) then begin
-
-    for i := 0 to CurrentComments.Count - 1 do
-      with CurrentComments[i] do
-        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caAfterParam, Short);
-
-    CurrentParam.Comments.AddRange(CurrentComments);
-    CurrentComments.Clear;
-
-  end;
-
-end;
-
-procedure TLSNISCParamsReader.InitParser;
+procedure TLSNIDCStringParser.InitParser;
 begin
 
   inherited InitParser;
-
-  FCurrentComments := TUserParam.TCommentList.Create;
 
   {         RegionClass          OpeningKey                       ClosingKey                      Caption  }
   AddRegion(TLongCommentRegion,  KWR_LONG_COMMENT_OPENING_KEY_A,  KWR_LONG_COMMENT_CLOSING_KEY_A, 'comment');
@@ -254,82 +184,67 @@ begin
 
 end;
 
-procedure TLSNISCParamsReader.BeforeReadParam(_Param: TParam);
-begin
-  inherited BeforeReadParam(_Param);
-  (_Param as TUserParam).Comments.Clear;
-end;
-
-procedure TLSNISCParamsReader.AfterReadParam(_Param: TParam);
-begin
-  inherited AfterReadParam(_Param);
-  CurrentParam := _Param as TUserParam;
-end;
-
-procedure TLSNISCParamsReader.AfterReadParams(_Param: TParam);
-var
-  Comment: TUserParam.TComment;
-  ParamComments: TUserParam.TCommentList;
-begin
-
-  inherited AfterReadParams(_Param);
-
-  ParamComments := (_Param as TUserParam).Comments;
-
-  { Чтение вложенного блока завершено и обычные комментарии уже розданы внутренним параметрам. Здесь остаются только
-    "бесхозные" в случае, когда вложенных параметров не было. Отдаем их параметру-мастеру как InsideEmptyParams. }
-  for Comment in CurrentComments do
-    with Comment do
-      ParamComments.AddComment(Text, Opening, Closing, caInsideEmptyParams, Short);
-
-  CurrentComments.Clear;
-
-end;
-
-procedure TLSNISCParamsReader.KeyEvent(const _KeyWord: TKeyWord);
+procedure TLSNIDCStringParser.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
   inherited KeyEvent(_KeyWord);
 
-  case _KeyWord.KeyType of
+  if Assigned(UserParamsReader) then
 
-    { Которые на предыдущих строках от имени премещаем в BeforeParam оттуда. }
-    ktLineEnd:   DetachBeforeParam;
-    { Обработка блока заканчивается в положении BeforeName. Но паарметра больше не будет. Перемещаем в AfterParam
-      последнего считанного параметра. }
-    ktSourceEnd: SaveTail;
+    case _KeyWord.KeyType of
 
-  end;
+      ktLineEnd:   LineEnd;
+      ktSourceEnd: UserParamsReader.SourceEnd;
+
+    end;
 
 end;
 
-function TLSNISCParamsReader.ReadElement(_Trim: Boolean): String;
+procedure TLSNIDCStringParser.LineEnd;
 begin
-  Result := inherited ReadElement(_Trim);
+
+  { Которые на предыдущих строках от имени премещаем в BeforeParam оттуда. }
+  if
+
+      Assigned(UserParamsReader) and
+      (ElementType = etName) and
+      (CursorStanding = csBefore)
+
+  then UserParamsReader.DetachBefore;
+
+end;
+
+procedure TLSNIDCStringParser.RetrieveTargerInterface(_Receiver: TIntfObject);
+begin
+  inherited RetrieveTargerInterface(_Receiver);
+  if not _Receiver.GetInterface(IUserParamsReader, FUserParamsReader) then
+    {raise EStringParserException.CreateFmt('Receiver class %s does not support comment reading.', [_Receiver.ClassName])};
+end;
+
+procedure TLSNIDCStringParser.FreeTargerInterface;
+begin
+  inherited FreeTargerInterface;
+  UserParamsReader := nil;
+end;
+
+function TLSNIDCStringParser.ReadValue: String;
+begin
+  Result := inherited ReadValue;
   if CommentTerminatedValue then
     Result := TrimRight(Result);
 end;
 
-procedure TLSNISCParamsReader.ElementTerminated(_KeyWord: TKeyWord);
+procedure TLSNIDCStringParser.ElementTerminated(_KeyWord: TKeyWord);
 begin
 
   inherited ElementTerminated(_KeyWord);
 
   if
 
-      ((ElementType = etName) or (_KeyWord.KeyType = ktSourceEnd)) and
-      Assigned(CurrentParam)
+      Assigned(UserParamsReader) and
+      ((ElementType = etName) or (_KeyWord.KeyType = ktSourceEnd))
 
-  then
-
-    with CurrentParam do begin
-
-      { Элемент типа "параметры", если они были пустые, уже может содержать блок комментариев InsideEmptyParams,
-        положенный туда в конце исполнения региона (AfterReadParams). Поэтому, здесь делаем вставку в начало списка. }
-      Comments.InsertRange(0, CurrentComments);
-      CurrentComments.Clear;
-
-    end;
+  then UserParamsReader.ElementTerminated;
 
 end;
 
@@ -347,9 +262,9 @@ begin
 
   inherited Opened(_Parser);
 
-  with _Parser as TLSNISCParamsReader do
+  with _Parser as TLSNIDCStringParser do
 
-    if CursorStanding = stInside then begin
+    if CursorStanding = scInside then begin
 
       { Флаг нужен для обрезки пробелов справа от элемента при считывании. Они точно являюются отступом перед
         комментарием, а не частью значения. }
@@ -374,14 +289,14 @@ var
   p: Int64;
 begin
 
-  with _Parser as TLSNISCParamsReader do begin
+  with _Parser as TLSNIDCStringParser do begin
 
     { Перемещаемся сразу на конец комментария, чтобы не бежать туда циклом. Этот Pos найдет его быстрее. }
     p := Pos(ClosingKey.StrValue, Source, Cursor);
     if p = 0 then Move(SrcLen - Cursor + 1)
     else Move(p - Cursor);
 
-    { Считываем, потому что уже можем. Так меньше лишней нагрузки, так как CanClose уже просто True. }
+    { Считываем, потому что уже можем. Так меньше лишней нагрузки, поскольку CanClose уже просто True. }
     AddComment(ReadComment, OpeningKey.StrValue, ClosingKey.StrValue, False);
 
   end;
@@ -398,8 +313,8 @@ begin
 
   inherited Closed(_Parser);
 
-  with _Parser as TLSNISCParamsReader do
-    if (ElementType = etValue) and (CursorStanding = stAfter) then
+  with _Parser as TLSNIDCStringParser do
+    if (ElementType = etValue) and (CursorStanding = csAfter) then
       KeyEvent(KWR_LINE_END_CRLF);
 
 end;
@@ -413,7 +328,7 @@ begin
     else if Copy(Source, Cursor, 2) = KWR_LINE_END_CRLF.StrValue then ClosingKey := KWR_LINE_END_CRLF
     else if Copy(Source, Cursor, 1) = KWR_LINE_END_CR.  StrValue then ClosingKey := KWR_LINE_END_CR
     else if Copy(Source, Cursor, 1) = KWR_LINE_END_LF.  StrValue then ClosingKey := KWR_LINE_END_LF
-    else raise EParamsReadException.Create('Impossible case of comment reading.');
+    else raise EStringParserException.Create('Impossible case of comment reading.');
 
 end;
 
@@ -422,7 +337,7 @@ var
   p: Int64;
 begin
 
-  with _Parser as TLSNISCParamsReader do begin
+  with _Parser as TLSNIDCStringParser do begin
 
     { Перемещаемся сразу на конец комментария, чтобы не бежать туда циклом. Этот Pos найдет его быстрее. }
     p := Min(Pos(CR, Source, Cursor), Pos(LF, Source, Cursor));

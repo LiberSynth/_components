@@ -21,7 +21,7 @@ type
     procedure Read; virtual; abstract;
 
     function Clone: TCustomParser; virtual;
-    procedure Accept(_Sender: TCustomParser); virtual;
+    procedure AcceptControl(_Sender: TCustomParser); virtual;
 
   end;
 
@@ -69,7 +69,7 @@ begin
   Result := TCustomParserClass(ClassType).Create;
 end;
 
-procedure TCustomParser.Accept(_Sender: TCustomParser);
+procedure TCustomParser.AcceptControl(_Sender: TCustomParser);
 begin
 end;
 

@@ -131,7 +131,7 @@ type
 
   protected
 
-    constructor Create(const _Name: String; const _PathSeparator: Char = '.'); override;
+    constructor Create(const _Name: String; const _PathSeparator: Char = '.'; _StrictDataType: Boolean = False); override;
 
     procedure AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean); override;
 
@@ -143,7 +143,7 @@ type
 
   end;
 
-  { Ётот класс Ќ≈ никому должен: уметь быстро обрабатывать большие хранилища. ≈сли формат LSNI используетс€ как
+  { Ётот класс никому Ќ≈ должен: уметь быстро обрабатывать большие хранилища. ≈сли формат LSNI используетс€ как
     мини-база, не нужно там держать комментарии никому. }
   TUserParams = class(TParams)
 
@@ -486,9 +486,9 @@ end;
 
 { TUserParam }
 
-constructor TUserParam.Create(const _Name: String; const _PathSeparator: Char);
+constructor TUserParam.Create;
 begin
-  inherited Create(_Name, _PathSeparator);
+  inherited Create(_Name, _PathSeparator, _StrictDataType);
   FComments := TCommentList.Create;
 end;
 
