@@ -411,9 +411,9 @@ const
     { caAfterValue        True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
 
     { caAfterParam        False        False       False } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False        False       True  } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False        False       True  } (LeftOffset: '';     RightOffset: ''    ),
     { caAfterParam        False        True        False } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False        True        True  } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False        True        True  } (LeftOffset: '';     RightOffset: ''    ),
     { caAfterParam        True         False       False } (LeftOffset: Offset; RightOffset: Offset),
     { caAfterParam        True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
     { caAfterParam        True         True        False } (LeftOffset: Offset; RightOffset: Offset),
@@ -549,6 +549,16 @@ var
 
   end;
 
+  function _CheckLastCRLF(const _Value: String): Boolean;
+  var
+    L: Integer;
+  begin
+    { Это совсем подбор, конечно, но оно за гранью всей логики. В том месте, где должна заканчиваться строка просто
+      может быть уже есть CRLF от короткого комментария. Это и проверяем, чтобы пустая строка не добавилась лишняя. }
+    L := Length(_Value);
+    Result := (L > 1) and (Copy(_Value, L - 1, 2) = CRLF);
+  end;
+
   procedure _FormatParams(_LastIsShort: Boolean);
   begin
 
@@ -560,19 +570,9 @@ var
     end else
 
       if SingleString then _Value := Format('(%s)', [_Value])
-      else if _LastIsShort then _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1)])
+      else if _CheckLastCRLF(_Value) then _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1)])
       else _Value := Format('(%s)', [CRLF + ShiftText(_Value, 1) + CRLF]);
 
-  end;
-
-  function _CheckLastCRLF: Boolean;
-  var
-    L: Integer;
-  begin
-    { Это совсем подбор, конечно, но оно за гранью всей логики. В том месте, где должна заканчиваться строка просто
-      может быть уже есть CRLF от короткого комментария. Это и проверяем, чтобы пустая строка не добавилась лишняя. }
-    L := Length(AfterValue);
-    Result := (L > 1) and ((Copy(AfterValue, L - 1, 2) = CRLF) or _LastParam);
   end;
 
 var
@@ -600,7 +600,7 @@ begin
     if _Param.DataType = dtParams then
       _FormatParams(Comments.LastIsShort);
 
-    if _CheckLastCRLF then Splitter := ''
+    if _CheckLastCRLF(AfterValue) then Splitter := ''
     else if SingleString then Splitter := ';'
     else Splitter := CRLF;
 
