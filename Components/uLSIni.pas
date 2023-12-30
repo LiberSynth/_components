@@ -105,6 +105,8 @@ type
     FNativeException: Boolean;
     FCommentSupport: TCommentSupport;
     FGetCustomSource: TGetCustomSourceProc;
+    FPathSeparator: Char;
+    FStrictDataTypes: Boolean;
 
     FParams: TParams;
 
@@ -137,15 +139,17 @@ type
 
   published
 
-    property StoreMethod: TIniStoreMethod read FStoreMethod write SetStoreMethod;
-    property SourceType: TIniSourceType read FSourceType write SetSourceType;
-    property AutoSave: Boolean read FAutoSave write FAutoSave;
-    property AutoLoad: Boolean read FAutoLoad write FAutoLoad;
-    property ErrorsLocating: Boolean read FErrorsLocating write SetErrorsLocating;
-    property NativeException: Boolean read FNativeException write FNativeException;
-    property CommentSupport: TCommentSupport read FCommentSupport write SetCommentSupport;
+    property StoreMethod: TIniStoreMethod read FStoreMethod write SetStoreMethod default smLSNIString;
+    property SourceType: TIniSourceType read FSourceType write SetSourceType default stFile;
+    property AutoSave: Boolean read FAutoSave write FAutoSave default False;
+    property AutoLoad: Boolean read FAutoLoad write FAutoLoad default False;
+    property ErrorsLocating: Boolean read FErrorsLocating write SetErrorsLocating default True;
+    property NativeException: Boolean read FNativeException write FNativeException default False;
+    property CommentSupport: TCommentSupport read FCommentSupport write SetCommentSupport default csNone;
     property SourcePath: String read FSourcePath write FSourcePath;
-    property GetCustomSource: TGetCustomSourceProc read FGetCustomSource write FGetCustomSource;
+    property GetCustomSource: TGetCustomSourceProc read FGetCustomSource write FGetCustomSource default nil;
+    property PathSeparator: Char read FPathSeparator write FPathSeparator default '.';
+    property StrictDataTypes: Boolean read FStrictDataTypes write FStrictDataTypes default False;
 
   end;
 
@@ -252,12 +256,8 @@ end;
 
 constructor TLSIni.Create(_Owner: TComponent);
 begin
-
   inherited Create(_Owner);
-
-  if csDesigning in ComponentState then
-    InitProperties;
-
+  InitProperties;
 end;
 
 destructor TLSIni.Destroy;
@@ -336,6 +336,7 @@ begin
   FStoreMethod    := smLSNIString;
   FSourceType     := stFile;
   FErrorsLocating := True;
+  FPathSeparator  := '.';
 
 end;
 
@@ -403,7 +404,8 @@ begin
 
   if not (csDesigning in ComponentState) then begin
 
-    FParams := ParamsClass.Create;
+    FParams := ParamsClass.Create(PathSeparator, StrictDataTypes);
+
     if AutoLoad then
       Load;
 

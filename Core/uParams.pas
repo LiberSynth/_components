@@ -284,8 +284,8 @@ type
   strict private
 
     FPathSeparator: Char;
-    FSaveToStringOptions: TSaveToStringOptions;
     FStrictDataTypes: Boolean;
+    FSaveToStringOptions: TSaveToStringOptions;
 
     FItems: TParamList;
     FListHolder: TParamsListHolder;
@@ -412,7 +412,7 @@ type
     property PathSeparator: Char read FPathSeparator;
     { TODO 3 -oVasilyevSM -cuParams: ¬ рендерер. }
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions write FSaveToStringOptions;
-    { TODO 3 -oVasilyevSM -cuParams: StrictDataTypes не работает, лупит в новый тип. }
+    { StrictDataTypes: False - значение конвернтируетс€ в имеющийс€ тип, True - значение записываетс€ с новым типом. }
     property StrictDataTypes: Boolean read FStrictDataTypes;
     property Count: Integer read GetCount;
 
