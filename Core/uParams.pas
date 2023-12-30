@@ -192,7 +192,6 @@ type
 
       function GetCount: Integer;
       function GetItems(_Index: Integer): TParam;
-
       function GetDataType(_Index: Integer): TParamDataType;
       function GetIsNull(_Index: Integer): Boolean;
 
@@ -410,7 +409,7 @@ type
     property List[const _Path: String]: TMultiParamList read GetList;
 
     property PathSeparator: Char read FPathSeparator;
-    { TODO 3 -oVasilyevSM -cuParams: В рендерер. }
+    { TODO 1 -oVasilyevSM -cuParams: В рендерер. }
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions write FSaveToStringOptions;
     { StrictDataTypes: False - значение конвернтируется в имеющийся тип, True - значение записывается с новым типом. }
     property StrictDataTypes: Boolean read FStrictDataTypes;
@@ -424,7 +423,6 @@ type
 
 function ParamDataTypeToStr(Value: TParamDataType): String;
 function StrToParamDataType(Value: String): TParamDataType;
-function ParamsToStr(Params: TParams): String;
 
 implementation
 
@@ -464,11 +462,6 @@ begin
 
   raise EConvertError.CreateFmt('%s is not a param data type value', [Value]);
 
-end;
-
-function ParamsToStr(Params: TParams): String;
-begin
-  Result := Params.SaveToString;
 end;
 
 { TParam }
@@ -806,29 +799,6 @@ begin
 
 end;
 
-class procedure TParam.ValidateName(const _Value, _PathSeparator: String);
-const
-  SC_PARAM_NAME_FORBIDDEN_CHARS = [' ', '''', '"'];
-var
-  i: Integer;
-begin
-
-  if Length(_Value) = 0 then
-    raise EParamsException.Create('Empty param name');
-
-  for i := 1 to Length(_Value) do
-    if not CharInSet(_Value[i], SC_TYPED_CHARS) then
-      raise EParamsException.CreateFmt('Character #%d is invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
-
-  for i := 1 to Length(_Value) do
-    if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
-      raise EParamsException.CreateFmt('Character ''%s'' is invalid in param name ''%s''', [_Value[i], _Value]);
-
-  if Pos(_PathSeparator, _Value) > 0 then
-    raise EParamsException.CreateFmt('Character ''%s'' is used as a path separator. So it is invalid in param name ''%s''.', [_PathSeparator, _Value]);
-
-end;
-
 procedure TParam.AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean);
 var
   P: TParams;
@@ -868,6 +838,29 @@ begin
     else
       raise EUncompletedMethod.Create;
     end;
+
+end;
+
+class procedure TParam.ValidateName(const _Value, _PathSeparator: String);
+const
+  SC_PARAM_NAME_FORBIDDEN_CHARS = [' ', '''', '"'];
+var
+  i: Integer;
+begin
+
+  if Length(_Value) = 0 then
+    raise EParamsException.Create('Empty param name');
+
+  for i := 1 to Length(_Value) do
+    if not CharInSet(_Value[i], SC_TYPED_CHARS) then
+      raise EParamsException.CreateFmt('Character #%d is invalid in param name ''%s''', [Ord(_Value[i]), _Value]);
+
+  for i := 1 to Length(_Value) do
+    if CharInSet(_Value[i], SC_PARAM_NAME_FORBIDDEN_CHARS) then
+      raise EParamsException.CreateFmt('Character ''%s'' is invalid in param name ''%s''', [_Value[i], _Value]);
+
+  if Pos(_PathSeparator, _Value) > 0 then
+    raise EParamsException.CreateFmt('Character ''%s'' is used as a path separator. So it is invalid in param name ''%s''.', [_PathSeparator, _Value]);
 
 end;
 
@@ -1739,10 +1732,48 @@ begin
 
 end;
 
+function TParams.FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean;
+var
+  Params: TParams;
+  Param: TParam;
+begin
+
+  Result := FindPath(_Path, Params);
+
+  if Result then
+
+    for Param in Params.Items do
+
+      if
+
+          SameText(Param.Name, _Path) and
+          ((_DataType = dtUnknown) or (Param.DataType = _DataType))
+
+      then begin
+
+        _Value := Param;
+        Exit(True);
+
+      end;
+
+  Result := False;
+
+end;
+
+function TParams.FindParam(_Path: String; var _Value: TParam): Boolean;
+begin
+  Result := FindParam(_Path, dtUnknown, _Value);
+end;
+
 function TParams.ParamByName(const _Path: String): TParam;
 begin
   if not FindParam(_Path, Result) then
     raise EParamsException.CreateFmt('Param %s not found', [_Path]);
+end;
+
+function TParams.CreateNewParam(const _Name: String): TParam;
+begin
+  Result := ParamClass.Create(_Name, PathSeparator, StrictDataTypes);
 end;
 
 function TParams.GetList(const _Path: String): TMultiParamList;
@@ -1763,11 +1794,6 @@ end;
 function TParams.GetCount: Integer;
 begin
   Result := Items.Count;
-end;
-
-function TParams.CreateNewParam(const _Name: String): TParam;
-begin
-  Result := ParamClass.Create(_Name, PathSeparator, StrictDataTypes);
 end;
 
 function TParams.GetDataType(const _Path: String): TParamDataType;
@@ -1905,39 +1931,6 @@ begin
   GetParam(_Path).AsParams := _Value;
 end;
 
-function TParams.FindParam(_Path: String; _DataType: TParamDataType; var _Value: TParam): Boolean;
-var
-  Params: TParams;
-  Param: TParam;
-begin
-
-  Result := FindPath(_Path, Params);
-
-  if Result then
-
-    for Param in Params.Items do
-
-      if
-
-          SameText(Param.Name, _Path) and
-          ((_DataType = dtUnknown) or (Param.DataType = _DataType))
-
-      then begin
-
-        _Value := Param;
-        Exit(True);
-
-      end;
-
-  Result := False;
-
-end;
-
-function TParams.FindParam(_Path: String; var _Value: TParam): Boolean;
-begin
-  Result := FindParam(_Path, dtUnknown, _Value);
-end;
-
 function TParams.GetParam(_Path: String): TParam;
 begin
 
@@ -1994,6 +1987,11 @@ begin
 
   ]);
 
+end;
+
+function TParams.Clone: TParams;
+begin
+  Result := TParamsClass(ClassType).Create(PathSeparator, StrictDataTypes);
 end;
 
 function TParams.FindDataType(const _Path: String; var _Value: TParamDataType): Boolean;
@@ -2239,11 +2237,6 @@ end;
 procedure TParams.Clear;
 begin
   Items.Clear;
-end;
-
-function TParams.Clone: TParams;
-begin
-  Result := TParamsClass(ClassType).Create(PathSeparator, StrictDataTypes);
 end;
 
 function TParams.SaveToString: String;

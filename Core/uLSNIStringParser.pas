@@ -27,7 +27,7 @@ unit uLSNIStringParser;
 
 { TODO 4 -oVasilyevSM -cuLSNIStringParser: Ошибка. Сдвигает многострочное значение, происходит инъекция пробелов.
   Либо нужно экранирование для многострочных строковых параметров, либо интеллектуальный сдвиг - только НЕ перенесенные
-  строки. }
+  строки. А лучше то и другое. }
 
 interface
 
@@ -35,7 +35,7 @@ uses
   { VCL }
   Generics.Collections, SysUtils,
   { LiberSynth }
-  uConsts, uTypes, uCore, uCustomReadWrite, uCustomStringParser, uReadWriteCommon, uStrUtils;
+  uConsts, uCore, uReadWriteCommon, uCustomStringParser, uStrUtils;
 
 type
 
@@ -390,28 +390,6 @@ begin
 
 end;
 
-function TLSNIStringParser.ReadValue: String;
-begin
-  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
-    условии, что значение считывается регионом. Поэтому, символ задается из региона. }
-  Result := ReadElement;
-  if DoublingChar > #0 then
-    Result := UndoubleStr(Result, DoublingChar);
-end;
-
-procedure TLSNIStringParser.RetrieveTargerInterface(_Receiver: TIntfObject);
-begin
-  if not _Receiver.GetInterface(INTVReader, FNTVReader) then
-    raise EStringParserException.CreateFmt('Receiver class %s does not support string parsing.', [_Receiver.ClassName]);
-end;
-
-procedure TLSNIStringParser.KeyEvent(const _KeyWord: TKeyWord);
-begin
-  inherited KeyEvent(_KeyWord);
-  if Nested and (_KeyWord.KeyType = ktNestedClosing) then
-    Terminate;
-end;
-
 function TLSNIStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
 var
   RI: TReadInfo;
@@ -450,11 +428,6 @@ begin
 
   Result := False;
 
-end;
-
-procedure TLSNIStringParser.FreeTargerInterface;
-begin
-  FNTVReader := nil;
 end;
 
 procedure TLSNIStringParser.CheckSyntax(const _KeyWord: TKeyWord);
@@ -513,6 +486,33 @@ begin
 
   then raise EStringParserException.Create(_GetMessage);
 
+end;
+
+function TLSNIStringParser.ReadValue: String;
+begin
+  { Дублировать нужно только одиночный закрывающий регион символ, поэтому и раздублировать только его надо при
+    условии, что значение считывается регионом. Поэтому, символ задается из региона. }
+  Result := ReadElement;
+  if DoublingChar > #0 then
+    Result := UndoubleStr(Result, DoublingChar);
+end;
+
+procedure TLSNIStringParser.RetrieveTargerInterface(_Receiver: TIntfObject);
+begin
+  if not _Receiver.GetInterface(INTVReader, FNTVReader) then
+    raise EStringParserException.CreateFmt('Receiver class %s does not support string parsing.', [_Receiver.ClassName]);
+end;
+
+procedure TLSNIStringParser.FreeTargerInterface;
+begin
+  FNTVReader := nil;
+end;
+
+procedure TLSNIStringParser.KeyEvent(const _KeyWord: TKeyWord);
+begin
+  inherited KeyEvent(_KeyWord);
+  if Nested and (_KeyWord.KeyType = ktNestedClosing) then
+    Terminate;
 end;
 
 procedure TLSNIStringParser.ProcessElement;

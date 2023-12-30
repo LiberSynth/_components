@@ -27,10 +27,6 @@ unit uReadWriteCommon;
 
 interface
 
-uses
-  { LiberSynth }
-  uCustomReadWrite;
-
 type
 
   { Name - Type - Value reader interface. Maintains nested reading. }

@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, Generics.Collections,
   { LiberSynth }
-  uCore, uCustomReadWrite, uReadWriteCommon, uParams, uStrUtils;
+  uCustomReadWrite, uReadWriteCommon, uParams, uStrUtils;
 
 type
 
@@ -123,16 +123,6 @@ end;
 
 { TParamsReader }
 
-function TParamsReader.Clone: TCustomReader;
-begin
-
-  Result := inherited Clone;
-
-  TParamsReader(Result).Params     := Params;
-  TParamsReader(Result).Nested     := True;
-
-end;
-
 constructor TParamsReader.Create;
 begin
   inherited Create;
@@ -145,16 +135,14 @@ begin
   inherited Destroy;
 end;
 
-procedure TParamsReader.AfterReadParam(_Param: TParam);
+function TParamsReader.Clone: TCustomReader;
 begin
-end;
 
-procedure TParamsReader.AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader);
-begin
-end;
+  Result := inherited Clone;
 
-procedure TParamsReader.BeforeReadParam(_Param: TParam);
-begin
+  TParamsReader(Result).Params     := Params;
+  TParamsReader(Result).Nested     := True;
+
 end;
 
 procedure TParamsReader.CheckPresetType(_Strict: Boolean);
@@ -185,6 +173,68 @@ procedure TParamsReader.ReadName(const _Element: String);
 begin
   TParam.ValidateName(_Element, Params.PathSeparator);
   FCurrentName := _Element;
+end;
+
+procedure TParamsReader.ReadType(const _Element: String);
+begin
+  FCurrentType := StrToParamDataType(_Element);
+  CheckPresetType(True);
+end;
+
+procedure TParamsReader.ReadValue(const _Element: String);
+var
+  Index: Integer;
+begin
+
+  CheckPresetType(True);
+
+  { Чтобы предопределить структуру листа для нетипизованного хранения, достаточно создать одну его строку в параметрах
+    до считывания. }
+  with Params.AddList(CurrentName) do begin
+
+    if ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
+    else Index := 0;
+
+    BeforeReadParam(Items[Index]);
+
+    if Length(_Element) > 0 then
+
+      case CurrentType of
+
+        dtBoolean:    AsBoolean   [Index] := StrToBoolean(_Element);
+        dtInteger:    AsInteger   [Index] := StrToInt(TrimDigital(_Element));
+        dtBigInt:     AsBigInt    [Index] := StrToBigInt(TrimDigital(_Element));
+        dtFloat:      AsFloat     [Index] := StrToFloat (TrimDigital(_Element));
+        dtExtended:   AsExtended  [Index] := StrToExtended(TrimDigital(_Element));
+        dtDateTime:   AsDateTime  [Index] := StrToDateTime(_Element);
+        dtGUID:       AsGUID      [Index] := StrToGUID(_Element);
+        dtAnsiString: AsAnsiString[Index] := StrToAnsiStr(_Element);
+        dtString:     AsString    [Index] := _Element;
+        dtBLOB:       AsBLOB      [Index] := HexStrToBLOB(_Element);
+        dtData:       AsData      [Index] := ByteStrToData(_Element);
+
+      end
+
+    else begin
+
+      IsNull  [Index] := True;
+      DataType[Index] := CurrentType;
+
+    end;
+
+    AfterReadParam(Items[Index]);
+
+  end;
+
+  FCurrentName := '';
+  FCurrentType := dtUnknown;
+
+end;
+
+function TParamsReader.IsNestedValue: Boolean;
+begin
+  CheckPresetType(False);
+  Result := FCurrentType = dtParams;
 end;
 
 procedure TParamsReader.ReadNestedBlock;
@@ -252,68 +302,6 @@ begin
 
 end;
 
-procedure TParamsReader.ReadType(const _Element: String);
-begin
-  FCurrentType := StrToParamDataType(_Element);
-  CheckPresetType(True);
-end;
-
-procedure TParamsReader.ReadValue(const _Element: String);
-var
-  Index: Integer;
-begin
-
-  CheckPresetType(True);
-
-  { Чтобы предопределить структуру листа для нетипизованного хранения, достаточно создать одну его строку в параметрах
-    до считывания. }
-  with Params.AddList(CurrentName) do begin
-
-    if ListStarter.Started(CurrentName) or (Count = 0) then Index := Append
-    else Index := 0;
-
-    BeforeReadParam(Items[Index]);
-
-    if Length(_Element) > 0 then
-
-      case CurrentType of
-
-        dtBoolean:    AsBoolean   [Index] := StrToBoolean(_Element);
-        dtInteger:    AsInteger   [Index] := StrToInt(TrimDigital(_Element));
-        dtBigInt:     AsBigInt    [Index] := StrToBigInt(TrimDigital(_Element));
-        dtFloat:      AsFloat     [Index] := StrToFloat (TrimDigital(_Element));
-        dtExtended:   AsExtended  [Index] := StrToExtended(TrimDigital(_Element));
-        dtDateTime:   AsDateTime  [Index] := StrToDateTime(_Element);
-        dtGUID:       AsGUID      [Index] := StrToGUID(_Element);
-        dtAnsiString: AsAnsiString[Index] := StrToAnsiStr(_Element);
-        dtString:     AsString    [Index] := _Element;
-        dtBLOB:       AsBLOB      [Index] := HexStrToBLOB(_Element);
-        dtData:       AsData      [Index] := ByteStrToData(_Element);
-
-      end
-
-    else begin
-
-      IsNull  [Index] := True;
-      DataType[Index] := CurrentType;
-
-    end;
-
-    AfterReadParam(Items[Index]);
-
-  end;
-
-  FCurrentName := '';
-  FCurrentType := dtUnknown;
-
-end;
-
-function TParamsReader.IsNestedValue: Boolean;
-begin
-  CheckPresetType(False);
-  Result := FCurrentType = dtParams;
-end;
-
 procedure TParamsReader.RetrieveParams(_Value: TParams);
 begin
   FParams := _Value;
@@ -322,6 +310,18 @@ end;
 procedure TParamsReader.RetrieveParser(_Value: TCustomParser);
 begin
   FParser := _Value;
+end;
+
+procedure TParamsReader.BeforeReadParam(_Param: TParam);
+begin
+end;
+
+procedure TParamsReader.AfterReadParam(_Param: TParam);
+begin
+end;
+
+procedure TParamsReader.AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader);
+begin
 end;
 
 end.

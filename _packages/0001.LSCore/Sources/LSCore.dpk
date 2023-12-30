@@ -43,7 +43,7 @@ contains
   uLSNIDCStringParser in '..\..\..\Core\uLSNIDCStringParser.pas',
   uParamsReader in '..\..\..\Core\uParamsReader.pas',
   uUserParams in '..\..\..\Core\uUserParams.pas',
-  uStub in '..\..\..\Core\uStub.pas',
+  uParamsReadWriteUtils in '..\..\..\Core\uParamsReadWriteUtils.pas',
   uUserParamsReader in '..\..\..\Core\uUserParamsReader.pas';
 
 end.

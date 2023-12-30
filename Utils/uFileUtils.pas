@@ -111,6 +111,8 @@ type
 
   TStorageItemArray = array of TStorageItem;
 
+  EFileException = class(ECoreException);
+
 function GetLogicalDrives: TStringArray;
 function Dir(const _Root: String): TStringArray;
 function DirEx(const _Root: String): TStorageItemArray;

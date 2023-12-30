@@ -82,8 +82,6 @@ type
 
   end;
 
-  EFileException = class(ECoreException);
-
 implementation
 
 { TIntfObject }

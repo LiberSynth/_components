@@ -98,6 +98,23 @@ const
 
 type
 
+  TKeyWordHelper = record helper for TKeyWord
+
+  private
+
+    constructor Create(_KeyType: TKeyType; const _StrValue: String); overload;
+
+    function GetKeyType: TKeyType;
+    procedure SetKeyType(const _Value: TKeyType);
+
+    {$HINTS OFF}
+    function TypeInSet(const _Set: TKeyTypes): Boolean;
+    {$HINTS ON}
+
+    property KeyType: TKeyType read GetKeyType write SetKeyType;
+
+  end;
+
   TCustomCommentRegion = class(TRegion)
 
   protected
@@ -129,24 +146,21 @@ type
 
   end;
 
-  TKeyWordHelper = record helper for TKeyWord
-
-  private
-
-    constructor Create(_KeyType: TKeyType; const _StrValue: String); overload;
-
-    function GetKeyType: TKeyType;
-    procedure SetKeyType(const _Value: TKeyType);
-
-    {$HINTS OFF}
-    function TypeInSet(const _Set: TKeyTypes): Boolean;
-    {$HINTS ON}
-
-    property KeyType: TKeyType read GetKeyType write SetKeyType;
-
-  end;
-
 { TLSNIDCStringParser }
+
+procedure TLSNIDCStringParser.LineEnd;
+begin
+
+  { Которые на предыдущих строках от имени, премещаем в BeforeParam оттуда. }
+  if
+
+      Assigned(UserParamsReader) and
+      (ElementType = etName) and
+      (CursorStanding = csBefore)
+
+  then UserParamsReader.DetachBefore;
+
+end;
 
 procedure TLSNIDCStringParser.AddComment(const _Value, _Opening, _Closing: String; _Short: Boolean);
 begin
@@ -184,6 +198,27 @@ begin
 
 end;
 
+procedure TLSNIDCStringParser.ElementTerminated(_KeyWord: TKeyWord);
+begin
+
+  inherited ElementTerminated(_KeyWord);
+
+  if
+
+      Assigned(UserParamsReader) and
+      ((ElementType = etName) or (_KeyWord.KeyType = ktSourceEnd))
+
+  then UserParamsReader.ElementTerminated;
+
+end;
+
+function TLSNIDCStringParser.ReadValue: String;
+begin
+  Result := inherited ReadValue;
+  if CommentTerminatedValue then
+    Result := TrimRight(Result);
+end;
+
 procedure TLSNIDCStringParser.KeyEvent(const _KeyWord: TKeyWord);
 begin
 
@@ -200,20 +235,6 @@ begin
 
 end;
 
-procedure TLSNIDCStringParser.LineEnd;
-begin
-
-  { Которые на предыдущих строках от имени премещаем в BeforeParam оттуда. }
-  if
-
-      Assigned(UserParamsReader) and
-      (ElementType = etName) and
-      (CursorStanding = csBefore)
-
-  then UserParamsReader.DetachBefore;
-
-end;
-
 procedure TLSNIDCStringParser.RetrieveTargerInterface(_Receiver: TIntfObject);
 begin
   inherited RetrieveTargerInterface(_Receiver);
@@ -227,25 +248,27 @@ begin
   UserParamsReader := nil;
 end;
 
-function TLSNIDCStringParser.ReadValue: String;
+{ TKeyWordHelper }
+
+constructor TKeyWordHelper.Create(_KeyType: TKeyType; const _StrValue: String);
 begin
-  Result := inherited ReadValue;
-  if CommentTerminatedValue then
-    Result := TrimRight(Result);
+  Create(Integer(_KeyType), _StrValue);
 end;
 
-procedure TLSNIDCStringParser.ElementTerminated(_KeyWord: TKeyWord);
+function TKeyWordHelper.GetKeyType: TKeyType;
 begin
+  Result := TKeyType(KeyTypeInternal)
+end;
 
-  inherited ElementTerminated(_KeyWord);
+procedure TKeyWordHelper.SetKeyType(const _Value: TKeyType);
+begin
+  if Integer(_Value) <> KeyTypeInternal then
+    KeyTypeInternal := Integer(_Value)
+end;
 
-  if
-
-      Assigned(UserParamsReader) and
-      ((ElementType = etName) or (_KeyWord.KeyType = ktSourceEnd))
-
-  then UserParamsReader.ElementTerminated;
-
+function TKeyWordHelper.TypeInSet(const _Set: TKeyTypes): Boolean;
+begin
+  Result := KeyType in _Set;
 end;
 
 { TCustomCommentRegion }
@@ -308,17 +331,6 @@ end;
 
 { TShortCommentRegion }
 
-procedure TShortCommentRegion.Closed(_Parser: TCustomStringParser);
-begin
-
-  inherited Closed(_Parser);
-
-  with _Parser as TLSNIDCStringParser do
-    if (ElementType = etValue) and (CursorStanding = csAfter) then
-      KeyEvent(KWR_LINE_END_CRLF);
-
-end;
-
 procedure TShortCommentRegion.DetermineClosingKey(_Parser: TCustomStringParser);
 begin
 
@@ -355,31 +367,19 @@ begin
 
 end;
 
+procedure TShortCommentRegion.Closed(_Parser: TCustomStringParser);
+begin
+
+  inherited Closed(_Parser);
+
+  with _Parser as TLSNIDCStringParser do
+    if (ElementType = etValue) and (CursorStanding = csAfter) then
+      KeyEvent(KWR_LINE_END_CRLF);
+
+end;
+
 procedure TShortCommentRegion.CheckUnterminated;
 begin
-end;
-
-{ TKeyWordHelper }
-
-constructor TKeyWordHelper.Create(_KeyType: TKeyType; const _StrValue: String);
-begin
-  Create(Integer(_KeyType), _StrValue);
-end;
-
-function TKeyWordHelper.GetKeyType: TKeyType;
-begin
-  Result := TKeyType(KeyTypeInternal)
-end;
-
-procedure TKeyWordHelper.SetKeyType(const _Value: TKeyType);
-begin
-  if Integer(_Value) <> KeyTypeInternal then
-    KeyTypeInternal := Integer(_Value)
-end;
-
-function TKeyWordHelper.TypeInSet(const _Set: TKeyTypes): Boolean;
-begin
-  Result := KeyType in _Set;
 end;
 
 end.

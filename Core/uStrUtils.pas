@@ -34,7 +34,8 @@ uses
   uConsts, uTypes, uDataUtils;
 
 { v Проверка v }
-{ TODO -oVasilyevSM -cuStrUtils: Продолжение следует: Integer, BigInt, Float, Extended, DateTime, AnsiString, String, BLOB, Data }
+{ TODO 2 -oVasilyevSM -cuStrUtils: Продолжение следует: Integer, BigInt, Float, Extended, DateTime, AnsiString, String,
+  BLOB, Data. И не просто написать, а применить.  }
 function StrIsBoolean(const S: String): Boolean;
 function StrIsGUID(const Value: String): Boolean;
 function IsHexStr(const Value: String): Boolean;
@@ -105,7 +106,6 @@ function StrMaskMatch(Value, Mask: String): Boolean;
 function FileMaskMatch(const FileName, Mask: String): Boolean;
 function FileMasksMatch(const FileName, Masks: String): Boolean;
 
-{ TODO 4 -oVasilyevSM -cuStrUtils: Не менять местами параметры. }
 function ShiftText(const Value: String; Level: ShortInt; Interval: Byte = 2): String; overload;
 procedure ShiftText(Level: ShortInt; Interval: Byte; var Value: String); overload;
 procedure ShiftText(Level: ShortInt; var Value: String); overload;
@@ -124,6 +124,8 @@ function FormatNowToFileName(EmptyZero: Boolean = True): String;
 { ^ Стандартное форматирование дат ^ }
 
 { TODO 4 -oVasilyevSM -cuStrUtils: Можно ускорить эти функции }
+{ TODO 2 -oVasilyevSM -cuStrUtils: Касаемо всех, кто обрабатывает строковые массивы: добавить поддержку CaseSensitive в
+  каждую и это должен быть set of опций, а не куча буленов.  }
 function StrToArray(Value: String; const Delimiter: String = ';'; DelimBehind: Boolean = True): TStringArray;
 function ArrayToStr(const StrArray: TStringArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String; overload;
 function ArrayToStr(const IntArray: TIntegerArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String; overload;
@@ -135,10 +137,8 @@ procedure AddToStrArray(
     IgnoreEmpty: Boolean = False;
     Distinct: Boolean = False;
     Sorted: Boolean = False
-    { TODO 4 -oVasilyevSM -cuStrUtils: CaseSensitive + сделать оверлоды с меньшим количеством параметров }
 
 );
-{ TODO 4 -oVasilyevSM -cuStrUtils: Distinct, CaseSensitive + сделать оверлоды с меньшим количеством параметров }
 function IntersectStrArrays(const ArrayA, ArrayB: TStringArray): TStringArray;
 function ExcludeFromStrArray(const ArrayFrom, ArrayToExclude: TStringArray): TStringArray;
 function ConcatStrArrays(const ArrayA, ArrayB: TStringArray; Distinct: Boolean = False; Sorted: Boolean = False): TStringArray;

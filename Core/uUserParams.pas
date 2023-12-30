@@ -25,11 +25,7 @@ unit uUserParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 2 -oVasilyevSM -cuUserParams: Уборка. Господи, как теперь убираться - ваще хз. Надо uses чистить... Избавиться от
-  вложенных классов. Выхлопа мало, все равно не укроешь все что выставлять не нужно. Соседи здесь хотят больше пабликов
-  и приходится выдавать. А минуса два: 1) глаза сломаешь в объявдении класса; 2) обращение ко вложенному классу имеет
-  совершенно совершенно лишний префикс, всегда в строку не влезает выражение. }
-{ TODO 2 -oVasilyevSM -cuUserParams: Есть еще один кейс - пустой файл только с комментариями }
+{ TODO 5 -oVasilyevSM -cuUserParams: Есть еще один кейс - пустой файл только с комментариями }
 { TODO 5 -oVasilyevSM -cuUserParams: Задача: Нужны параметры, хранящие исходное форматирование. Всю строку между
   элементами запоминать в объект и потом выбрасывать обратно в строку в исходном виде, что бы там ни было. }
 
@@ -39,7 +35,7 @@ uses
   { VCL }
   Generics.Collections, SysUtils,
   { Liber Synth }
-  uConsts, uTypes, uDataUtils, uStrUtils, uParams;
+  uConsts, uDataUtils, uStrUtils, uParams;
 
 type
 
@@ -122,8 +118,8 @@ type
       );
       function GetBlock(_Anchor: TCommentAnchor; _Typed, _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
 
-      function LastIsShort: Boolean; overload;
       function FirstIsShort(_Typed: Boolean; _Anchor: TCommentAnchor): Boolean;
+      function LastIsShort: Boolean; overload;
       function LastIsShort(_Typed: Boolean; _Anchor: TCommentAnchor): Boolean; overload;
 
     end;
@@ -140,9 +136,9 @@ type
 
   public
 
-    property Comments: TCommentList read FComments;
-
     destructor Destroy; override;
+
+    property Comments: TCommentList read FComments;
 
   end;
 
@@ -227,11 +223,27 @@ begin
 
 end;
 
+{ TUserParam.TCommentList.TOffsetInfoReply }
+
+procedure TUserParam.TCommentList.TOffsetInfoReply.Get(var _LeftOffset, _RightOffset: String);
+begin
+  _LeftOffset  := LeftOffset;
+  _RightOffset := RightOffset;
+end;
+
 { TUserParam.TCommentList }
 
-procedure TUserParam.TCommentList.AddComment;
+function TUserParam.TCommentList.Filter(_Anchors: TCommentAnchors): TCommentList;
+var
+  Comment: TComment;
 begin
-  inherited Add(TComment.Create(_Text, _Opening, _Closing, _Anchor, _Short));
+
+  Result := TUserParam.TCommentList.Create;
+
+  for Comment in Self do
+    if Comment.Anchor in _Anchors then
+      Result.Add(Comment);
+
 end;
 
 function TUserParam.TCommentList.TypedAnchors(_Typed: Boolean; _Anchor: TCommentAnchor): TCommentAnchors;
@@ -242,106 +254,6 @@ begin
   else if _Anchor in [caBeforeType, caAfterType] then Result := []
   else Result := [_Anchor];
 
-end;
-
-function TUserParam.TCommentList.GetBlock(_Anchor: TCommentAnchor; _Typed, _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
-const
-
-  LongSplitter = {$IFDEF FORMATCOMMENTDEBUG}'#'{$ELSE}' '{$ENDIF};
-
-var
-  Comment: TComment;
-  Splitter: String;
-
-  function _GetValue(_Short: Boolean): String;
-  var
-    LeftMargin, RightMargin, RightField: String;
-  begin
-
-    with Comment do begin
-
-      GetMargins(_SingleString, LeftMargin, RightMargin);
-
-      { Разделитель комментариев в блоке }
-      if _Short and not _SingleString then Splitter := ''
-      else Splitter := LongSplitter;
-
-      { "Поля" вокруг текста одного комментария внутри его границ. }
-      if _Short and not _SingleString then RightField := ''
-      else RightField := ' ';
-
-      Result := Format('%s %s%s%s%s', [
-
-          LeftMargin,
-          {$IFDEF FORMATCOMMENTDEBUG}CommentAnchorToStr(_Anchor) + ':' + {$ENDIF}Text,
-          RightField,
-          RightMargin,
-          Splitter
-
-      ]);
-
-    end;
-
-  end;
-
-var
-  Search: TUserParam.TCommentList;
-  Anchors: TCommentAnchors;
-begin
-
-  Result   := '';
-  Splitter := '';
-
-  { В режиме без типа комментарии типа складываются в AfterName. }
-  Anchors := TypedAnchors(_Typed, _Anchor);
-  if Anchors <> [] then begin
-
-    Search := Filter(Anchors);
-    try
-
-      for Comment in Search do
-        with Comment do
-          Result := Result + _GetValue(Short);
-
-    finally
-      Search.Free;
-    end;
-
-    { Как раз последний разделитель значений нужно отрезать, неважно, какие были в цикле. }
-    CutStr(Result, Length(Splitter));
-    { Отступы справа и слева всего блока комментариев }
-    ProcessOffsets(Result, _Anchor, _Typed, _SingleString, _FirstParam, _LastParam, _Nested);
-
-  end;
-
-end;
-
-function TUserParam.TCommentList.LastIsShort(_Typed: Boolean; _Anchor: TCommentAnchor): Boolean;
-begin
-
-  with Filter(TypedAnchors(_Typed, _Anchor)) do
-
-    try
-
-      Result := (Count > 0) and Last.Short;
-
-    finally
-      Free;
-    end;
-
-end;
-
-function TUserParam.TCommentList.LastIsShort: Boolean;
-begin
-  Result := (Count > 0) and Last.Short;
-end;
-
-{ TUserParam.TCommentList.TOffsetInfoReply }
-
-procedure TUserParam.TCommentList.TOffsetInfoReply.Get(var _LeftOffset, _RightOffset: String);
-begin
-  _LeftOffset  := LeftOffset;
-  _RightOffset := RightOffset;
 end;
 
 procedure TUserParam.TCommentList.ProcessOffsets;
@@ -453,6 +365,7 @@ var
   LeftOffset, RightOffset: String;
 begin
 
+  { TODO 1 -oVasilyevSM -cuUserParams: Карта требует расширения. }
   if Length(_Value) > 0 then begin
 
     RA_OffsetSetting[_OffsetInfoKey].Get(LeftOffset, RightOffset);
@@ -475,16 +388,80 @@ begin
 
 end;
 
-function TUserParam.TCommentList.Filter(_Anchors: TCommentAnchors): TCommentList;
+procedure TUserParam.TCommentList.AddComment;
+begin
+  inherited Add(TComment.Create(_Text, _Opening, _Closing, _Anchor, _Short));
+end;
+
+function TUserParam.TCommentList.GetBlock(_Anchor: TCommentAnchor; _Typed, _SingleString, _FirstParam, _LastParam, _Nested: Boolean): String;
+const
+
+  LongSplitter = {$IFDEF FORMATCOMMENTDEBUG}'#'{$ELSE}' '{$ENDIF};
+
 var
   Comment: TComment;
+  Splitter: String;
+
+  function _GetValue(_Short: Boolean): String;
+  var
+    LeftMargin, RightMargin, RightField: String;
+  begin
+
+    with Comment do begin
+
+      GetMargins(_SingleString, LeftMargin, RightMargin);
+
+      { Разделитель комментариев в блоке }
+      if _Short and not _SingleString then Splitter := ''
+      else Splitter := LongSplitter;
+
+      { "Поля" вокруг текста одного комментария внутри его границ. }
+      if _Short and not _SingleString then RightField := ''
+      else RightField := ' ';
+
+      Result := Format('%s %s%s%s%s', [
+
+          LeftMargin,
+          {$IFDEF FORMATCOMMENTDEBUG}CommentAnchorToStr(_Anchor) + ':' + {$ENDIF}Text,
+          RightField,
+          RightMargin,
+          Splitter
+
+      ]);
+
+    end;
+
+  end;
+
+var
+  Search: TUserParam.TCommentList;
+  Anchors: TCommentAnchors;
 begin
 
-  Result := TUserParam.TCommentList.Create;
+  Result   := '';
+  Splitter := '';
 
-  for Comment in Self do
-    if Comment.Anchor in _Anchors then
-      Result.Add(Comment);
+  { В режиме без типа комментарии типа складываются в AfterName. }
+  Anchors := TypedAnchors(_Typed, _Anchor);
+  if Anchors <> [] then begin
+
+    Search := Filter(Anchors);
+    try
+
+      for Comment in Search do
+        with Comment do
+          Result := Result + _GetValue(Short);
+
+    finally
+      Search.Free;
+    end;
+
+    { Как раз последний разделитель значений нужно отрезать, неважно, какие были в цикле. }
+    CutStr(Result, Length(Splitter));
+    { Отступы справа и слева всего блока комментариев }
+    ProcessOffsets(Result, _Anchor, _Typed, _SingleString, _FirstParam, _LastParam, _Nested);
+
+  end;
 
 end;
 
@@ -496,6 +473,26 @@ begin
     try
 
       Result := (Count > 0) and First.Short;
+
+    finally
+      Free;
+    end;
+
+end;
+
+function TUserParam.TCommentList.LastIsShort: Boolean;
+begin
+  Result := (Count > 0) and Last.Short;
+end;
+
+function TUserParam.TCommentList.LastIsShort(_Typed: Boolean; _Anchor: TCommentAnchor): Boolean;
+begin
+
+  with Filter(TypedAnchors(_Typed, _Anchor)) do
+
+    try
+
+      Result := (Count > 0) and Last.Short;
 
     finally
       Free;
@@ -528,7 +525,7 @@ begin
 
 end;
 
-{ TUserParam }
+{ TUserParams }
 
 function TUserParams.ParamClass: TParamClass;
 begin

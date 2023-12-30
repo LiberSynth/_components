@@ -9,7 +9,9 @@ uses
 type
 
   { Целиком абстрактные классы. Не знают, из чего считывать и во что. Нужны для запуска из объектов с переменной
-    конкретикой. Взаимодействие обеспечивается через интерфейсы. }
+    конкретикой. Взаимодействие исполняется через интерфейсы. При считывании Parser - ведущий, Reader - ведомый. При
+    сохранении - наоборот, Renderer - ведущий, Writer - ведомый. }
+
   TCustomParser = class abstract (TIntfObject)
 
   public
@@ -39,7 +41,7 @@ type
 
   TCustomReaderClass = class of TCustomReader;
 
-  { renderer composer emiter generator }
+  { renderer composer conductor }
 
   TCustomWriter = class abstract (TIntfObject)
 
@@ -47,7 +49,7 @@ type
 
     constructor Create; virtual;
 
-    procedure Read; virtual; abstract;
+    procedure Write; virtual; abstract;
 
   end;
 

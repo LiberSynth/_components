@@ -37,7 +37,7 @@ unit uDataUtils;
 interface
 
 uses
-  { VCL }
+{ VCL }
   SysUtils,
   { LiberSynth }
   uConsts, uTypes, uCore;

@@ -29,7 +29,7 @@ interface
 
 uses
   { VCL }
-  SysUtils, Generics.Collections, Windows,
+  SysUtils, Generics.Collections,
   { LiberSynth }
   uConsts, uTypes, uCore, uCustomReadWrite, uDataUtils;
 
@@ -126,37 +126,6 @@ type
     { Ќа данный момент повода здесь что-то добавить нет. }
   end;
 
-  TLocation = record
-
-    Line: Int64;
-    Column: Int64;
-    Position: Int64;
-
-    constructor Create(_Line, _Column, _Position: Int64);
-
-    function Text: String;
-
-  end;
-
-  TLocator = class
-
-  strict private
-
-  strict private
-
-    FLastElementStart: Int64;
-
-  private
-
-    procedure CheckPoint(_Cursor: Int64);
-    function Location(const _Source: String): TLocation;
-
-  public
-
-    constructor Create;
-
-  end;
-
   ICustomStringParser = interface ['{2BFFF59C-28FF-40A6-A42A-DA4AB854ECB4}']
 
     procedure SetSource(const _Source: String);
@@ -171,6 +140,39 @@ type
   end;
 
   TCustomStringParser = class abstract (TCustomParser, ICustomStringParser)
+
+  private
+
+  type
+
+    TLocation = record
+
+      Line: Int64;
+      Column: Int64;
+      Position: Int64;
+
+      constructor Create(_Line, _Column, _Position: Int64);
+
+      function Text: String;
+
+    end;
+
+    TLocator = class
+
+    strict private
+
+      FLastElementStart: Int64;
+
+    private
+
+      procedure CheckPoint(_Cursor: Int64);
+      function Location(const _Source: String): TLocation;
+
+    public
+
+      constructor Create;
+
+    end;
 
   strict private
 
@@ -301,7 +303,7 @@ type
 
     FInitExceptionClass: ExceptClass;
     FInitMessage: String;
-    FLocation: TLocation;
+    FLocation: TCustomStringParser.TLocation;
 
   private
 
@@ -309,7 +311,7 @@ type
 
         _InitExceptionClass: ExceptClass;
         const _InitMessage: String;
-        _Location: TLocation
+        _Location: TCustomStringParser.TLocation
 
     );
 
@@ -509,9 +511,9 @@ begin
     FActiveRegion.CheckUnterminated;
 end;
 
-{ TLocation }
+{ TCustomStringParser.TLocation }
 
-constructor TLocation.Create(_Line, _Column, _Position: Int64);
+constructor TCustomStringParser.TLocation.Create(_Line, _Column, _Position: Int64);
 begin
 
   Line     := _Line;
@@ -520,25 +522,25 @@ begin
 
 end;
 
-function TLocation.Text: String;
+function TCustomStringParser.TLocation.Text: String;
 begin
   Result := Format('Line = %d, Column = %d, Position = %d', [Line, Column, Position]);
 end;
 
-{ TLocator }
+{ TCustomStringParser.TLocator }
 
-constructor TLocator.Create;
+constructor TCustomStringParser.TLocator.Create;
 begin
   inherited Create;
   FLastElementStart := 1;
 end;
 
-procedure TLocator.CheckPoint(_Cursor: Int64);
+procedure TCustomStringParser.TLocator.CheckPoint(_Cursor: Int64);
 begin
   FLastElementStart := _Cursor;
 end;
 
-function TLocator.Location(const _Source: String): TLocation;
+function TCustomStringParser.TLocator.Location(const _Source: String): TLocation;
 var
   i, LineStart: Int64;
 begin
@@ -712,13 +714,6 @@ begin
   Result := Regions.Active;
 end;
 
-procedure TCustomStringParser.AcceptControl(_Sender: TCustomParser);
-begin
-  inherited AcceptControl(_Sender);
-  Move((_Sender as TCustomStringParser).Cursor - Cursor);
-  CheckPoint;
-end;
-
 procedure TCustomStringParser.CheckPoint;
 begin
   if Located then
@@ -758,24 +753,6 @@ begin
     Regions.CheckUnterminated;
 
   end;
-
-end;
-
-function TCustomStringParser.Clone: TCustomParser;
-begin
-
-  Result := inherited Clone;
-
-  TCustomStringParser(Result).FSource      := Source;
-  TCustomStringParser(Result).FSrcLen      := Length(Source);
-  TCustomStringParser(Result).FCursor      := Cursor;
-  TCustomStringParser(Result).FNestedLevel := NestedLevel + 1;
-
-  TCustomStringParser(Result).Located         := Located;
-  TCustomStringParser(Result).NativeException := NativeException;
-  TCustomStringParser(Result).Locator         := Locator;
-
-  TCustomStringParser(Result).SetSource(Source);
 
 end;
 
@@ -894,6 +871,31 @@ end;
 procedure TCustomStringParser.CheckSyntax(const _KeyWord: TKeyWord);
 begin
   CheckUnterminated(_KeyWord.KeyType);
+end;
+
+function TCustomStringParser.Clone: TCustomParser;
+begin
+
+  Result := inherited Clone;
+
+  TCustomStringParser(Result).FSource      := Source;
+  TCustomStringParser(Result).FSrcLen      := Length(Source);
+  TCustomStringParser(Result).FCursor      := Cursor;
+  TCustomStringParser(Result).FNestedLevel := NestedLevel + 1;
+
+  TCustomStringParser(Result).Located         := Located;
+  TCustomStringParser(Result).NativeException := NativeException;
+  TCustomStringParser(Result).Locator         := Locator;
+
+  TCustomStringParser(Result).SetSource(Source);
+
+end;
+
+procedure TCustomStringParser.AcceptControl(_Sender: TCustomParser);
+begin
+  inherited AcceptControl(_Sender);
+  Move((_Sender as TCustomStringParser).Cursor - Cursor);
+  CheckPoint;
 end;
 
 procedure TCustomStringParser.SetSource(const _Source: String);
