@@ -25,24 +25,17 @@ unit uLSIni;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 3 -oVasilyevSM -cuLSIni: Нужен будет еще один контроль - после завершения считывания нельзя менять свойства
-  считывателя, экспортера и параметров. Это не адаптер. Если нужен адаптер, можно написать его, используя имеющиеся в
-  паблике классы. }
-{ TODO 4 -oVasilyevSM -cuLSIni: Иконка }
-{ TODO -oVasilyevSM: В SaveToString нужен еще один режим, явное указание типа параметра в ини-файле
-  или без него. И тогда при считывании тип должен предварительно определяться в приложении примерно через вызов функций
-  RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В LoadFromString также можно вызв=ывать
-  из пустого контейнера с готовой структурой. Тогда она просто заполняется данными, типы известны и не требуют хранения
-  в строке. }
-{ TODO -oVasilyevSM: В компонентах, использующих TParams свойства, задаваемые в констукторе давать менять только в дизайн-таме }
-{ TODO -oVasilyevSM: Режим "сохранять строки всегда в кавычках" }
-{ TODO -oVasilyevSM: Нужна оболочка TFileParams, которая будет сохраняться в файл. Вот она-то и должна поддерживать комментарии итд. }
-{ TODO -oVasilyevSM: Режим TFileParams.AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда - зависит от типа оъекта,
+{ TODO 3 -oVasilyevSM: В Save нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда при
+  считывании тип должен предварительно определяться в приложении примерно через вызов функций RegisterParam. Таким
+  образом, имеем два формата ини-файла, полный и краткий. В Load также можно вызывать из пустого контейнера с готовой
+  структурой. Тогда она просто заполняется данными, типы известны и не требуют хранения в строке. }
+{ TODO 3 -oVasilyevSM: Режим "сохранять строки всегда в кавычках" }
+{ TODO 3 -oVasilyevSM: Режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда - зависит от типа оъекта,
   ToFile, ToStream, ToString, To Registry. Файл держать открытым, чтобы не перезаписывать целиком каждый раз. Итд. }
-{ TODO -oVasilyevSM: Компонент TRegParams }
-{ TODO -oVasilyevSM: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
+{ TODO 4 -oVasilyevSM: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
+{ TODO 4 -oVasilyevSM -cuLSIni: Иконка }
 
-(*
+{
 
   Парсер знает, из чего считывать, но не знает, во что.
   Ридер - знает во что, но не знает, из чего.
@@ -85,7 +78,7 @@ unit uLSIni;
           ParamsSingleStringParamRegistryWriter~
           ParamsSingleBLOBParamRegistryWriter~
 
-*)
+}
 
 interface
 
@@ -134,6 +127,7 @@ type
     procedure SetSourceType(const _Value: TIniSourceType);
     procedure SetStoreMethod(const _Value: TIniStoreMethod);
     procedure SetErrorsLocating(const _Value: Boolean);
+    procedure SetStrictDataTypes(const _Value: Boolean);
 
   protected
 
@@ -161,7 +155,7 @@ type
     property SourcePath: String read FSourcePath write FSourcePath;
     property GetCustomSource: TGetCustomSourceProc read FGetCustomSource write FGetCustomSource default nil;
     property PathSeparator: Char read FPathSeparator write FPathSeparator default '.';
-    property StrictDataTypes: Boolean read FStrictDataTypes write FStrictDataTypes default False;
+    property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes default False;
 
   end;
 
@@ -332,6 +326,19 @@ begin
 
 end;
 
+procedure TLSIni.SetStrictDataTypes(const _Value: Boolean);
+begin
+
+  if _Value <> FStrictDataTypes then begin
+
+    FStrictDataTypes := _Value;
+    if Assigned(Params) then
+      Params.StrictDataTypes := _Value;
+
+  end;
+
+end;
+
 procedure TLSIni.SetErrorsLocating(const _Value: Boolean);
 begin
 
@@ -353,7 +360,8 @@ begin
 
   if not (csDesigning in ComponentState) then begin
 
-    FParams := ParamsClass.Create(PathSeparator, StrictDataTypes);
+    FParams := ParamsClass.Create(PathSeparator);
+    FParams.StrictDataTypes := StrictDataTypes;
 
     if AutoLoad then
       Load;

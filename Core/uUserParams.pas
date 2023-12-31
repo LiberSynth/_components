@@ -130,7 +130,7 @@ type
 
   protected
 
-    constructor Create(const _Name: String; const _PathSeparator: Char = '.'; _StrictDataType: Boolean = False); override;
+    constructor Create(const _Name: String; const _PathSeparator: Char = '.'); override;
 
     procedure AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean); override;
 
@@ -504,7 +504,7 @@ end;
 
 constructor TUserParam.Create;
 begin
-  inherited Create(_Name, _PathSeparator, _StrictDataType);
+  inherited Create(_Name, _PathSeparator);
   FComments := TCommentList.Create;
 end;
 

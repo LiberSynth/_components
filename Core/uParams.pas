@@ -102,11 +102,11 @@ type
 
     procedure Clear;
 
-    property StrictDataType: Boolean read FStrictDataType;
+    property StrictDataType: Boolean read FStrictDataType write FStrictDataType;
 
   protected
 
-    constructor Create(const _Name: String; const _PathSeparator: Char = '.'; _StrictDataType: Boolean = False); virtual;
+    constructor Create(const _Name: String; const _PathSeparator: Char = '.'); virtual;
 
     { Для передачи без разбора типов }
     procedure AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean); virtual;
@@ -301,6 +301,7 @@ type
 
     function GetList(const _Path: String): TMultiParamList;
     function GetCount: Integer;
+    procedure SetStrictDataTypes(const _Value: Boolean);
 
   private
 
@@ -347,7 +348,7 @@ type
 
   public
 
-    constructor Create(const _PathSeparator: Char = '.'; _StrictDataTypes: Boolean = False);
+    constructor Create(const _PathSeparator: Char = '.');
     destructor Destroy; override;
 
     function Clone: TParams;
@@ -412,7 +413,7 @@ type
     { TODO 1 -oVasilyevSM -cuParams: В рендерер. }
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions write FSaveToStringOptions;
     { StrictDataTypes: False - значение конвернтируется в имеющийся тип, True - значение записывается с новым типом. }
-    property StrictDataTypes: Boolean read FStrictDataTypes;
+    property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes;
     property Count: Integer read GetCount;
 
   end;
@@ -473,7 +474,6 @@ begin
 
   FIsNull         := True;
   FPathSeparator  := _PathSeparator;
-  FStrictDataType := _StrictDataType;
 
   ValidateName(_Name, FPathSeparator);
   FName := _Name;
@@ -1658,7 +1658,6 @@ begin
   inherited Create;
 
   FPathSeparator   := _PathSeparator;
-  FStrictDataTypes := _StrictDataTypes;
 
   FItems      := TParamList.Create;
   FListHolder := TParamsListHolder.Create;
@@ -1773,7 +1772,8 @@ end;
 
 function TParams.CreateNewParam(const _Name: String): TParam;
 begin
-  Result := ParamClass.Create(_Name, PathSeparator, StrictDataTypes);
+  Result := ParamClass.Create(_Name, PathSeparator);
+  Result.StrictDataType := StrictDataTypes;
 end;
 
 function TParams.GetList(const _Path: String): TMultiParamList;
@@ -1794,6 +1794,34 @@ end;
 function TParams.GetCount: Integer;
 begin
   Result := Items.Count;
+end;
+
+procedure TParams.SetStrictDataTypes(const _Value: Boolean);
+
+  procedure _SetSubjectValue(_Owner: TParams);
+  var
+    Param: TParam;
+  begin
+
+    for Param in _Owner.Items do begin
+
+      Param.StrictDataType := _Value;
+      if Param.DataType = dtParams then
+        _SetSubjectValue(Param.AsParams);
+
+    end;
+
+  end;
+
+begin
+
+  if _Value <> FStrictDataTypes then begin
+
+    FStrictDataTypes := _Value;
+    _SetSubjectValue(Self);
+
+  end;
+
 end;
 
 function TParams.GetDataType(const _Path: String): TParamDataType;
@@ -1991,7 +2019,8 @@ end;
 
 function TParams.Clone: TParams;
 begin
-  Result := TParamsClass(ClassType).Create(PathSeparator, StrictDataTypes);
+  Result := TParamsClass(ClassType).Create(PathSeparator);
+  TParams(Result).StrictDataTypes := StrictDataTypes;
 end;
 
 function TParams.FindDataType(const _Path: String; var _Value: TParamDataType): Boolean;
