@@ -14,6 +14,10 @@ type
 
   TCustomParser = class abstract (TIntfObject)
 
+  strict private
+
+    FTerminated: Boolean;
+
   public
 
     constructor Create; virtual;
@@ -21,9 +25,12 @@ type
     procedure RetrieveTargerInterface(_Receiver: TIntfObject); virtual; abstract;
     procedure FreeTargerInterface; virtual; abstract;
     procedure Read; virtual; abstract;
+    procedure Terminate;
 
     function Clone: TCustomParser; virtual;
     procedure AcceptControl(_Sender: TCustomParser); virtual;
+
+    property Terminated: Boolean read FTerminated;
 
   end;
 
@@ -64,6 +71,11 @@ implementation
 constructor TCustomParser.Create;
 begin
   inherited Create;
+end;
+
+procedure TCustomParser.Terminate;
+begin
+  FTerminated := True;
 end;
 
 function TCustomParser.Clone: TCustomParser;

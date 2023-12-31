@@ -133,9 +133,12 @@ type
     procedure SetLocated(_Value: Boolean);
     function GetNativeException: Boolean;
     procedure SetNativeException(_Value: Boolean);
+    function GetProgressEvent: TProgressEvent;
+    procedure SetProgressEvent(_Value: TProgressEvent);
 
     property Located: Boolean read GetLocated write SetLocated;
     property NativeException: Boolean read GetNativeException write SetNativeException;
+    property ProgressEvent: TProgressEvent read GetProgressEvent write SetProgressEvent;
 
   end;
 
@@ -183,8 +186,8 @@ type
     FElementStart: Int64;
     FRegionStart: Int64;
 
-    FTerminated: Boolean;
     FNestedLevel: Word;
+    FProgressEvent: TProgressEvent;
     FLocated: Boolean;
     FNativeException: Boolean;
 
@@ -214,8 +217,12 @@ type
     procedure SetLocated(_Value: Boolean);
     function GetNativeException: Boolean;
     procedure SetNativeException(_Value: Boolean);
+    function GetProgressEvent: TProgressEvent;
+    procedure SetProgressEvent(_Value: TProgressEvent);
 
     property NestedLevel: Word read FNestedLevel;
+    property ProgressEvent: TProgressEvent read FProgressEvent write FProgressEvent;
+
 
   private
 
@@ -236,6 +243,7 @@ type
     procedure AddRegion(const _RegionClass: TRegionClass; const _OpeningKey, _ClosingKey: TKeyWord; const _Caption: String);
     function ExecuteRegion: Boolean;
     procedure CheckSyntax(const _KeyWord: TKeyWord); virtual;
+    procedure DoProgressEvent(const _Text: String = ''); virtual;
 
     property KeyWords: TKeyWordList read FKeyWords;
     property Locator: TLocator read FLocator write FLocator;
@@ -258,7 +266,6 @@ type
 
     { Методы и свойства для управления }
     procedure Move(_Incrementer: Int64 = 1); inline;
-    procedure Terminate;
     function Nested: Boolean;
 
     { Главный внешний метод }
@@ -272,7 +279,6 @@ type
     property CursorStanding: TStanding read FCursorStanding;
     property ElementStart: Int64 read FElementStart;
     property RegionStart: Int64 read FRegionStart;
-    property Terminated: Boolean read FTerminated;
     property Located: Boolean read GetLocated write SetLocated;
     property NativeException: Boolean read GetNativeException write SetNativeException;
 
@@ -617,7 +623,7 @@ var
   CursorKey: TKeyWord;
 begin
 
-  while not Eof and not FTerminated do begin
+  while not Eof and not Terminated do begin
 
     if not CheckRegions then
 
@@ -641,6 +647,7 @@ begin
   end;
 
   KeyEvent(KWR_SOURCE_END);
+  DoProgressEvent;
   Terminate;
 
 end;
@@ -786,6 +793,16 @@ begin
   FNativeException := _Value;
 end;
 
+function TCustomStringParser.GetProgressEvent: TProgressEvent;
+begin
+  Result := FProgressEvent;
+end;
+
+procedure TCustomStringParser.SetProgressEvent(_Value: TProgressEvent);
+begin
+  FProgressEvent := _Value;
+end;
+
 function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
 begin
   with _KeyWord do
@@ -837,6 +854,8 @@ begin
 
   else Result := '';
 
+  DoProgressEvent(Result);
+
 end;
 
 procedure TCustomStringParser.ElementTerminated(_KeyWord: TKeyWord);
@@ -873,21 +892,24 @@ begin
   CheckUnterminated(_KeyWord.KeyType);
 end;
 
+procedure TCustomStringParser.DoProgressEvent(const _Text: String);
+begin
+  if Assigned(FProgressEvent) then
+    ProgressEvent(SrcLen, Cursor, _Text);
+end;
+
 function TCustomStringParser.Clone: TCustomParser;
 begin
 
   Result := inherited Clone;
 
-  TCustomStringParser(Result).FSource      := Source;
-  TCustomStringParser(Result).FSrcLen      := Length(Source);
-  TCustomStringParser(Result).FCursor      := Cursor;
-  TCustomStringParser(Result).FNestedLevel := NestedLevel + 1;
-
+  TCustomStringParser(Result).SetSource(Source);
+  TCustomStringParser(Result).FCursor         := Cursor;
   TCustomStringParser(Result).Located         := Located;
   TCustomStringParser(Result).NativeException := NativeException;
   TCustomStringParser(Result).Locator         := Locator;
-
-  TCustomStringParser(Result).SetSource(Source);
+  TCustomStringParser(Result).ProgressEvent   := ProgressEvent;
+  TCustomStringParser(Result).FNestedLevel    := NestedLevel + 1;
 
 end;
 
@@ -957,11 +979,6 @@ begin
   if not Terminated then
     Inc(FCursor, _Incrementer);
 
-end;
-
-procedure TCustomStringParser.Terminate;
-begin
-  FTerminated   := True;
 end;
 
 function TCustomStringParser.Nested: Boolean;

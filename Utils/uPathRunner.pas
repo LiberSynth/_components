@@ -40,7 +40,7 @@ type
   TRunnerProcessFunction = procedure (const _FilePath: String; _MaskMatch: Boolean) of object;
   TRunnerProcessMethod = procedure (const _FilePath: String) of object;
   TRunnerProcessExMethod = procedure (const _FilePath: String; var _Terminate: Boolean) of object;
-  TRunnerProgressEvent = procedure (_Max, _Position: Integer; const _FilePath: String) of object;
+  TRunnerProgressEvent = procedure (_Max, _Position: Integer; const _FilePath: String) of object; // -> Core
 
   TRunnerOptions = class(TPersistent)
 

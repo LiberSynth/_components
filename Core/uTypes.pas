@@ -41,6 +41,8 @@ type
   TRegProc = procedure;
   TObjProc = procedure () of object;
 
+  TProgressEvent = procedure (_Max, _Position: Integer; const _Text: String) of object;
+
 implementation
 
 end.

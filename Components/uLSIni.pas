@@ -86,8 +86,8 @@ uses
   { VCL }
   SysUtils, Classes,
   { LiberSynth }
-  uCore, uFileUtils, uParams, uUserParams, uCustomReadWrite, uCustomStringParser, uLSNIStringParser, uLSNIDCStringParser,
-  uParamsReader, uUserParamsReader, uComponentTypes;
+  uTypes, uCore, uFileUtils, uParams, uUserParams, uCustomReadWrite, uCustomStringParser, uLSNIStringParser,
+  uLSNIDCStringParser, uParamsReader, uUserParamsReader, uComponentTypes;
 
 type
 
@@ -109,9 +109,10 @@ type
     FErrorsLocating: Boolean;
     FNativeException: Boolean;
     FCommentSupport: TCommentSupport;
-    FGetCustomSource: TGetCustomSourceProc;
     FPathSeparator: Char;
     FStrictDataTypes: Boolean;
+    FGetCustomSource: TGetCustomSourceProc;
+    FProgress: TProgressEvent;
 
     FParams: TParams;
 
@@ -153,9 +154,10 @@ type
     property NativeException: Boolean read FNativeException write FNativeException default False;
     property CommentSupport: TCommentSupport read FCommentSupport write SetCommentSupport default csNone;
     property SourcePath: String read FSourcePath write FSourcePath;
-    property GetCustomSource: TGetCustomSourceProc read FGetCustomSource write FGetCustomSource default nil;
     property PathSeparator: Char read FPathSeparator write FPathSeparator default '.';
     property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes default False;
+    property GetCustomSource: TGetCustomSourceProc read FGetCustomSource write FGetCustomSource default nil;
+    property Progress: TProgressEvent read FProgress write FProgress default nil;
 
   end;
 
@@ -394,9 +396,10 @@ begin
 
           try
 
+            CustomStringParser.SetSource(GetSourceString);
             CustomStringParser.Located         := ErrorsLocating;
             CustomStringParser.NativeException := NativeException;
-            CustomStringParser.SetSource(GetSourceString);
+            CustomStringParser.ProgressEvent   := Progress;
 
             ParamsReader.RetrieveParser(Parser);
 
