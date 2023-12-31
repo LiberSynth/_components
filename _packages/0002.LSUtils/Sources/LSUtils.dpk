@@ -36,7 +36,6 @@ contains
   uFileUtils in '..\..\..\Utils\uFileUtils.pas',
   uPathRunner in '..\..\..\Utils\uPathRunner.pas',
   uStackTracing in '..\..\..\Utils\uStackTracing.pas',
-  uLog in '..\..\..\Utils\uLog.pas',
-  uSomeParams in '..\..\..\Utils\uSomeParams.pas';
+  uLog in '..\..\..\Utils\uLog.pas';
 
 end.

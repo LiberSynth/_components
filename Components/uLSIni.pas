@@ -29,6 +29,18 @@ unit uLSIni;
   считывателя, экспортера и параметров. Это не адаптер. Если нужен адаптер, можно написать его, используя имеющиеся в
   паблике классы. }
 { TODO 4 -oVasilyevSM -cuLSIni: Иконка }
+{ TODO -oVasilyevSM: В SaveToString нужен еще один режим, явное указание типа параметра в ини-файле
+  или без него. И тогда при считывании тип должен предварительно определяться в приложении примерно через вызов функций
+  RegisterParam. Таким образом, имеем два формата ини-файла, полный и краткий. В LoadFromString также можно вызв=ывать
+  из пустого контейнера с готовой структурой. Тогда она просто заполняется данными, типы известны и не требуют хранения
+  в строке. }
+{ TODO -oVasilyevSM: В компонентах, использующих TParams свойства, задаваемые в констукторе давать менять только в дизайн-таме }
+{ TODO -oVasilyevSM: Режим "сохранять строки всегда в кавычках" }
+{ TODO -oVasilyevSM: Нужна оболочка TFileParams, которая будет сохраняться в файл. Вот она-то и должна поддерживать комментарии итд. }
+{ TODO -oVasilyevSM: Режим TFileParams.AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда - зависит от типа оъекта,
+  ToFile, ToStream, ToString, To Registry. Файл держать открытым, чтобы не перезаписывать целиком каждый раз. Итд. }
+{ TODO -oVasilyevSM: Компонент TRegParams }
+{ TODO -oVasilyevSM: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
 
 (*
 
@@ -110,7 +122,7 @@ type
 
     FParams: TParams;
 
-    procedure InitProperties;
+    procedure InitDefaultProperties;
     function ParamsClass: TParamsClass;
     function ReaderClass: TCustomReaderClass;
     function ParserClass: TCustomParserClass;
@@ -132,8 +144,8 @@ type
     constructor Create(_Owner: TComponent); override;
     destructor Destroy; override;
 
-    procedure Save;
     procedure Load;
+    procedure Save;
 
     property Params: TParams read FParams write FParams;
 
@@ -164,100 +176,10 @@ end;
 
 { TLSIni }
 
-procedure TLSIni.Save;
-begin
-  CheckDirExisting(ExtractFileDir(SourceFile));
-  StrToFile(Params.SaveToString, SourceFile);
-end;
-
-procedure TLSIni.SetCommentSupport(const _Value: TCommentSupport);
-begin
-
-  if _Value <> FCommentSupport then begin
-
-    if (_Value > csNone) and (StoreMethod = smBLOB) then
-      raise EComponentException.Create('Invalid combination of properties. Comments are only supported for the string sources.');
-    if (_Value > csNone) and (SourceType in [stRegistryStructured, stRegistrySingleParam] ) then
-      raise EComponentException.Create('Invalid combination of properties. Comments are not supported for the registry stored source.');
-
-    FCommentSupport := _Value;
-
-  end;
-
-end;
-
-procedure TLSIni.SetErrorsLocating(const _Value: Boolean);
-begin
-
-  if _Value <> FErrorsLocating then begin
-
-    if _Value and (SourceType = stRegistryStructured) then
-      raise EComponentException.Create('Invalid combination of properties. Error locating are not supported for the registry structured source.');
-
-    FErrorsLocating := _Value;
-
-  end;
-
-end;
-
-function TLSIni.GetSourceString: String;
-begin
-
-  if StoreMethod = smBLOB then
-    raise EComponentException.Create('Impossible combination: blob reading and string source.');
-
-  Result := '';
-  case SourceType of
-
-    stFile:                Result := FileToStr(SourceFile);
-    stRegistryStructured:  raise EComponentException.Create('Impossible combination: registry reading and string source.');
-//    stRegistrySingleParam: ;
-    stCustom: Result := DoGetCustomSourceString; { Именно здесь - строка. GetSourceBLOB - BLOB. }
-
-  else
-    raise EUncompletedMethod.Create;
-  end;
-
-end;
-
-procedure TLSIni.SetSourceType(const _Value: TIniSourceType);
-begin
-
-  if _Value <> FSourceType then begin
-
-    if (_Value in [stRegistryStructured, stRegistrySingleParam]) and (CommentSupport > csNone) then
-      raise EComponentException.Create('Invalid combination of properties. Comments are not supported when saving to the registry.');
-
-    FSourceType := _Value;
-
-  end;
-
-end;
-
-procedure TLSIni.SetStoreMethod(const _Value: TIniStoreMethod);
-begin
-
-  if _Value <> FStoreMethod then begin
-
-    if (_Value = smBLOB) and (CommentSupport > csNone) then
-      raise EComponentException.Create('Invalid combination of properties. Comments are only supported when saving to a string.');
-
-    FStoreMethod := _Value;
-
-  end;
-
-end;
-
-function TLSIni.SourceFile: String;
-begin
-  if Length(SourcePath) = 0 then Result := Format('%s\%s.ini', [ExeDir, ExeName])
-  else Result := SourcePath;
-end;
-
 constructor TLSIni.Create(_Owner: TComponent);
 begin
   inherited Create(_Owner);
-  InitProperties;
+  InitDefaultProperties;
 end;
 
 destructor TLSIni.Destroy;
@@ -266,10 +188,14 @@ begin
   inherited Destroy;
 end;
 
-function TLSIni.DoGetCustomSourceString: String;
+procedure TLSIni.InitDefaultProperties;
 begin
-  if Assigned(FGetCustomSource) then
-    FGetCustomSource(Result);
+
+  FStoreMethod    := smLSNIString;
+  FSourceType     := stFile;
+  FErrorsLocating := True;
+  FPathSeparator  := '.';
+
 end;
 
 function TLSIni.ParamsClass: TParamsClass;
@@ -330,13 +256,109 @@ begin
 
 end;
 
-procedure TLSIni.InitProperties;
+function TLSIni.SourceFile: String;
+begin
+  if Length(SourcePath) = 0 then Result := Format('%s\%s.ini', [ExeDir, ExeName])
+  else Result := SourcePath;
+end;
+
+function TLSIni.GetSourceString: String;
 begin
 
-  FStoreMethod    := smLSNIString;
-  FSourceType     := stFile;
-  FErrorsLocating := True;
-  FPathSeparator  := '.';
+  if StoreMethod = smBLOB then
+    raise EComponentException.Create('Impossible combination: blob reading and string source.');
+
+  Result := '';
+  case SourceType of
+
+    stFile:                Result := FileToStr(SourceFile);
+    stRegistryStructured:  raise EComponentException.Create('Impossible combination: registry reading and string source.');
+//    stRegistrySingleParam: ;
+    stCustom: Result := DoGetCustomSourceString; { Именно здесь - строка. GetSourceBLOB - BLOB. }
+
+  else
+    raise EUncompletedMethod.Create;
+  end;
+
+end;
+
+function TLSIni.DoGetCustomSourceString: String;
+begin
+  if Assigned(FGetCustomSource) then
+    FGetCustomSource(Result);
+end;
+
+procedure TLSIni.SetCommentSupport(const _Value: TCommentSupport);
+begin
+
+  if _Value <> FCommentSupport then begin
+
+    if (_Value > csNone) and (StoreMethod = smBLOB) then
+      raise EComponentException.Create('Invalid combination of properties. Comments are only supported for the string sources.');
+    if (_Value > csNone) and (SourceType in [stRegistryStructured, stRegistrySingleParam] ) then
+      raise EComponentException.Create('Invalid combination of properties. Comments are not supported for the registry stored source.');
+
+    FCommentSupport := _Value;
+
+  end;
+
+end;
+
+procedure TLSIni.SetSourceType(const _Value: TIniSourceType);
+begin
+
+  if _Value <> FSourceType then begin
+
+    if (_Value in [stRegistryStructured, stRegistrySingleParam]) and (CommentSupport > csNone) then
+      raise EComponentException.Create('Invalid combination of properties. Comments are not supported when saving to the registry.');
+
+    FSourceType := _Value;
+
+  end;
+
+end;
+
+procedure TLSIni.SetStoreMethod(const _Value: TIniStoreMethod);
+begin
+
+  if _Value <> FStoreMethod then begin
+
+    if (_Value = smBLOB) and (CommentSupport > csNone) then
+      raise EComponentException.Create('Invalid combination of properties. Comments are only supported when saving to a string.');
+
+    FStoreMethod := _Value;
+
+  end;
+
+end;
+
+procedure TLSIni.SetErrorsLocating(const _Value: Boolean);
+begin
+
+  if _Value <> FErrorsLocating then begin
+
+    if _Value and (SourceType = stRegistryStructured) then
+      raise EComponentException.Create('Invalid combination of properties. Error locating are not supported for the registry structured source.');
+
+    FErrorsLocating := _Value;
+
+  end;
+
+end;
+
+procedure TLSIni.Loaded;
+begin
+
+  inherited Loaded;
+
+  if not (csDesigning in ComponentState) then begin
+
+    FParams := ParamsClass.Create(PathSeparator, StrictDataTypes);
+
+    if AutoLoad then
+      Load;
+
+  end;
 
 end;
 
@@ -397,20 +419,10 @@ begin
 
 end;
 
-procedure TLSIni.Loaded;
+procedure TLSIni.Save;
 begin
-
-  inherited Loaded;
-
-  if not (csDesigning in ComponentState) then begin
-
-    FParams := ParamsClass.Create(PathSeparator, StrictDataTypes);
-
-    if AutoLoad then
-      Load;
-
-  end;
-
+  CheckDirExisting(ExtractFileDir(SourceFile));
+  StrToFile(Params.SaveToString, SourceFile);
 end;
 
 end.
