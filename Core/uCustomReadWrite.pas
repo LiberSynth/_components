@@ -1,5 +1,30 @@
 unit uCustomReadWrite;
 
+(*******************************************************************************************)
+(*            _____          _____          _____          _____          _____            *)
+(*           /\    \        /\    \        /\    \        /\    \        /\    \           *)
+(*          /::\____\      /::\    \      /::\    \      /::\    \      /::\    \          *)
+(*         /:::/    /      \:::\    \    /::::\    \    /::::\    \    /::::\    \         *)
+(*        /:::/    /        \:::\    \  /::::::\    \  /::::::\    \  /::::::\    \        *)
+(*       /:::/    /          \:::\    \ :::/\:::\    \ :::/\:::\    \ :::/\:::\    \       *)
+(*      /:::/    /            \:::\    \ :/__\:::\    \ :/__\:::\    \ :/__\:::\    \      *)
+(*     /:::/    /             /::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \     *)
+(*    /:::/    /     _____   /::::::\    \ \   \:::\    \ \   \:::\    \ \   \:::\    \    *)
+(*   /:::/    /     /\    \ /:::/\:::\    \ \   \:::\ ___\ \   \:::\    \ \   \:::\____\   *)
+(*  /:::/____/     /::\    /:::/  \:::\____\ \   \:::|    | \   \:::\____\ \   \:::|    |  *)
+(*  \:::\    \     \:::\  /:::/    \::/    / :\  /:::|____| :\   \::/    / :\  /:::|____|  *)
+(*   \:::\    \     \:::\/:::/    / \/____/ :::\/:::/    / :::\   \/____/ :::\/:::/    /   *)
+(*    \:::\    \     \::::::/    /  \:::\   \::::::/    /  \:::\    \  |:::::::::/    /    *)
+(*     \:::\    \     \::::/____/    \:::\   \::::/    /    \:::\____\ |::|\::::/    /     *)
+(*      \:::\    \     \:::\    \     \:::\  /:::/    / :\   \::/    / |::| \::/____/      *)
+(*       \:::\    \     \:::\    \     \:::\/:::/    / :::\   \/____/  |::|  ~|            *)
+(*        \:::\    \     \:::\    \     \::::::/    /  \:::\    \      |::|   |            *)
+(*         \:::\____\     \:::\____\     \::::/    /    \:::\____\     \::|   |            *)
+(*          \::/    /      \::/    /      \::/____/      \::/    /      \:|   |            *)
+(*           \/____/        \/____/        ~~             \/____/        \|___|            *)
+(*                                                                                         *)
+(*******************************************************************************************)
+
 interface
 
 uses
@@ -48,21 +73,40 @@ type
 
   TCustomReaderClass = class of TCustomReader;
 
-  { renderer composer conductor }
-
   TCustomWriter = class abstract (TIntfObject)
 
   public
 
     constructor Create; virtual;
 
-    procedure Write; virtual; abstract;
+  end;
+
+  TCustomWriterClass = class of TCustomWriter;
+
+  TCustomCompiler = class abstract (TIntfObject)
+
+  strict private
+
+    FWriter: TCustomWriter;
+
+  protected
+
+    property Writer: TCustomWriter read FWriter;
+
+  public
+
+    constructor Create(_Writer: TCustomWriter); virtual;
+
+    procedure RetrieveWriter(_Writer: TCustomWriter);
+    procedure Run; virtual; abstract;
 
   end;
 
-  TCustomWriterClass = class of TCustomParser;
+  TCustomCompilerClass = class of TCustomCompiler;
 
   ECustomReadWriteException = class(ECoreException);
+  EReadException = class(ECustomReadWriteException);
+  EWriteException = class(ECustomReadWriteException);
 
 implementation
 
@@ -104,6 +148,19 @@ end;
 constructor TCustomWriter.Create;
 begin
   inherited Create;
+end;
+
+{ TCustomCompiler }
+
+constructor TCustomCompiler.Create(_Writer: TCustomWriter);
+begin
+  inherited Create;
+  FWriter := _Writer;
+end;
+
+procedure TCustomCompiler.RetrieveWriter(_Writer: TCustomWriter);
+begin
+  FWriter := _Writer;
 end;
 
 end.

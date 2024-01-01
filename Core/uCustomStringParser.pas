@@ -284,7 +284,7 @@ type
 
   end;
 
-  EStringParserException = class(ECustomReadWriteException)
+  EStringParserException = class(EReadException)
 
   strict private
 
@@ -303,7 +303,7 @@ type
 
   { Этот класс используется, когда CustomStringParser.NativeException = False. Он позволит спозиционировать курсор в
    контроле с источником, чтобы указать на место ошибки. }
-  ELocatedException = class(ECustomReadWriteException)
+  ELocatedException = class(EReadException)
 
   strict private
 

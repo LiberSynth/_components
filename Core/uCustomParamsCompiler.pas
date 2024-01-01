@@ -1,4 +1,4 @@
-unit uReadWriteCommon;
+unit uCustomParamsCompiler;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -27,31 +27,54 @@ unit uReadWriteCommon;
 
 interface
 
+uses
+  { LiberSynth }
+  uCustomReadWrite, uParams;
+
 type
 
-  { Name - Type - Value reader interface. Maintains nested reading. }
-  INTVReader = interface ['{6585B06A-2103-42FD-8581-9F650B603FD0}']
+  ICustomParamsCompiler = interface ['{59076600-E1FD-4DFA-A5AE-0318D4BEA634}']
 
-    procedure ReadName(const _Element: String);
-    procedure ReadType(const _Element: String);
-    procedure ReadValue(const _Element: String);
-    function IsNestedValue: Boolean;
-    procedure ReadNestedBlock;
+    procedure RetrieveParams(_Value: TParams);
 
   end;
 
-  { Comments reader interface. Maintains comments. }
-  IUserParamsReader = interface ['{C1A83F9A-2CEA-441E-B3DA-AE9022D8DFBC}']
+  TCustomParamsCompiler = class(TCustomCompiler, ICustomParamsCompiler)
 
-    procedure AddNameComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure AddTypeComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure AddValueComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure DetachBefore;
-    procedure SourceEnd;
-    procedure ElementTerminated;
+  strict private
+
+    FParams: TParams;
+
+    { ICustomParamsCompiler }
+    procedure RetrieveParams(_Value: TParams);
+
+    property Params: TParams read FParams;
+
+  protected
+
+    procedure CompileParam(_Param: TParam); virtual; abstract;
+
+  public
+
+    procedure Run; override;
 
   end;
 
 implementation
+
+{ TCustomParamsCompiler }
+
+procedure TCustomParamsCompiler.RetrieveParams(_Value: TParams);
+begin
+  FParams := _Value;
+end;
+
+procedure TCustomParamsCompiler.Run;
+var
+  Param: TParam;
+begin
+  for Param in Params.Items do
+    CompileParam(Param);
+end;
 
 end.

@@ -336,7 +336,6 @@ type
 
     function GetParam(_Path: String): TParam;
 
-    property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cuParams: Сделать бы default, а то бесит это Items повсюду. }
     property ListHolder: TParamsListHolder read FListHolder;
 
   protected
@@ -410,11 +409,12 @@ type
     property List[const _Path: String]: TMultiParamList read GetList;
 
     property PathSeparator: Char read FPathSeparator;
+    property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cuParams: Сделать бы default, а то бесит это Items повсюду. }
+    property Count: Integer read GetCount;
     { TODO 1 -oVasilyevSM -cuParams: В рендерер. }
     property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions write FSaveToStringOptions;
     { StrictDataTypes: False - значение конвернтируется в имеющийся тип, True - значение записывается с новым типом. }
     property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes;
-    property Count: Integer read GetCount;
 
   end;
 

@@ -101,7 +101,7 @@ type
 
   end;
 
-  EParamsReadException = class(ECustomReadWriteException);
+  EParamsReadException = class(EReadException);
 
 implementation
 

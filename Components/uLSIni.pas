@@ -32,7 +32,6 @@ unit uLSIni;
 { TODO 3 -oVasilyevSM: Режим "сохранять строки всегда в кавычках" }
 { TODO 3 -oVasilyevSM: Режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда - зависит от типа оъекта,
   ToFile, ToStream, ToString, To Registry. Файл держать открытым, чтобы не перезаписывать целиком каждый раз. Итд. }
-{ TODO 4 -oVasilyevSM: Чтение с событием для прогресса. В Вордстоке словарь читается прилично времени. }
 { TODO 4 -oVasilyevSM -cuLSIni: Иконка }
 
 {
@@ -86,13 +85,22 @@ uses
   { VCL }
   SysUtils, Classes,
   { LiberSynth }
-  uTypes, uCore, uFileUtils, uParams, uUserParams, uCustomReadWrite, uCustomStringParser, uLSNIStringParser,
-  uLSNIDCStringParser, uParamsReader, uUserParamsReader, uComponentTypes;
+  uComponentTypes, uTypes, uCore, uFileUtils, uParams, uUserParams, uCustomReadWrite, uCustomStringParser,
+  uLSNIStringParser, uLSNIDCStringParser, uParamsReader, uUserParamsReader, uCustomStringWriter, uCustomParamsCompiler,
+  uParamsLSNIStringCompiler;
 
 type
 
-  TIniStoreMethod = (smLSNIString, smClassicIni, smBLOB);
-  TIniSourceType  = (stFile, stRegistryStructured, stRegistrySingleParam, stCustom);
+{
+                                          Loading specifier Saving Specifier
+  Storage:      File, Registry, Custom    LoadSource        SaveSource
+  SourceType:   String, BLOB, Structured  Parser            Writer/Compiler
+  SourceFormat: LSNI, Classic, Custom     Parser            Writer/Compiler
+  Comments:     None, Strict, User        Parser            Writer/Compiler
+
+}
+  TSourceType     = (stFile, stRegistryStructured, stRegistrySingleParam, stCustom);
+  TStoreMethod    = (smLSNIString, smClassicIni, smBLOB, smCustom);
   TCommentSupport = (csNone, csStockFormat, csOriginarFormat);
 
   TGetCustomSourceProc = procedure (var _Value) of object;
@@ -101,8 +109,8 @@ type
 
   strict private
 
-    FStoreMethod: TIniStoreMethod;
-    FSourceType: TIniSourceType;
+    FStoreMethod: TStoreMethod;
+    FSourceType: TSourceType;
     FAutoSave: Boolean;
     FAutoLoad: Boolean;
     FSourcePath: String;
@@ -120,15 +128,21 @@ type
     function ParamsClass: TParamsClass;
     function ReaderClass: TCustomReaderClass;
     function ParserClass: TCustomParserClass;
+    function CompilerClass: TCustomCompilerClass;
+    function WriterClass: TCustomWriterClass;
     function SourceFile: String;
     function GetSourceString: String;
     function DoGetCustomSourceString: String;
 
     procedure SetCommentSupport(const _Value: TCommentSupport);
-    procedure SetSourceType(const _Value: TIniSourceType);
-    procedure SetStoreMethod(const _Value: TIniStoreMethod);
+    procedure SetSourceType(const _Value: TSourceType);
+    procedure SetStoreMethod(const _Value: TStoreMethod);
     procedure SetErrorsLocating(const _Value: Boolean);
     procedure SetStrictDataTypes(const _Value: Boolean);
+
+    procedure SetParserSource(_Parser: TCustomParser);
+
+    procedure SaveContent(_Writer: TCustomWriter);
 
   protected
 
@@ -146,8 +160,8 @@ type
 
   published
 
-    property StoreMethod: TIniStoreMethod read FStoreMethod write SetStoreMethod default smLSNIString;
-    property SourceType: TIniSourceType read FSourceType write SetSourceType default stFile;
+    property StoreMethod: TStoreMethod read FStoreMethod write SetStoreMethod default smLSNIString;
+    property SourceType: TSourceType read FSourceType write SetSourceType default stFile;
     property AutoSave: Boolean read FAutoSave write FAutoSave default False;
     property AutoLoad: Boolean read FAutoLoad write FAutoLoad default False;
     property ErrorsLocating: Boolean read FErrorsLocating write SetErrorsLocating default True;
@@ -232,12 +246,13 @@ end;
 function TLSIni.ParserClass: TCustomParserClass;
 const
 
-  Map: array [TIniStoreMethod, TCommentSupport] of TCustomParserClass = (
+  Map: array [TStoreMethod, TCommentSupport] of TCustomParserClass = (
 
                        { csNone,            csStockFormat,       csOriginarFormat }
       { smLSNIString } ( TLSNIStringParser, TLSNIDCStringParser, TCustomParser    ),
       { smClassicIni } ( TCustomParser,     TCustomParser,       TCustomParser    ),
-      { smBLOB       } ( TCustomParser,     nil,                 nil              )
+      { smBLOB       } ( TCustomParser,     nil,                 nil              ),
+      { smCustom     } ( TCustomParser,     nil,                 nil              )
 
   );
 
@@ -249,6 +264,66 @@ begin
     raise EUncompletedMethod.Create;
   if not Assigned(Result) then
     raise EComponentException.Create('Impossible combination of properties. There are no blobs with comments.');
+
+end;
+
+function TLSIni.CompilerClass: TCustomCompilerClass;
+const
+
+  Map: array [TStoreMethod, TCommentSupport] of TCustomCompilerClass = (
+
+                       { csNone              csStockFormat        csOriginarFormat }
+      { smLSNIString } (TLSNIStringCompiler, TCustomCompiler,     TCustomCompiler  ),
+      { smClassicIni } (TCustomCompiler,     TCustomCompiler,     TCustomCompiler  ),
+      { smBLOB       } (TCustomCompiler,     nil,                 nil              ),
+      { smCustom     } (TCustomCompiler,     nil,                 nil              )
+
+  );
+
+begin
+
+  Result := Map[StoreMethod, CommentSupport];
+
+  if Result = TCustomCompiler then
+    raise EUncompletedMethod.Create;
+  if not Assigned(Result) then
+    raise EComponentException.Create('Impossible combination of properties. There are no blobs with comments.');
+
+end;
+
+function TLSIni.WriterClass: TCustomWriterClass;
+const
+
+  Map: array [TSourceType, TStoreMethod, TCommentSupport] of TCustomWriterClass = (
+
+                                             { csNone           csStockFormat    csOriginarFormat }
+      { stFile                smLSNIString } ((TCustomStringWriter, TCustomWriter,   TCustomWriter    ),
+      { stFile                smClassicIni }  (TCustomWriter,   TCustomWriter,   TCustomWriter    ),
+      { stFile                smBLOB       }  (TCustomWriter,   nil,             nil              ),
+      { stFile                smCustom     }  (TCustomWriter,   nil,             nil              )),
+      { stRegistryStructured  smLSNIString } ((TCustomWriter,   nil,             nil              ),
+      { stRegistryStructured  smClassicIni }  (TCustomWriter,   nil,             nil              ),
+      { stRegistryStructured  smBLOB       }  (TCustomWriter,   nil,             nil              ),
+      { stRegistryStructured  smCustom     }  (TCustomWriter,   nil,             nil              )),
+      { stRegistrySingleParam smLSNIString } ((TCustomWriter,   TCustomWriter,   TCustomWriter    ),
+      { stRegistrySingleParam smClassicIni }  (TCustomWriter,   TCustomWriter,   TCustomWriter    ),
+      { stRegistrySingleParam smBLOB       }  (TCustomWriter,   nil,             nil              ),
+      { stRegistrySingleParam smCustom     }  (TCustomWriter,   nil,             nil              )),
+      { stCustom              smLSNIString } ((TCustomWriter,   TCustomWriter,   TCustomWriter    ),
+      { stCustom              smClassicIni }  (TCustomWriter,   TCustomWriter,   TCustomWriter    ),
+      { stCustom              smBLOB       }  (TCustomWriter,   nil,             nil              ),
+      { stCustom              smCustom     }  (TCustomWriter,   nil,             nil              ))
+
+  );
+
+begin
+
+  Result := Map[SourceType, StoreMethod, CommentSupport];
+
+//  if Result = TCustomWriter then
+//    raise EUncompletedMethod.Create;
+//  if not Assigned(Result) then
+//    raise EComponentException.Create('Impossible combination of properties. There are no blobs with comments.');
 
 end;
 
@@ -300,7 +375,7 @@ begin
 
 end;
 
-procedure TLSIni.SetSourceType(const _Value: TIniSourceType);
+procedure TLSIni.SetSourceType(const _Value: TSourceType);
 begin
 
   if _Value <> FSourceType then begin
@@ -314,7 +389,7 @@ begin
 
 end;
 
-procedure TLSIni.SetStoreMethod(const _Value: TIniStoreMethod);
+procedure TLSIni.SetStoreMethod(const _Value: TStoreMethod);
 begin
 
   if _Value <> FStoreMethod then begin
@@ -355,6 +430,68 @@ begin
 
 end;
 
+procedure TLSIni.SetParserSource(_Parser: TCustomParser);
+var
+  CustomStringParser: ICustomStringParser;
+begin
+
+  if _Parser.GetInterface(ICustomStringParser, CustomStringParser) then
+
+    try
+
+      CustomStringParser.SetSource(GetSourceString);
+      CustomStringParser.Located         := ErrorsLocating;
+      CustomStringParser.NativeException := NativeException;
+      CustomStringParser.ProgressEvent   := Progress;
+      Exit;
+
+    finally
+      CustomStringParser := nil;
+    end;
+
+//    if Parser.GetInterface(ICustomBLOBParser, CustomBLOBParser) then
+//      _SetBLOBSource(CustomStringParser)
+//    if Parser.GetInterface(ICustomRegistryParser, CustomStringParser) then
+//      _SetRegistrySource(CustomRegistryParser)};
+
+  raise EUncompletedMethod.Create;
+
+end;
+
+procedure TLSIni.SaveContent(_Writer: TCustomWriter);
+var
+  CustomStringWriter: ICustomStringWriter;
+begin
+
+  if not _Writer.GetInterface(ICustomStringWriter, CustomStringWriter) then
+    raise EWriteException.Create('Writer does not support ICustomStringWriter interface.');
+
+{
+                                          Loading specifier Saving Specifier
+  Storage:      File, Registry, Custom    LoadSource        SaveSource
+  SourceType:   String, BLOB, Structured  Parser            Writer/Compiler
+  SourceFormat: LSNI, Classic, Custom     Parser            Writer/Compiler
+  Comments:     None, Strict, User        Parser            Writer/Compiler
+
+  TSourceType     = (stFile, stRegistryStructured, stRegistrySingleParam, stCustom);
+  TStoreMethod    = (smLSNIString, smClassicIni, smBLOB, smCustom);
+  TCommentSupport = (csNone, csStockFormat, csOriginarFormat);
+
+}
+
+  if SourceType = stFile then begin
+
+    CheckDirExisting(ExtractFileDir(SourceFile));
+    //StrToFile(CustomStringWriter.Content, SourceFile);
+
+  end else raise EUncompletedMethod.Create;
+
+//  if SourceType = stCustom then begin
+//    event
+//  end;
+
+end;
+
 procedure TLSIni.Loaded;
 begin
 
@@ -377,7 +514,6 @@ var
   Parser: TCustomParser;
   Reader: TCustomReader;
   ParamsReader: IParamsReader;
-  CustomStringParser: ICustomStringParser;
 begin
 
   Reader := ReaderClass.Create;
@@ -392,29 +528,17 @@ begin
       Parser := ParserClass.Create;
       try
 
-        if Parser.GetInterface(ICustomStringParser, CustomStringParser) then
+        ParamsReader.RetrieveParser(Parser);
+        SetParserSource(Parser);
 
-          try
+        Parser.RetrieveTargerInterface(Reader);
+        try
 
-            CustomStringParser.SetSource(GetSourceString);
-            CustomStringParser.Located         := ErrorsLocating;
-            CustomStringParser.NativeException := NativeException;
-            CustomStringParser.ProgressEvent   := Progress;
+          Parser.Read;
 
-            ParamsReader.RetrieveParser(Parser);
-
-            Parser.RetrieveTargerInterface(Reader);
-            try
-
-              Parser.Read;
-
-            finally
-              Parser.FreeTargerInterface;
-            end;
-
-          finally
-            CustomStringParser := nil;
-          end;
+        finally
+          Parser.FreeTargerInterface;
+        end;
 
       finally
         Parser.Free;
@@ -431,9 +555,40 @@ begin
 end;
 
 procedure TLSIni.Save;
+var
+  Compiler: TCustomCompiler;
+  Writer: TCustomWriter;
+  ParamsCompiler: ICustomParamsCompiler;
 begin
-  CheckDirExisting(ExtractFileDir(SourceFile));
-  StrToFile(Params.SaveToString, SourceFile);
+
+  Writer := WriterClass.Create;
+  try
+
+    Compiler := CompilerClass.Create(Writer);
+    try
+
+      if not Compiler.GetInterface(ICustomParamsCompiler, ParamsCompiler) then
+        raise EComponentException.Create('Compiler does not support IParamsCompiler interface.');
+      try
+
+        ParamsCompiler.RetrieveParams(Params);
+
+        Compiler.Run;
+
+      finally
+        ParamsCompiler := nil;
+      end;
+
+    finally
+      Compiler.Free;
+    end;
+
+    SaveContent(Writer);
+
+  finally
+    Writer.Free;
+  end;
+
 end;
 
 end.

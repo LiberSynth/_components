@@ -53,6 +53,11 @@ const
   SC_INTEGER_CHARS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
   SC_TYPED_CHARS   = [' '..'~', #128..#255];
 
+//  CC_Lagune: TRGB = ( 10, 190, 230);
+//  CC_Sand:   TRGB = (240, 225, 290);
+//  CC_Grace:  TRGB = (   ,    ,    );
+//  CC_Sky:    TRGB = (   ,    ,    );
+
 implementation
 
 end.

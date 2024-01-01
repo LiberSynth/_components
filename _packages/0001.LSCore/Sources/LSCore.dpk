@@ -36,14 +36,18 @@ contains
   uGUID in '..\..\..\Core\uGUID.pas',
   uStrUtils in '..\..\..\Core\uStrUtils.pas',
   uParams in '..\..\..\Core\uParams.pas',
+  uUserParams in '..\..\..\Core\uUserParams.pas',
   uCustomReadWrite in '..\..\..\Core\uCustomReadWrite.pas',
   uReadWriteCommon in '..\..\..\Core\uReadWriteCommon.pas',
   uCustomStringParser in '..\..\..\Core\uCustomStringParser.pas',
   uLSNIStringParser in '..\..\..\Core\uLSNIStringParser.pas',
   uLSNIDCStringParser in '..\..\..\Core\uLSNIDCStringParser.pas',
   uParamsReader in '..\..\..\Core\uParamsReader.pas',
-  uUserParams in '..\..\..\Core\uUserParams.pas',
-  uParamsReadWriteUtils in '..\..\..\Core\uParamsReadWriteUtils.pas',
-  uUserParamsReader in '..\..\..\Core\uUserParamsReader.pas';
+  uUserParamsReader in '..\..\..\Core\uUserParamsReader.pas',
+  uCustomStringWriter in '..\..\..\Core\uCustomStringWriter.pas',
+  uCustomParamsCompiler in '..\..\..\Core\uCustomParamsCompiler.pas',
+  uCustomParamsStringCompiler in '..\..\..\Core\uCustomParamsStringCompiler.pas',
+  uParamsLSNIStringCompiler in '..\..\..\Core\uParamsLSNIStringCompiler.pas',
+  uParamsReadWriteUtils in '..\..\..\Core\uParamsReadWriteUtils.pas';
 
 end.

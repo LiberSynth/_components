@@ -48,7 +48,7 @@ begin
   try
 
     if not Reader.GetInterface(IParamsReader, ParamsReader) then
-      raise ECustomReadWriteException.Create('Reader does not support IParamsReader interface.');
+      raise EReadException.Create('Reader does not support IParamsReader interface.');
     try
 
       ParamsReader.RetrieveParams(Params);
@@ -57,7 +57,7 @@ begin
       try
 
         if not Parser.GetInterface(ICustomStringParser, CustomStringParser) then
-          raise ECustomReadWriteException.Create('Parser does not support ICustomStringParser interface.');
+          raise EReadException.Create('Parser does not support ICustomStringParser interface.');
         try
 
           CustomStringParser.Located := Located;
@@ -105,7 +105,7 @@ begin
   try
 
     if not Reader.GetInterface(IParamsReader, ParamsReader) then
-      raise ECustomReadWriteException.Create('Reader does not support IParamsReader interface.');
+      raise EReadException.Create('Reader does not support IParamsReader interface.');
     try
 
       ParamsReader.RetrieveParams(Params);
@@ -114,7 +114,7 @@ begin
       try
 
         if not Parser.GetInterface(ICustomStringParser, CustomStringParser) then
-          raise ECustomReadWriteException.Create('Parser does not support ICustomStringParser interface.');
+          raise EReadException.Create('Parser does not support ICustomStringParser interface.');
         try
 
           CustomStringParser.Located := Located;

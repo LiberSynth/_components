@@ -1,4 +1,4 @@
-unit uReadWriteCommon;
+unit uCustomStringWriter;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -27,31 +27,57 @@ unit uReadWriteCommon;
 
 interface
 
+uses
+  { LiberSynth }
+  uCustomReadWrite;
+
 type
 
-  { Name - Type - Value reader interface. Maintains nested reading. }
-  INTVReader = interface ['{6585B06A-2103-42FD-8581-9F650B603FD0}']
+  ICustomStringWriter = interface ['{285786DB-6F78-44A9-B779-358D063502BE}']
 
-    procedure ReadName(const _Element: String);
-    procedure ReadType(const _Element: String);
-    procedure ReadValue(const _Element: String);
-    function IsNestedValue: Boolean;
-    procedure ReadNestedBlock;
+    procedure Write(const _Value: String);
+    function GetContent: String;
+
+    property Content: String read GetContent;
 
   end;
 
-  { Comments reader interface. Maintains comments. }
-  IUserParamsReader = interface ['{C1A83F9A-2CEA-441E-B3DA-AE9022D8DFBC}']
+  TCustomStringWriter = class abstract (TCustomWriter, ICustomStringWriter)
 
-    procedure AddNameComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure AddTypeComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure AddValueComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure DetachBefore;
-    procedure SourceEnd;
-    procedure ElementTerminated;
+  strict private
+
+    FContent: String;
+
+    { ICustomStringWriter }
+    procedure Write(const _Value: String);
+    function GetContent: String;
+
+  public
+
+    constructor Create; override;
+
+    property Content: String read FContent;
 
   end;
 
 implementation
+
+{ TCustomStringWriter }
+
+constructor TCustomStringWriter.Create;
+begin
+  inherited Create;
+end;
+
+procedure TCustomStringWriter.Write(const _Value: String);
+begin
+  { TODO 5 -oVasilyevSM -cuCustomReadWrite: Можно ускорить, выделять память страницами, а в конце подрезать. }
+  FContent := FContent + _Value;
+end;
+
+function TCustomStringWriter.GetContent: String;
+begin
+  Result := Content;
+end;
 
 end.

@@ -1,4 +1,4 @@
-unit uReadWriteCommon;
+unit uCustomParamsStringCompiler;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -27,31 +27,52 @@ unit uReadWriteCommon;
 
 interface
 
+uses
+  { LiberSynth }
+  uCustomParamsCompiler, uParams, uCustomReadWrite, uCustomStringWriter;
+
 type
 
-  { Name - Type - Value reader interface. Maintains nested reading. }
-  INTVReader = interface ['{6585B06A-2103-42FD-8581-9F650B603FD0}']
+  TCustomParamsStringCompiler = class(TCustomParamsCompiler)
 
-    procedure ReadName(const _Element: String);
-    procedure ReadType(const _Element: String);
-    procedure ReadValue(const _Element: String);
-    function IsNestedValue: Boolean;
-    procedure ReadNestedBlock;
+  strict private
 
-  end;
+    FCustomStringWriter: ICustomStringWriter;
 
-  { Comments reader interface. Maintains comments. }
-  IUserParamsReader = interface ['{C1A83F9A-2CEA-441E-B3DA-AE9022D8DFBC}']
+    property CustomStringWriter: ICustomStringWriter read FCustomStringWriter;
 
-    procedure AddNameComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure AddTypeComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure AddValueComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
-    procedure DetachBefore;
-    procedure SourceEnd;
-    procedure ElementTerminated;
+  protected
+
+    procedure CompileParam(_Param: TParam); override;
+    function FormatParam(_Param: TParam): String; virtual; abstract;
+
+  public
+
+    constructor Create(_Writer: TCustomWriter); override;
+    destructor Destroy; override;
 
   end;
 
 implementation
+
+{ TCustomParamsStringCompiler }
+
+constructor TCustomParamsStringCompiler.Create(_Writer: TCustomWriter);
+begin
+  inherited Create(_Writer);
+  if not Writer.GetInterface(ICustomStringWriter, FCustomStringWriter) then
+    raise EWriteException.Create('Writer does not support ICustomStringWriter interface.');
+end;
+
+destructor TCustomParamsStringCompiler.Destroy;
+begin
+  FCustomStringWriter := nil;
+  inherited Destroy;
+end;
+
+procedure TCustomParamsStringCompiler.CompileParam(_Param: TParam);
+begin
+  CustomStringWriter.Write(FormatParam(_Param));
+end;
 
 end.
