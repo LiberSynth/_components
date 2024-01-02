@@ -221,8 +221,6 @@ type
     procedure SetProgressEvent(_Value: TProgressEvent);
 
     property NestedLevel: Word read FNestedLevel;
-    property ProgressEvent: TProgressEvent read FProgressEvent write FProgressEvent;
-
 
   private
 
@@ -281,6 +279,7 @@ type
     property RegionStart: Int64 read FRegionStart;
     property Located: Boolean read GetLocated write SetLocated;
     property NativeException: Boolean read GetNativeException write SetNativeException;
+    property ProgressEvent: TProgressEvent read FProgressEvent write FProgressEvent;
 
   end;
 

@@ -595,8 +595,8 @@ var
   ParamFormat, Splitter: String;
 begin
 
-  Typed        := not (soTypesFree in SaveToStringOptions);
-  SingleString := soSingleString in SaveToStringOptions;
+//  Typed        := not (soTypesFree in SaveToStringOptions);
+//  SingleString := soSingleString in SaveToStringOptions;
 
   if Typed then ParamFormat := SC_VALUE_TYPED
   else ParamFormat := SC_VALUE_UNTYPED;

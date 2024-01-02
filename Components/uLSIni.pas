@@ -86,8 +86,8 @@ uses
   SysUtils, Classes,
   { LiberSynth }
   uComponentTypes, uTypes, uCore, uFileUtils, uParams, uUserParams, uCustomReadWrite, uCustomStringParser,
-  uLSNIStringParser, uLSNIDCStringParser, uParamsReader, uUserParamsReader, uCustomStringWriter, uCustomParamsCompiler,
-  uParamsLSNIStringCompiler;
+  uLSNIStringParser, uLSNIDCStringParser, uParamsReader, uUserParamsReader, uStringWriter, uCustomParamsCompiler,
+  uLSNIStringParamsCompiler;
 
 type
 
@@ -272,11 +272,11 @@ const
 
   Map: array [TStoreMethod, TCommentSupport] of TCustomCompilerClass = (
 
-                       { csNone              csStockFormat        csOriginarFormat }
-      { smLSNIString } (TLSNIStringCompiler, TCustomCompiler,     TCustomCompiler  ),
-      { smClassicIni } (TCustomCompiler,     TCustomCompiler,     TCustomCompiler  ),
-      { smBLOB       } (TCustomCompiler,     nil,                 nil              ),
-      { smCustom     } (TCustomCompiler,     nil,                 nil              )
+                       { csNone                    csStockFormat        csOriginarFormat }
+      { smLSNIString } (TLSNIStringParamsCompiler, TCustomCompiler,     TCustomCompiler  ),
+      { smClassicIni } (TCustomCompiler,           TCustomCompiler,     TCustomCompiler  ),
+      { smBLOB       } (TCustomCompiler,           nil,                 nil              ),
+      { smCustom     } (TCustomCompiler,           nil,                 nil              )
 
   );
 
@@ -297,7 +297,7 @@ const
   Map: array [TSourceType, TStoreMethod, TCommentSupport] of TCustomWriterClass = (
 
                                              { csNone           csStockFormat    csOriginarFormat }
-      { stFile                smLSNIString } ((TCustomStringWriter, TCustomWriter,   TCustomWriter    ),
+      { stFile                smLSNIString } ((TStringWriter,   TCustomWriter,   TCustomWriter    ),
       { stFile                smClassicIni }  (TCustomWriter,   TCustomWriter,   TCustomWriter    ),
       { stFile                smBLOB       }  (TCustomWriter,   nil,             nil              ),
       { stFile                smCustom     }  (TCustomWriter,   nil,             nil              )),
@@ -439,10 +439,11 @@ begin
 
     try
 
-      CustomStringParser.SetSource(GetSourceString);
       CustomStringParser.Located         := ErrorsLocating;
       CustomStringParser.NativeException := NativeException;
       CustomStringParser.ProgressEvent   := Progress;
+
+      CustomStringParser.SetSource(GetSourceString);
       Exit;
 
     finally
@@ -460,11 +461,11 @@ end;
 
 procedure TLSIni.SaveContent(_Writer: TCustomWriter);
 var
-  CustomStringWriter: ICustomStringWriter;
+  StringWriter: IStringWriter;
 begin
 
-  if not _Writer.GetInterface(ICustomStringWriter, CustomStringWriter) then
-    raise EWriteException.Create('Writer does not support ICustomStringWriter interface.');
+  if not _Writer.GetInterface(IStringWriter, StringWriter) then
+    raise EWriteException.Create('Writer does not support IStringWriter interface.');
 
 {
                                           Loading specifier Saving Specifier
@@ -482,7 +483,7 @@ begin
   if SourceType = stFile then begin
 
     CheckDirExisting(ExtractFileDir(SourceFile));
-    //StrToFile(CustomStringWriter.Content, SourceFile);
+    StrToFile(StringWriter.Content, SourceFile);
 
   end else raise EUncompletedMethod.Create;
 
@@ -520,7 +521,7 @@ begin
   try
 
     if not Reader.GetInterface(IParamsReader, ParamsReader) then
-      raise EComponentException.Create('Reader does not support IParamsReader interface.');
+      raise EReadException.Create('Reader does not support IParamsReader interface.');
     try
 
       ParamsReader.RetrieveParams(Params);
@@ -558,25 +559,26 @@ procedure TLSIni.Save;
 var
   Compiler: TCustomCompiler;
   Writer: TCustomWriter;
-  ParamsCompiler: ICustomParamsCompiler;
+  CustomParamsCompiler: ICustomParamsCompiler;
 begin
 
   Writer := WriterClass.Create;
   try
 
-    Compiler := CompilerClass.Create(Writer);
+    Compiler := CompilerClass.Create;
     try
 
-      if not Compiler.GetInterface(ICustomParamsCompiler, ParamsCompiler) then
-        raise EComponentException.Create('Compiler does not support IParamsCompiler interface.');
+      Compiler.RetrieveWriter(Writer);
+
+      if not Compiler.GetInterface(ICustomParamsCompiler, CustomParamsCompiler) then
+        raise EWriteException.Create('Compiler does not support ICustomParamsCompiler interface.');
       try
 
-        ParamsCompiler.RetrieveParams(Params);
-
+        CustomParamsCompiler.RetrieveParams(Params);
         Compiler.Run;
 
       finally
-        ParamsCompiler := nil;
+        CustomParamsCompiler := nil;
       end;
 
     finally

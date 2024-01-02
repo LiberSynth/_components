@@ -55,8 +55,6 @@ type
 
   protected
 
-    procedure RetrieveParams(_Value: TParams); override;
-
     procedure BeforeReadParam(_Param: TParam); override;
     procedure AfterReadParam(_Param: TParam); override;
     procedure AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader); override;
@@ -65,6 +63,8 @@ type
 
     constructor Create; override;
     destructor Destroy; override;
+
+    procedure RetrieveParams(_Value: TParams); override;
 
   end;
 
@@ -157,13 +157,6 @@ begin
 
 end;
 
-procedure TUserParamsReader.RetrieveParams(_Value: TParams);
-begin
-  if not (_Value is TUserParams) then
-    raise EParamsReadException.Create('Output params must be a class TUserParams object.');
-  inherited RetrieveParams(_Value);
-end;
-
 procedure TUserParamsReader.BeforeReadParam(_Param: TParam);
 begin
   inherited BeforeReadParam(_Param);
@@ -197,6 +190,13 @@ begin
 
   NestedComments.Clear;
 
+end;
+
+procedure TUserParamsReader.RetrieveParams(_Value: TParams);
+begin
+  if not (_Value is TUserParams) then
+    raise EParamsReadException.Create('Output params must be a class TUserParams object.');
+  inherited RetrieveParams(_Value);
 end;
 
 end.

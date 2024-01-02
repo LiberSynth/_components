@@ -238,7 +238,8 @@ end;
 procedure TLSNIDCStringParser.RetrieveTargerInterface(_Receiver: TIntfObject);
 begin
   inherited RetrieveTargerInterface(_Receiver);
-  { Проверяем по месту вызова Assigned(UserParamsReader) и получаем возможность чтения с отбросом комментариев. }
+  { Здесь запрашиваем интерфейс мягко, потом проверяем его присутствие по месту вызова и, в результате, получаем
+    возможность чтения с отбросом комментариев простым созданием парсера соответствующего класса. }
   _Receiver.GetInterface(IUserParamsReader, FUserParamsReader);
 end;
 

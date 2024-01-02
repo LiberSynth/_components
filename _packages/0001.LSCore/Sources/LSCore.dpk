@@ -44,10 +44,10 @@ contains
   uLSNIDCStringParser in '..\..\..\Core\uLSNIDCStringParser.pas',
   uParamsReader in '..\..\..\Core\uParamsReader.pas',
   uUserParamsReader in '..\..\..\Core\uUserParamsReader.pas',
-  uCustomStringWriter in '..\..\..\Core\uCustomStringWriter.pas',
+  uStringWriter in '..\..\..\Core\uStringWriter.pas',
   uCustomParamsCompiler in '..\..\..\Core\uCustomParamsCompiler.pas',
-  uCustomParamsStringCompiler in '..\..\..\Core\uCustomParamsStringCompiler.pas',
-  uParamsLSNIStringCompiler in '..\..\..\Core\uParamsLSNIStringCompiler.pas',
+  uCustomStringParamsCompiler in '..\..\..\Core\uCustomStringParamsCompiler.pas',
+  uLSNIStringParamsCompiler in '..\..\..\Core\uLSNIStringParamsCompiler.pas',
   uParamsReadWriteUtils in '..\..\..\Core\uParamsReadWriteUtils.pas';
 
 end.

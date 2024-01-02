@@ -84,10 +84,6 @@ type
 
   protected
 
-    { IParamsReader }
-    procedure RetrieveParams(_Value: TParams); virtual;
-    procedure RetrieveParser(_Value: TCustomParser);
-
     procedure BeforeReadParam(_Param: TParam); virtual;
     procedure AfterReadParam(_Param: TParam); virtual;
     procedure AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader); virtual;
@@ -98,6 +94,10 @@ type
     destructor Destroy; override;
 
     function Clone: TCustomReader; override;
+
+    { IParamsReader }
+    procedure RetrieveParams(_Value: TParams); virtual;
+    procedure RetrieveParser(_Value: TCustomParser);
 
   end;
 
@@ -302,16 +302,6 @@ begin
 
 end;
 
-procedure TParamsReader.RetrieveParams(_Value: TParams);
-begin
-  FParams := _Value;
-end;
-
-procedure TParamsReader.RetrieveParser(_Value: TCustomParser);
-begin
-  FParser := _Value;
-end;
-
 procedure TParamsReader.BeforeReadParam(_Param: TParam);
 begin
 end;
@@ -322,6 +312,16 @@ end;
 
 procedure TParamsReader.AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader);
 begin
+end;
+
+procedure TParamsReader.RetrieveParams(_Value: TParams);
+begin
+  FParams := _Value;
+end;
+
+procedure TParamsReader.RetrieveParser(_Value: TCustomParser);
+begin
+  FParser := _Value;
 end;
 
 end.

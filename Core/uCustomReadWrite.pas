@@ -85,19 +85,13 @@ type
 
   TCustomCompiler = class abstract (TIntfObject)
 
-  strict private
-
-    FWriter: TCustomWriter;
-
-  protected
-
-    property Writer: TCustomWriter read FWriter;
-
   public
 
-    constructor Create(_Writer: TCustomWriter); virtual;
+    constructor Create; virtual;
 
-    procedure RetrieveWriter(_Writer: TCustomWriter);
+    function Clone: TCustomCompiler; virtual;
+
+    procedure RetrieveWriter(_Writer: TCustomWriter); virtual; abstract;
     procedure Run; virtual; abstract;
 
   end;
@@ -152,15 +146,14 @@ end;
 
 { TCustomCompiler }
 
-constructor TCustomCompiler.Create(_Writer: TCustomWriter);
+constructor TCustomCompiler.Create;
 begin
   inherited Create;
-  FWriter := _Writer;
 end;
 
-procedure TCustomCompiler.RetrieveWriter(_Writer: TCustomWriter);
+function TCustomCompiler.Clone: TCustomCompiler;
 begin
-  FWriter := _Writer;
+  Result := TCustomCompilerClass(ClassType).Create;
 end;
 
 end.

@@ -172,9 +172,6 @@ type
 
   end;
 
-  TSaveToStringOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
-  TSaveToStringOptions = set of TSaveToStringOption;
-
   TParams = class
 
   strict private
@@ -284,7 +281,6 @@ type
 
     FPathSeparator: Char;
     FStrictDataTypes: Boolean;
-    FSaveToStringOptions: TSaveToStringOptions;
 
     FItems: TParamList;
     FListHolder: TParamsListHolder;
@@ -341,6 +337,7 @@ type
   protected
 
     function ParamClass: TParamClass; virtual;
+    { TODO 1 -oVasilyevSM -cuParams: Убрать }
     function FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String; virtual;
 
     property Nested: Boolean read FNested write FNested;
@@ -388,8 +385,7 @@ type
     procedure DeleteValue(const _Path: String);
     procedure Clear;
 
-    { TODO 5 -oVasilyevSM -cuParams: Похоже, тут не место этим методам. Параметры ничего не должны знать о считывателях.
-      Это задача внешней функции, лежащей в юните каждого считывателя. }
+    { TODO 1 -oVasilyevSM -cuParams: Убрать }
     function SaveToString: String;
 
     property DataType[const _Path: String]: TParamDataType read GetDataType;
@@ -411,8 +407,6 @@ type
     property PathSeparator: Char read FPathSeparator;
     property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cuParams: Сделать бы default, а то бесит это Items повсюду. }
     property Count: Integer read GetCount;
-    { TODO 1 -oVasilyevSM -cuParams: В рендерер. }
-    property SaveToStringOptions: TSaveToStringOptions read FSaveToStringOptions write FSaveToStringOptions;
     { StrictDataTypes: False - значение конвернтируется в имеющийся тип, True - значение записывается с новым типом. }
     property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes;
 
@@ -829,7 +823,6 @@ begin
         begin
 
           P := TParamsClass(_Host.ClassType).Create(_Host.PathSeparator);
-          P.SaveToStringOptions := _Host.SaveToStringOptions;
           SetAsParams(P);
           P.Assign(_Source.AsParams, _ForceAdding);
 
@@ -1723,7 +1716,6 @@ begin
 
         SetAsParams(TParams.Create(PathSeparator));
         Result := AsParams;
-        Result.SaveToStringOptions := SaveToStringOptions;
 
       end;
 
@@ -1974,47 +1966,8 @@ begin
 end;
 
 function TParams.FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
-const
-
-  SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
-  SC_VALUE_TYPED   = '%0:s: %1:s = %2:s%3:s';
-
-var
-  ParamFormat: String;
-  Splitter: String;
 begin
-
-  if _Param.DataType = dtParams then begin
-
-    if (soSingleString in SaveToStringOptions) or (_Param.AsParams.Count = 0) then
-
-      _Value := Format('(%s)', [_Value])
-
-    else begin
-
-      if Length(_Value) > 0 then _Value := _Value + CRLF;
-      _Value := Format('(%s%s)', [CRLF, ShiftText(_Value, 1)]);
-
-    end;
-
-  end;
-
-  if soTypesFree in SaveToStringOptions then ParamFormat := SC_VALUE_UNTYPED
-  else ParamFormat := SC_VALUE_TYPED;
-
-  if _Last then Splitter := ''
-  else if soSingleString in SaveToStringOptions then Splitter := ';'
-  else Splitter := CRLF;
-
-  Result := Format(ParamFormat, [
-
-      _Param.Name,
-      ParamDataTypeToStr(_Param.DataType),
-      _Value,
-      Splitter
-
-  ]);
-
+  Result := '';
 end;
 
 function TParams.Clone: TParams;
@@ -2279,7 +2232,6 @@ function TParams.SaveToString: String;
 
       if
 
-          (soForceQuoteStrings in SaveToStringOptions) or
           { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
           (Pos(CR,  Result) > 0) or
           (Pos(LF,  Result) > 0) or

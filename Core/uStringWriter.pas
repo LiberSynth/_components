@@ -1,4 +1,4 @@
-unit uParamsLSNIStringCompiler;
+unit uStringWriter;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -29,25 +29,55 @@ interface
 
 uses
   { LiberSynth }
-  uCustomParamsStringCompiler, uParams;
+  uCustomReadWrite;
 
 type
 
-  TLSNIStringCompiler = class(TCustomParamsStringCompiler)
+  IStringWriter = interface ['{285786DB-6F78-44A9-B779-358D063502BE}']
 
-  protected
+    procedure Write(const _Value: String);
+    function GetContent: String;
 
-    function FormatParam(_Param: TParam): String; override;
+    property Content: String read GetContent;
+
+  end;
+
+  TStringWriter = class abstract (TCustomWriter, IStringWriter)
+
+  strict private
+
+    FContent: String;
+
+    { IStringWriter }
+    procedure Write(const _Value: String);
+    function GetContent: String;
+
+  public
+
+    constructor Create; override;
+
+    property Content: String read FContent;
 
   end;
 
 implementation
 
-{ TLSNIStringCompiler }
+{ TStringWriter }
 
-function TLSNIStringCompiler.FormatParam(_Param: TParam): String;
+constructor TStringWriter.Create;
 begin
-  Result := _Param.Name;
+  inherited Create;
+end;
+
+procedure TStringWriter.Write(const _Value: String);
+begin
+  { TODO 5 -oVasilyevSM -cuCustomReadWrite: Можно ускорить, выделять память страницами, а в конце подрезать. }
+  FContent := FContent + _Value;
+end;
+
+function TStringWriter.GetContent: String;
+begin
+  Result := Content;
 end;
 
 end.

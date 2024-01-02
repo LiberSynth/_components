@@ -45,16 +45,16 @@ type
 
     FParams: TParams;
 
-    { ICustomParamsCompiler }
-    procedure RetrieveParams(_Value: TParams);
-
     property Params: TParams read FParams;
 
   protected
 
-    procedure CompileParam(_Param: TParam); virtual; abstract;
+    procedure CompileParam(_Param: TParam; _First, _Last: Boolean); virtual; abstract;
 
   public
+
+    { ICustomParamsCompiler }
+    procedure RetrieveParams(_Value: TParams);
 
     procedure Run; override;
 
@@ -71,10 +71,19 @@ end;
 
 procedure TCustomParamsCompiler.Run;
 var
-  Param: TParam;
+  i, Count: Integer;
+  First, Last: Boolean;
 begin
-  for Param in Params.Items do
-    CompileParam(Param);
+
+  Count := Params.Items.Count;
+  for i := 0 to Count - 1 do begin
+
+    First := i = 0;
+    Last  := i = Count - 1;
+    CompileParam(Params.Items[i], First, Last);
+
+  end;
+
 end;
 
 end.

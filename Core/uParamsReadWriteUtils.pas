@@ -29,62 +29,64 @@ interface
 
 uses
   { LiberSynth }
-  uParams, uCustomReadWrite, uCustomStringParser, uLSNIStringParser, uLSNIDCStringParser, uParamsReader;
+  uTypes, uParams, uCustomReadWrite, uCustomStringParser, uLSNIStringParser, uLSNIDCStringParser, uParamsReader,
+  uUserParamsReader, uStringWriter, uCustomParamsCompiler, uLSNIStringParamsCompiler;
 
-procedure LSNIStrToParams(const Source: String; Params: TParams; Located: Boolean = True; NativeException: Boolean = False);
-procedure LSNIDCStrToParams(const Source: String; Params: TParams; Located: Boolean = True; NativeException: Boolean = False);
+{ TODO 5 -oVasilyevSM -cuParamsReadWriteUtils: Можно сделать одну рабочую функцию. }
+procedure LSNIStrToParams(
+
+    const Source: String;
+    Params: TParams;
+    Located: Boolean = True;
+    NativeException: Boolean = False;
+    ProgressEvent: TProgressEvent = nil
+
+);
+procedure LSNIDCStrToParams(
+
+    const Source: String;
+    Params: TParams;
+    Located: Boolean = True;
+    NativeException: Boolean = False;
+    ProgressEvent: TProgressEvent = nil
+
+);
+function ParamsToLSNIStr(Params: TParams; Options: TSaveToStringOptions = []): String;
 
 implementation
 
-procedure LSNIStrToParams(const Source: String; Params: TParams; Located, NativeException: Boolean);
+procedure LSNIStrToParams(const Source: String; Params: TParams; Located, NativeException: Boolean; ProgressEvent: TProgressEvent);
 var
-  Reader: TCustomReader;
-  ParamsReader: IParamsReader;
-  Parser: TCustomParser;
-  CustomStringParser: ICustomStringParser;
+  Reader: TParamsReader;
+  Parser: TLSNIStringParser;
 begin
 
   Reader := TParamsReader.Create;
   try
 
-    if not Reader.GetInterface(IParamsReader, ParamsReader) then
-      raise EReadException.Create('Reader does not support IParamsReader interface.');
+    Reader.RetrieveParams(Params);
+
+    Parser := TLSNIStringParser.Create;
     try
 
-      ParamsReader.RetrieveParams(Params);
+      Parser.Located         := Located;
+      Parser.NativeException := NativeException;
+      Parser.ProgressEvent   := ProgressEvent;
+      Parser.SetSource(Source);
 
-      Parser := TLSNIStringParser.Create;
+      Reader.RetrieveParser(Parser);
+
+      Parser.RetrieveTargerInterface(Reader);
       try
 
-        if not Parser.GetInterface(ICustomStringParser, CustomStringParser) then
-          raise EReadException.Create('Parser does not support ICustomStringParser interface.');
-        try
-
-          CustomStringParser.Located := Located;
-          CustomStringParser.NativeException := NativeException;
-          CustomStringParser.SetSource(Source);
-
-          ParamsReader.RetrieveParser(Parser);
-
-          Parser.RetrieveTargerInterface(Reader);
-          try
-
-            Parser.Read;
-
-          finally
-            Parser.FreeTargerInterface;
-          end;
-
-        finally
-          CustomStringParser := nil;
-        end;
+        Parser.Read;
 
       finally
-        Parser.Free;
+        Parser.FreeTargerInterface;
       end;
 
     finally
-      ParamsReader := nil;
+      Parser.Free;
     end;
 
   finally
@@ -93,59 +95,71 @@ begin
 
 end;
 
-procedure LSNIDCStrToParams(const Source: String; Params: TParams; Located, NativeException: Boolean);
+procedure LSNIDCStrToParams(const Source: String; Params: TParams; Located, NativeException: Boolean; ProgressEvent: TProgressEvent);
 var
-  Parser: TCustomParser;
-  Reader: TCustomReader;
-  ParamsReader: IParamsReader;
-  CustomStringParser: ICustomStringParser;
+  Reader: TUserParamsReader;
+  Parser: TLSNIDCStringParser;
 begin
 
-  Reader := TParamsReader.Create;
+  Reader := TUserParamsReader.Create;
   try
 
-    if not Reader.GetInterface(IParamsReader, ParamsReader) then
-      raise EReadException.Create('Reader does not support IParamsReader interface.');
+    Reader.RetrieveParams(Params);
+
+    Parser := TLSNIDCStringParser.Create;
     try
 
-      ParamsReader.RetrieveParams(Params);
+      Parser.Located := Located;
+      Parser.NativeException := NativeException;
+      Parser.ProgressEvent   := ProgressEvent;
+      Parser.SetSource(Source);
 
-      Parser := TLSNIDCStringParser.Create;
+      Reader.RetrieveParser(Parser);
+
+      Parser.RetrieveTargerInterface(Reader);
       try
 
-        if not Parser.GetInterface(ICustomStringParser, CustomStringParser) then
-          raise EReadException.Create('Parser does not support ICustomStringParser interface.');
-        try
-
-          CustomStringParser.Located := Located;
-          CustomStringParser.NativeException := NativeException;
-          CustomStringParser.SetSource(Source);
-
-          ParamsReader.RetrieveParser(Parser);
-
-          Parser.RetrieveTargerInterface(Reader);
-          try
-
-            Parser.Read;
-
-          finally
-            Parser.FreeTargerInterface;
-          end;
-
-        finally
-          CustomStringParser := nil;
-        end;
+        Parser.Read;
 
       finally
-        Parser.Free;
+        Parser.FreeTargerInterface;
       end;
 
     finally
-      ParamsReader := nil;
+      Parser.Free;
     end;
 
   finally
     Reader.Free;
+  end;
+
+end;
+
+function ParamsToLSNIStr(Params: TParams; Options: TSaveToStringOptions): String;
+var
+  Writer: TStringWriter;
+  Compiler: TLSNIStringParamsCompiler;
+begin
+
+  Writer := TStringWriter.Create;
+  try
+
+    Compiler := TLSNIStringParamsCompiler.Create;
+    try
+
+      Compiler.Options := Options;
+      Compiler.RetrieveWriter(Writer);
+      Compiler.RetrieveParams(Params);
+      Compiler.Run;
+
+    finally
+      Compiler.Free;
+    end;
+
+    Result := Writer.Content;
+
+  finally
+    Writer.Free;
   end;
 
 end;

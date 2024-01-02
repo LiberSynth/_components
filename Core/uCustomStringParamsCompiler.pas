@@ -1,4 +1,4 @@
-unit uCustomStringWriter;
+unit uCustomStringParamsCompiler;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -29,55 +29,50 @@ interface
 
 uses
   { LiberSynth }
-  uCustomReadWrite;
+  uCustomParamsCompiler, uParams, uCustomReadWrite, uStringWriter;
 
 type
 
-  ICustomStringWriter = interface ['{285786DB-6F78-44A9-B779-358D063502BE}']
-
-    procedure Write(const _Value: String);
-    function GetContent: String;
-
-    property Content: String read GetContent;
-
-  end;
-
-  TCustomStringWriter = class abstract (TCustomWriter, ICustomStringWriter)
+  TCustomStringParamsCompiler = class(TCustomParamsCompiler)
 
   strict private
 
-    FContent: String;
+    FStringWriter: IStringWriter;
 
-    { ICustomStringWriter }
-    procedure Write(const _Value: String);
-    function GetContent: String;
+    property StringWriter: IStringWriter read FStringWriter write FStringWriter;
+
+  protected
+
+    procedure CompileParam(_Param: TParam; _First, _Last: Boolean); override;
+    function FormatParam(_Param: TParam; _First, _Last: Boolean): String; virtual; abstract;
 
   public
 
-    constructor Create; override;
+    destructor Destroy; override;
 
-    property Content: String read FContent;
+    procedure RetrieveWriter(_Writer: TCustomWriter); override;
 
   end;
 
 implementation
 
-{ TCustomStringWriter }
+{ TCustomParamsStringCompiler }
 
-constructor TCustomStringWriter.Create;
+destructor TCustomStringParamsCompiler.Destroy;
 begin
-  inherited Create;
+  FStringWriter := nil;
+  inherited Destroy;
 end;
 
-procedure TCustomStringWriter.Write(const _Value: String);
+procedure TCustomStringParamsCompiler.CompileParam(_Param: TParam; _First, _Last: Boolean);
 begin
-  { TODO 5 -oVasilyevSM -cuCustomReadWrite: Можно ускорить, выделять память страницами, а в конце подрезать. }
-  FContent := FContent + _Value;
+  StringWriter.Write(FormatParam(_Param, _First, _Last));
 end;
 
-function TCustomStringWriter.GetContent: String;
+procedure TCustomStringParamsCompiler.RetrieveWriter(_Writer: TCustomWriter);
 begin
-  Result := Content;
+  if not _Writer.GetInterface(IStringWriter, FStringWriter) then
+    raise EWriteException.Create('Writer does not support IStringWriter interface.');
 end;
 
 end.
