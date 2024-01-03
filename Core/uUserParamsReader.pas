@@ -40,7 +40,7 @@ type
   strict private
 
     FCurrentParam: TUserParam;
-    FCurrentComments: TUserParam.TCommentList;
+    FCurrentComments: TCommentList;
 
     { IUserParamsReader }
     procedure AddNameComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
@@ -51,7 +51,7 @@ type
     procedure ElementTerminated;
 
     property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
-    property CurrentComments: TUserParam.TCommentList read FCurrentComments;
+    property CurrentComments: TCommentList read FCurrentComments;
 
   protected
 
@@ -75,7 +75,7 @@ implementation
 constructor TUserParamsReader.Create;
 begin
   inherited Create;
-  FCurrentComments := TUserParam.TCommentList.Create;
+  FCurrentComments := TCommentList.Create;
 end;
 
 destructor TUserParamsReader.Destroy;
@@ -117,7 +117,7 @@ begin
   for i := 0 to CurrentComments.Count - 1 do
     with CurrentComments[i] do
       if Anchor = caBeforeName then
-        CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
+        CurrentComments[i] := TComment.Create(Text, Opening, Closing, caBeforeParam, Short);
 
 end;
 
@@ -130,7 +130,7 @@ begin
     комментарии в AfterParam последнего считанного параметра. }
   for i := 0 to CurrentComments.Count - 1 do
     with CurrentComments[i] do
-      CurrentComments[i] := TUserParam.TComment.Create(Text, Opening, Closing, caAfterParam, Short);
+      CurrentComments[i] := TComment.Create(Text, Opening, Closing, caAfterParam, Short);
 
   if Assigned(CurrentParam) then begin
 
@@ -173,8 +173,8 @@ end;
 
 procedure TUserParamsReader.AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader);
 var
-  Comment: TUserParam.TComment;
-  NestedComments: TUserParam.TCommentList;
+  Comment: TComment;
+  NestedComments: TCommentList;
 begin
 
   inherited AfterNestedReading(_Param, _NestedReader);

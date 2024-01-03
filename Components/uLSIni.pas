@@ -87,7 +87,7 @@ uses
   { LiberSynth }
   uComponentTypes, uTypes, uCore, uFileUtils, uParams, uUserParams, uCustomReadWrite, uCustomStringParser,
   uLSNIStringParser, uLSNIDCStringParser, uParamsReader, uUserParamsReader, uStringWriter, uCustomParamsCompiler,
-  uLSNIStringParamsCompiler;
+  uLSNIStringParamsCompiler, uLSNIDCStringParamsCompiler;
 
 type
 
@@ -104,6 +104,7 @@ type
   TCommentSupport = (csNone, csStockFormat, csOriginarFormat);
 
   TGetCustomSourceProc = procedure (var _Value) of object;
+  TSetCustomSourceProc = procedure (const _Value) of object;
 
   TLSIni = class(TComponent)
 
@@ -120,6 +121,7 @@ type
     FPathSeparator: Char;
     FStrictDataTypes: Boolean;
     FGetCustomSource: TGetCustomSourceProc;
+    FSetCustomSource: TSetCustomSourceProc;
     FProgress: TProgressEvent;
 
     FParams: TParams;
@@ -133,6 +135,7 @@ type
     function SourceFile: String;
     function GetSourceString: String;
     function DoGetCustomSourceString: String;
+    procedure DoSetCustomSourceString(const _Value);
 
     procedure SetCommentSupport(const _Value: TCommentSupport);
     procedure SetSourceType(const _Value: TSourceType);
@@ -156,6 +159,7 @@ type
     procedure Load;
     procedure Save;
 
+    { TODO 3 -oVasilyevSM -cuLSIni: Скорее всего убрать в прайват. }
     property Params: TParams read FParams write FParams;
 
   published
@@ -171,6 +175,8 @@ type
     property PathSeparator: Char read FPathSeparator write FPathSeparator default '.';
     property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes default False;
     property GetCustomSource: TGetCustomSourceProc read FGetCustomSource write FGetCustomSource default nil;
+    { TODO 1 -oVasilyevSM -cuLSIni: Название события! }
+    property SetCustomSource: TSetCustomSourceProc read FSetCustomSource write FSetCustomSource default nil;
     property Progress: TProgressEvent read FProgress write FProgress default nil;
 
   end;
@@ -272,11 +278,11 @@ const
 
   Map: array [TStoreMethod, TCommentSupport] of TCustomCompilerClass = (
 
-                       { csNone                    csStockFormat        csOriginarFormat }
-      { smLSNIString } (TLSNIStringParamsCompiler, TCustomCompiler,     TCustomCompiler  ),
-      { smClassicIni } (TCustomCompiler,           TCustomCompiler,     TCustomCompiler  ),
-      { smBLOB       } (TCustomCompiler,           nil,                 nil              ),
-      { smCustom     } (TCustomCompiler,           nil,                 nil              )
+                       { csNone                    csStockFormat                csOriginarFormat }
+      { smLSNIString } (TLSNIStringParamsCompiler, TLSNIDCStringParamsCompiler, TCustomCompiler  ),
+      { smClassicIni } (TCustomCompiler,           TCustomCompiler,             TCustomCompiler  ),
+      { smBLOB       } (TCustomCompiler,           nil,                         nil              ),
+      { smCustom     } (TCustomCompiler,           nil,                         nil              )
 
   );
 
@@ -297,20 +303,20 @@ const
   Map: array [TSourceType, TStoreMethod, TCommentSupport] of TCustomWriterClass = (
 
                                              { csNone           csStockFormat    csOriginarFormat }
-      { stFile                smLSNIString } ((TStringWriter,   TCustomWriter,   TCustomWriter    ),
-      { stFile                smClassicIni }  (TCustomWriter,   TCustomWriter,   TCustomWriter    ),
+      { stFile                smLSNIString } ((TStringWriter,   TStringWriter,   TStringWriter    ),
+      { stFile                smClassicIni }  (TStringWriter,   TStringWriter,   TStringWriter    ),
       { stFile                smBLOB       }  (TCustomWriter,   nil,             nil              ),
       { stFile                smCustom     }  (TCustomWriter,   nil,             nil              )),
       { stRegistryStructured  smLSNIString } ((TCustomWriter,   nil,             nil              ),
       { stRegistryStructured  smClassicIni }  (TCustomWriter,   nil,             nil              ),
       { stRegistryStructured  smBLOB       }  (TCustomWriter,   nil,             nil              ),
       { stRegistryStructured  smCustom     }  (TCustomWriter,   nil,             nil              )),
-      { stRegistrySingleParam smLSNIString } ((TCustomWriter,   TCustomWriter,   TCustomWriter    ),
-      { stRegistrySingleParam smClassicIni }  (TCustomWriter,   TCustomWriter,   TCustomWriter    ),
+      { stRegistrySingleParam smLSNIString } ((TStringWriter,   TStringWriter,   TStringWriter    ),
+      { stRegistrySingleParam smClassicIni }  (TStringWriter,   TStringWriter,   TStringWriter    ),
       { stRegistrySingleParam smBLOB       }  (TCustomWriter,   nil,             nil              ),
       { stRegistrySingleParam smCustom     }  (TCustomWriter,   nil,             nil              )),
-      { stCustom              smLSNIString } ((TCustomWriter,   TCustomWriter,   TCustomWriter    ),
-      { stCustom              smClassicIni }  (TCustomWriter,   TCustomWriter,   TCustomWriter    ),
+      { stCustom              smLSNIString } ((TStringWriter,   TStringWriter,   TStringWriter    ),
+      { stCustom              smClassicIni }  (TStringWriter,   TStringWriter,   TStringWriter    ),
       { stCustom              smBLOB       }  (TCustomWriter,   nil,             nil              ),
       { stCustom              smCustom     }  (TCustomWriter,   nil,             nil              ))
 
@@ -357,6 +363,12 @@ function TLSIni.DoGetCustomSourceString: String;
 begin
   if Assigned(FGetCustomSource) then
     FGetCustomSource(Result);
+end;
+
+procedure TLSIni.DoSetCustomSourceString(const _Value);
+begin
+  if Assigned(FSetCustomSource) then
+    FSetCustomSource(_Value);
 end;
 
 procedure TLSIni.SetCommentSupport(const _Value: TCommentSupport);
@@ -462,10 +474,8 @@ end;
 procedure TLSIni.SaveContent(_Writer: TCustomWriter);
 var
   StringWriter: IStringWriter;
+  Content: String;
 begin
-
-  if not _Writer.GetInterface(IStringWriter, StringWriter) then
-    raise EWriteException.Create('Writer does not support IStringWriter interface.');
 
 {
                                           Loading specifier Saving Specifier
@@ -482,14 +492,23 @@ begin
 
   if SourceType = stFile then begin
 
-    CheckDirExisting(ExtractFileDir(SourceFile));
-    StrToFile(StringWriter.Content, SourceFile);
+    if _Writer.GetInterface(IStringWriter, StringWriter) then begin
+
+      CheckDirExisting(ExtractFileDir(SourceFile));
+      StrToFile(StringWriter.Content, SourceFile);
+
+    end else raise EUncompletedMethod.Create; { if _Writer.GetInterface(IBLOBWriter, BLOBWriter) then }
+
+  end else if SourceType = stCustom then begin
+
+    if _Writer.GetInterface(IStringWriter, StringWriter) then begin
+
+      Content := StringWriter.Content;
+      DoSetCustomSourceString(Content);
+
+    end else raise EUncompletedMethod.Create; { if _Writer.GetInterface(IBLOBWriter, BLOBWriter) then }
 
   end else raise EUncompletedMethod.Create;
-
-//  if SourceType = stCustom then begin
-//    event
-//  end;
 
 end;
 

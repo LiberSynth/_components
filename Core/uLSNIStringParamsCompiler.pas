@@ -25,6 +25,8 @@ unit uLSNIStringParamsCompiler;
 (*                                                                                         *)
 (*******************************************************************************************)
 
+{ TODO 1 -oVasilyevSM -cuLSNIStringParamsCompiler: Уборка }
+
 interface
 
 uses
@@ -43,17 +45,28 @@ type
   strict private
 
     FOptions: TSaveToStringOptions;
+    FNested: Boolean;
+    FParamFormat: String;
+    FParamSplitter: String;
 
-    function FormatStringValue(const _Value: String): String;
-    function CompileNestedParams(_NestedParams: TParams): String;
+    function FormatParamsValue(const _Value: String): String;
 
   protected
 
+    procedure Prepare; virtual;
     function FormatParam(_Param: TParam; _First, _Last: Boolean): String; override;
+    function FormatStringValue(const _Value: String): String;
+    function CompileNestedParams(_NestedParams: TParams): String;
+
+    property Nested: Boolean read FNested write FNested;
+    property ParamFormat: String read FParamFormat write FParamFormat;
+    property ParamSplitter: String read FParamSplitter write FParamSplitter;
 
   public
 
     function Clone: TCustomCompiler; override;
+
+    procedure Run; override;
 
     property Options: TSaveToStringOptions read FOptions write FOptions;
 
@@ -85,10 +98,27 @@ begin
 
 end;
 
+function TLSNIStringParamsCompiler.FormatParamsValue(const _Value: String): String;
+begin
+
+  Result := _Value;
+  if not (soSingleString in Options) then begin
+
+    if (Length(_Value) > 0) then
+      Result := Result + CRLF;
+
+    Result := CRLF + ShiftText(Result, 1);
+
+  end;
+
+  Result := Format('(%s)', [Result]);
+
+end;
+
 function TLSNIStringParamsCompiler.CompileNestedParams(_NestedParams: TParams): String;
 var
   Writer: TStringWriter;
-  Compiler: TCustomCompiler;
+  Compiler: TLSNIStringParamsCompiler;
   CustomParamsCompiler: ICustomParamsCompiler;
   StringWriter: IStringWriter;
 begin
@@ -96,9 +126,10 @@ begin
   Writer := TStringWriter.Create;
   try
 
-    Compiler := Clone;
+    Compiler := Clone as TLSNIStringParamsCompiler;
     try
 
+      Compiler.Nested := True;
       Compiler.RetrieveWriter(Writer);
 
       if not Compiler.GetInterface(ICustomParamsCompiler, CustomParamsCompiler) then
@@ -132,53 +163,42 @@ begin
 
 end;
 
-function TLSNIStringParamsCompiler.FormatParam(_Param: TParam; _First, _Last: Boolean): String;
+procedure TLSNIStringParamsCompiler.Prepare;
 const
 
   SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
   SC_VALUE_TYPED   = '%0:s: %1:s = %2:s%3:s';
 
-var
-  ParamFormat: String;
-  Splitter: String;
-  Value: String;
 begin
-
-  if _Param.DataType = dtParams then begin
-
-    Value := CompileNestedParams(_Param.AsParams);
-
-    if (soSingleString in Options) or (_Param.AsParams.Count = 0) then
-
-      Value := Format('(%s)', [Value])
-
-    else begin
-
-      if Length(Value) > 0 then Value := Value + CRLF;
-      Value := Format('(%s%s)', [CRLF, ShiftText(Value, 1)]);
-
-    end;
-
-  end else if _Param.DataType in [dtAnsiString, dtString] then
-
-    Value := FormatStringValue(_Param.AsString)
-
-  else Value := _Param.AsString;
 
   if soTypesFree in Options then ParamFormat := SC_VALUE_UNTYPED
   else ParamFormat := SC_VALUE_TYPED;
+  if soSingleString in Options then ParamSplitter := '; '
+  else ParamSplitter := CRLF;
 
-  if _Last then Splitter := ''
-  { TODO 1 -oVasilyevSM -cuLSNIStringParamsCompiler: Ошибка: в однострочном режиме не хватает ' ' после ;. }
-  else if soSingleString in Options then Splitter := ';'
-  else Splitter := CRLF;
+end;
+
+function TLSNIStringParamsCompiler.FormatParam(_Param: TParam; _First, _Last: Boolean): String;
+begin
+
+  if _Last then ParamSplitter := '';
+
+  case _Param.DataType of
+
+    dtAnsiString: Result := FormatStringValue(_Param.AsString);
+    dtString:     Result := FormatStringValue(_Param.AsString);
+    dtParams:     Result := FormatParamsValue(CompileNestedParams(_Param.AsParams));
+
+  else
+    Result := _Param.AsString;
+  end;
 
   Result := Format(ParamFormat, [
 
       _Param.Name,
       ParamDataTypeToStr(_Param.DataType),
-      Value,
-      Splitter
+      Result,
+      ParamSplitter
 
   ]);
 
@@ -188,6 +208,12 @@ function TLSNIStringParamsCompiler.Clone: TCustomCompiler;
 begin
   Result := inherited Clone;
   TLSNIStringParamsCompiler(Result).Options := Options;
+end;
+
+procedure TLSNIStringParamsCompiler.Run;
+begin
+  Prepare;
+  inherited Run;
 end;
 
 end.

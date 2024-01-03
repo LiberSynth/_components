@@ -48,6 +48,7 @@ contains
   uCustomParamsCompiler in '..\..\..\Core\uCustomParamsCompiler.pas',
   uCustomStringParamsCompiler in '..\..\..\Core\uCustomStringParamsCompiler.pas',
   uLSNIStringParamsCompiler in '..\..\..\Core\uLSNIStringParamsCompiler.pas',
+  uLSNIDCStringParamsCompiler in '..\..\..\Core\uLSNIDCStringParamsCompiler.pas',
   uParamsReadWriteUtils in '..\..\..\Core\uParamsReadWriteUtils.pas';
 
 end.

@@ -407,7 +407,8 @@ type
     property PathSeparator: Char read FPathSeparator;
     property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cuParams: Сделать бы default, а то бесит это Items повсюду. }
     property Count: Integer read GetCount;
-    { StrictDataTypes: False - значение конвернтируется в имеющийся тип, True - значение записывается с новым типом. }
+    { StrictDataTypes: False - значение конвернтируется хэлпером в имеющийся тип, True - значение записывается с новым
+      типом. }
     property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes;
 
   end;

@@ -249,7 +249,7 @@ begin
   NestedParser := Parser.Clone;
   try
 
-    NestedReader := TParamsReader(Clone);
+    NestedReader := Clone as TParamsReader;
     try
 
       NestedReader.Params := Params.Clone;
