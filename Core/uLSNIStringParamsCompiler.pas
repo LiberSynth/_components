@@ -35,17 +35,30 @@ uses
 
 type
 
-  TSaveToStringOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
-  TSaveToStringOptions = set of TSaveToStringOption;
+  TLSNISaveOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
+  TLSNISaveOptions = set of TLSNISaveOption;
 
-  TLSNIStringParamsCompiler = class(TCustomStringParamsCompiler)
+  ILSNIStringParamsCompiler = interface ['{C30F5C20-3F3B-4B17-9EA8-644415751CE9}']
+
+    function GetOptions: TLSNISaveOptions;
+    procedure SetOptions(_Value: TLSNISaveOptions);
+
+    property Options: TLSNISaveOptions read GetOptions write SetOptions;
+
+  end;
+
+  TLSNIStringParamsCompiler = class(TCustomStringParamsCompiler, ILSNIStringParamsCompiler)
 
   strict private
 
-    FOptions: TSaveToStringOptions;
+    FOptions: TLSNISaveOptions;
     FNested: Boolean;
     FParamFormat: String;
     FParamSplitter: String;
+
+    { ILSNIStringParamsCompiler }
+    function GetOptions: TLSNISaveOptions;
+    procedure SetOptions(_Value: TLSNISaveOptions);
 
     function FormatParamsValue(const _Value: String): String;
 
@@ -65,13 +78,23 @@ type
     function Clone: TCustomCompiler; override;
     procedure Run; override;
 
-    property Options: TSaveToStringOptions read FOptions write FOptions;
+    property Options: TLSNISaveOptions read GetOptions write SetOptions;
 
   end;
 
 implementation
 
 { TLSNIStringParamsCompiler }
+
+function TLSNIStringParamsCompiler.GetOptions: TLSNISaveOptions;
+begin
+  Result := FOptions;
+end;
+
+procedure TLSNIStringParamsCompiler.SetOptions(_Value: TLSNISaveOptions);
+begin
+  FOptions := _Value;
+end;
 
 function TLSNIStringParamsCompiler.FormatParamsValue(const _Value: String): String;
 begin
@@ -175,11 +198,12 @@ begin
       try
 
         CustomParamsCompiler.RetrieveParams(_NestedParams);
-        Compiler.Run;
 
       finally
         CustomParamsCompiler := nil;
       end;
+
+      Compiler.Run;
 
     finally
       Compiler.Free;

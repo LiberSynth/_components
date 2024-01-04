@@ -51,8 +51,8 @@ procedure LSNIDCStrToParams(
     ProgressEvent: TProgressEvent = nil
 
 );
-function ParamsToLSNIStr(Params: TParams; Options: TSaveToStringOptions = []): String;
-function ParamsToLSNIDCStr(Params: TParams; Options: TSaveToStringOptions = []): String;
+function ParamsToLSNIStr(Params: TParams; Options: TLSNISaveOptions = []): String;
+function ParamsToLSNIDCStr(Params: TParams; Options: TLSNISaveOptions = []): String;
 
 implementation
 
@@ -136,7 +136,7 @@ begin
 
 end;
 
-function ParamsToLSNIStr(Params: TParams; Options: TSaveToStringOptions): String;
+function ParamsToLSNIStr(Params: TParams; Options: TLSNISaveOptions): String;
 var
   Writer: TStringWriter;
   Compiler: TLSNIStringParamsCompiler;
@@ -165,7 +165,7 @@ begin
 
 end;
 
-function ParamsToLSNIDCStr(Params: TParams; Options: TSaveToStringOptions): String;
+function ParamsToLSNIDCStr(Params: TParams; Options: TLSNISaveOptions): String;
 var
   Writer: TStringWriter;
   Compiler: TLSNIDCStringParamsCompiler;

@@ -95,6 +95,8 @@ end;
 procedure SaveParams;
 begin
 
+  { TODO 5 -oVasilyevSM -cLSDebug: Поправить }
+
 //  try
 //
 //    LSIni.Save;

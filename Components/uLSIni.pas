@@ -123,6 +123,7 @@ type
     FGetCustomContext: TGetCustomContextProc;
     FSetCustomContext: TSetCustomContextProc;
     FProgress: TProgressEvent;
+    FLSNISaveOptions: TLSNISaveOptions;
 
     FParams: TParams;
 
@@ -144,7 +145,7 @@ type
     procedure SetStrictDataTypes(const _Value: Boolean);
 
     procedure SetParserContext(_Parser: TCustomParser);
-
+    procedure SetCompilerFeatures(_Compiler: TCustomCompiler);
     procedure SaveContent(_Writer: TCustomWriter);
 
   protected
@@ -177,6 +178,7 @@ type
     property GetCustomContext: TGetCustomContextProc read FGetCustomContext write FGetCustomContext default nil;
     property SetCustomContext: TSetCustomContextProc read FSetCustomContext write FSetCustomContext default nil;
     property Progress: TProgressEvent read FProgress write FProgress default nil;
+    property LSNISaveOptions: TLSNISaveOptions read FLSNISaveOptions write FLSNISaveOptions;
 
   end;
 
@@ -395,6 +397,14 @@ begin
 
 end;
 
+procedure TLSIni.SetCompilerFeatures(_Compiler: TCustomCompiler);
+var
+  LSNIStringParamsCompiler: ILSNIStringParamsCompiler;
+begin
+  if _Compiler.GetInterface(ILSNIStringParamsCompiler, LSNIStringParamsCompiler) then
+    LSNIStringParamsCompiler.Options := LSNISaveOptions;
+end;
+
 procedure TLSIni.SetSourceType(const _Value: TSourceType);
 begin
 
@@ -460,19 +470,15 @@ begin
   _Parser.SetSource(Context);
   _Parser.FreeContext(Context);
 
-  if _Parser.GetInterface(ICustomStringParser, CustomStringParser) then
+  if _Parser.GetInterface(ICustomStringParser, CustomStringParser) then begin
 
-    try
+    CustomStringParser.Located         := ErrorsLocating;
+    CustomStringParser.NativeException := NativeException;
+    CustomStringParser.ProgressEvent   := Progress;
 
-      CustomStringParser.Located         := ErrorsLocating;
-      CustomStringParser.NativeException := NativeException;
-      CustomStringParser.ProgressEvent   := Progress;
+    Exit;
 
-      Exit;
-
-    finally
-      CustomStringParser := nil;
-    end;
+  end;
 
 //    if Parser.GetInterface(ICustomBLOBParser, CustomBLOBParser) then
 //      _SetBLOBSource(CustomStringParser)
@@ -606,11 +612,13 @@ begin
       try
 
         CustomParamsCompiler.RetrieveParams(Params);
-        Compiler.Run;
 
       finally
         CustomParamsCompiler := nil;
       end;
+
+      SetCompilerFeatures(Compiler);
+      Compiler.Run;
 
     finally
       Compiler.Free;
