@@ -37,8 +37,7 @@ procedure LSNIStrToParams(
 
     const Source: String;
     Params: TParams;
-    Located: Boolean = True;
-    NativeException: Boolean = False;
+    ErrorsAssists: TErrorsAssists = [eaLocating];
     ProgressEvent: TProgressEvent = nil
 
 );
@@ -46,8 +45,7 @@ procedure LSNIDCStrToParams(
 
     const Source: String;
     Params: TParams;
-    Located: Boolean = True;
-    NativeException: Boolean = False;
+    ErrorsAssists: TErrorsAssists = [eaLocating];
     ProgressEvent: TProgressEvent = nil
 
 );
@@ -56,7 +54,7 @@ function ParamsToLSNIDCStr(Params: TParams; Options: TLSNISaveOptions = []): Str
 
 implementation
 
-procedure LSNIStrToParams(const Source: String; Params: TParams; Located, NativeException: Boolean; ProgressEvent: TProgressEvent);
+procedure LSNIStrToParams(const Source: String; Params: TParams; ErrorsAssists: TErrorsAssists; ProgressEvent: TProgressEvent);
 var
   Reader: TParamsReader;
   Parser: TLSNIStringParser;
@@ -70,9 +68,8 @@ begin
     Parser := TLSNIStringParser.Create;
     try
 
-      Parser.Located         := Located;
-      Parser.NativeException := NativeException;
-      Parser.ProgressEvent   := ProgressEvent;
+      Parser.ErrorsAssists := ErrorsAssists;
+      Parser.ProgressEvent := ProgressEvent;
       Parser.SetSource(Source);
 
       Reader.RetrieveParser(Parser);
@@ -96,7 +93,7 @@ begin
 
 end;
 
-procedure LSNIDCStrToParams(const Source: String; Params: TParams; Located, NativeException: Boolean; ProgressEvent: TProgressEvent);
+procedure LSNIDCStrToParams(const Source: String; Params: TParams; ErrorsAssists: TErrorsAssists; ProgressEvent: TProgressEvent);
 var
   Reader: TUserParamsReader;
   Parser: TLSNIDCStringParser;
@@ -110,9 +107,8 @@ begin
     Parser := TLSNIDCStringParser.Create;
     try
 
-      Parser.Located := Located;
-      Parser.NativeException := NativeException;
-      Parser.ProgressEvent   := ProgressEvent;
+      Parser.ErrorsAssists := ErrorsAssists;
+      Parser.ProgressEvent := ProgressEvent;
       Parser.SetSource(Source);
 
       Reader.RetrieveParser(Parser);

@@ -25,13 +25,12 @@ unit uLSIni;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 3 -oVasilyevSM: В Save нужен еще один режим, явное указание типа параметра в ини-файле или без него. И тогда при
-  считывании тип должен предварительно определяться в приложении примерно через вызов функций RegisterParam. Таким
-  образом, имеем два формата ини-файла, полный и краткий. В Load также можно вызывать из пустого контейнера с готовой
-  структурой. Тогда она просто заполняется данными, типы известны и не требуют хранения в строке. }
-{ TODO 3 -oVasilyevSM: Режим "сохранять строки всегда в кавычках" }
-{ TODO 3 -oVasilyevSM: Режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда - зависит от типа оъекта,
-  ToFile, ToStream, ToString, To Registry. Файл держать открытым, чтобы не перезаписывать целиком каждый раз. Итд. }
+{ TODO 3 -oVasilyevSM: Нужен формализованный способ выполнять преднастройку для нетипизованных параметров.Примерно через
+  вызов функций RegisterParam или просто присвоением. Считывание уже поддерживает такой режим, ему просто нужны все
+  параметры, назначенные перед загрузкой. Вот это назначение и надо сделать удобным. }
+{ TODO 3 -oVasilyevSM: Режим AutoSave. В каждом SetAs вызывать в нем SaveTo... Куда - зависит от типа выходного
+  контекста, ToFile, ToStream, ToString, To Registry. Файл держать открытым, чтобы не перезаписывать целиком каждый раз.
+  Итд. }
 { TODO 4 -oVasilyevSM -cuLSIni: Иконка }
 
 {
@@ -115,8 +114,7 @@ type
     FAutoSave: Boolean;
     FAutoLoad: Boolean;
     FSourcePath: String;
-    FErrorsLocating: Boolean;
-    FNativeException: Boolean;
+    FErrorsAssists: TErrorsAssists;
     FCommentSupport: TCommentSupport;
     FPathSeparator: Char;
     FStrictDataTypes: Boolean;
@@ -141,7 +139,7 @@ type
     procedure SetCommentSupport(const _Value: TCommentSupport);
     procedure SetSourceType(const _Value: TSourceType);
     procedure SetStoreMethod(const _Value: TStoreMethod);
-    procedure SetErrorsLocating(const _Value: Boolean);
+    procedure SetErrorsAssists(const _Value: TErrorsAssists);
     procedure SetStrictDataTypes(const _Value: Boolean);
 
     procedure SetParserContext(_Parser: TCustomParser);
@@ -169,8 +167,7 @@ type
     property SourceType: TSourceType read FSourceType write SetSourceType default stFile;
     property AutoSave: Boolean read FAutoSave write FAutoSave default False;
     property AutoLoad: Boolean read FAutoLoad write FAutoLoad default False;
-    property ErrorsLocating: Boolean read FErrorsLocating write SetErrorsLocating default True;
-    property NativeException: Boolean read FNativeException write FNativeException default False;
+    property ErrorsAssists: TErrorsAssists read FErrorsAssists write SetErrorsAssists default [eaLocating];
     property CommentSupport: TCommentSupport read FCommentSupport write SetCommentSupport default csNone;
     property SourcePath: String read FSourcePath write FSourcePath;
     property PathSeparator: Char read FPathSeparator write FPathSeparator default '.';
@@ -208,10 +205,10 @@ end;
 procedure TLSIni.InitDefaultProperties;
 begin
 
-  FStoreMethod    := smLSNIString;
-  FSourceType     := stFile;
-  FErrorsLocating := True;
-  FPathSeparator  := '.';
+  FStoreMethod   := smLSNIString;
+  FSourceType    := stFile;
+  FErrorsAssists := [eaLocating];
+  FPathSeparator := '.';
 
 end;
 
@@ -433,6 +430,20 @@ begin
 
 end;
 
+procedure TLSIni.SetErrorsAssists(const _Value: TErrorsAssists);
+begin
+
+  if _Value <> FErrorsAssists then begin
+
+    if (eaLocating in _Value) and (SourceType = stRegistryStructured) then
+      raise EComponentException.Create('Invalid combination of properties. Error locating are not supported for the registry structured source.');
+
+    FErrorsAssists := _Value;
+
+  end;
+
+end;
+
 procedure TLSIni.SetStrictDataTypes(const _Value: Boolean);
 begin
 
@@ -441,20 +452,6 @@ begin
     FStrictDataTypes := _Value;
     if Assigned(Params) then
       Params.StrictDataTypes := _Value;
-
-  end;
-
-end;
-
-procedure TLSIni.SetErrorsLocating(const _Value: Boolean);
-begin
-
-  if _Value <> FErrorsLocating then begin
-
-    if _Value and (SourceType = stRegistryStructured) then
-      raise EComponentException.Create('Invalid combination of properties. Error locating are not supported for the registry structured source.');
-
-    FErrorsLocating := _Value;
 
   end;
 
@@ -472,9 +469,8 @@ begin
 
   if _Parser.GetInterface(ICustomStringParser, CustomStringParser) then begin
 
-    CustomStringParser.Located         := ErrorsLocating;
-    CustomStringParser.NativeException := NativeException;
-    CustomStringParser.ProgressEvent   := Progress;
+    CustomStringParser.ErrorsAssists := ErrorsAssists;
+    CustomStringParser.ProgressEvent := Progress;
 
     Exit;
 

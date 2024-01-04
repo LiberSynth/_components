@@ -304,9 +304,10 @@ procedure TCommentListHelper.ProcessOffsets;
 
     Result :=
 
-        Integer(_Anchor) shl 3 or
+        Integer(_Anchor)            shl 4 or
+        BooleanToInt(_Nested)       shl 3 or
         BooleanToInt(_SingleString) shl 2 or
-        BooleanToInt(_FirstParam) shl 1 or
+        BooleanToInt(_FirstParam)   shl 1 or
         BooleanToInt(_LastParam);
 
   end;
@@ -315,90 +316,162 @@ const
 
   {$IFDEF FORMATCOMMENTDEBUG}Offset = '_'{$ELSE}Offset = ' '{$ENDIF};
 
-  RA_OffsetSetting: array [0..71] of TOffsetInfoReply = (
+  RA_OffsetSetting: array [0..143] of TOffsetInfoReply = (
 
-    { Anchor              SingleString FirstParam  LastParam }
-    { caBeforeParam       False        False       False } (LeftOffset: '';     RightOffset: CRLF  ),
-    { caBeforeParam       False        False       True  } (LeftOffset: '';     RightOffset: CRLF  ),
-    { caBeforeParam       False        True        False } (LeftOffset: '';     RightOffset: CRLF  ),
-    { caBeforeParam       False        True        True  } (LeftOffset: '';     RightOffset: CRLF  ),
-    { caBeforeParam       True         False       False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeParam       True         False       True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeParam       True         True        False } (LeftOffset: Offset; RightOffset: Offset),
-    { caBeforeParam       True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
-
-    { caBeforeName        False        False       False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        False        False       True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        False        True        False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        False        True        True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        True         False       False } (LeftOffset: Offset; RightOffset: Offset),
-    { caBeforeName        True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
-    { caBeforeName        True         True        False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeName        True         True        True  } (LeftOffset: Offset; RightOffset: Offset),
-
-    { caAfterName         False        False       False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         False        False       True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         False        True        False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         False        True        True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         True         False       False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         True         False       True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         True         True        False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterName         True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
-
-    { caBeforeType        False        False       False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        False        False       True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        False        True        False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        False        True        True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        True         False       False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        True         False       True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        True         True        False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeType        True         True        True  } (LeftOffset: '';     RightOffset: Offset),
-
-    { caAfterType         False        False       False } (LeftOffset: Offset; RightOffset: Offset),
-    { caAfterType         False        False       True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         False        True        False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         False        True        True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         True         False       False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         True         False       True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         True         True        False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterType         True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
-
-    { caBeforeValue       False        False       False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       False        False       True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       False        True        False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       False        True        True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       True         False       False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       True         False       True  } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       True         True        False } (LeftOffset: '';     RightOffset: Offset),
-    { caBeforeValue       True         True        True  } (LeftOffset: '';     RightOffset: Offset),
-
-    { caAfterValue        False        False       False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        False        False       True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        False        True        False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        False        True        True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        True         False       False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        True         False       True  } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        True         True        False } (LeftOffset: Offset; RightOffset: ''    ),
-    { caAfterValue        True         True        True  } (LeftOffset: Offset; RightOffset: ''    ),
-
-    { caAfterParam        False        False       False } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False        False       True  } (LeftOffset: '';     RightOffset: ''    ),
-    { caAfterParam        False        True        False } (LeftOffset: CRLF;   RightOffset: ''    ),
-    { caAfterParam        False        True        True  } (LeftOffset: '';     RightOffset: ''    ),
-    { caAfterParam        True         False       False } (LeftOffset: Offset; RightOffset: Offset),
-    { caAfterParam        True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
-    { caAfterParam        True         True        False } (LeftOffset: Offset; RightOffset: Offset),
-    { caAfterParam        True         True        True  } (LeftOffset: Offset; RightOffset: Offset),
-
-    { caInsideEmptyParams False        False       False } (LeftOffset: CRLF;   RightOffset: CRLF  ),
-    { caInsideEmptyParams False        False       True  } (LeftOffset: CRLF;   RightOffset: CRLF  ),
-    { caInsideEmptyParams False        True        False } (LeftOffset: CRLF;   RightOffset: CRLF  ),
-    { caInsideEmptyParams False        True        True  } (LeftOffset: CRLF;   RightOffset: CRLF  ),
-    { caInsideEmptyParams True         False       False } (LeftOffset: Offset; RightOffset: Offset),
-    { caInsideEmptyParams True         False       True  } (LeftOffset: Offset; RightOffset: Offset),
-    { caInsideEmptyParams True         True        False } (LeftOffset: Offset; RightOffset: Offset),
-    { caInsideEmptyParams True         True        True  } (LeftOffset: Offset; RightOffset: Offset)
-    { Anchor              SingleString FirstParam  LastParam }
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caBeforeParam       False          False          False          False          } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False          False          False          True           } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False          False          True           False          } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False          False          True           True           } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       False          True           False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       False          True           False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       False          True           True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       False          True           True           True           } (LeftOffset: '';     RightOffset: ''    ),
+    { caBeforeParam       True           False          False          False          } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       True           False          False          True           } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       True           False          True           False          } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       True           False          True           True           } (LeftOffset: '';     RightOffset: CRLF  ),
+    { caBeforeParam       True           True           False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       True           True           False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeParam       True           True           True           False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeParam       True           True           True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caBeforeName        False          False          False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False          False          False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False          False          True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False          False          True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False          True           False          False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeName        False          True           False          True           } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeName        False          True           True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        False          True           True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True           False          False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True           False          False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True           False          True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True           False          True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True           True           False          False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeName        True           True           False          True           } (LeftOffset: Offset; RightOffset: Offset),
+    { caBeforeName        True           True           True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeName        True           True           True           True           } (LeftOffset: Offset; RightOffset: Offset),
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caAfterName         False          False          False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False          False          False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False          False          True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False          False          True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False          True           False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False          True           False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False          True           True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         False          True           True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True           False          False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True           False          False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True           False          True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True           False          True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True           True           False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True           True           False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True           True           True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterName         True           True           True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caBeforeType        False          False          False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False          False          False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False          False          True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False          False          True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False          True           False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False          True           False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False          True           True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        False          True           True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True           False          False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True           False          False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True           False          True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True           False          True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True           True           False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True           True           False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True           True           True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeType        True           True           True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caAfterType         False          False          False          False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterType         False          False          False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False          False          True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False          False          True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False          True           False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False          True           False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False          True           True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         False          True           True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True           False          False          False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterType         True           False          False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True           False          True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True           False          True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True           True           False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True           True           False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True           True           True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterType         True           True           True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caBeforeValue       False          False          False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False          False          False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False          False          True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False          False          True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False          True           False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False          True           False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False          True           True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       False          True           True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True           False          False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True           False          False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True           False          True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True           False          True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True           True           False          False          } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True           True           False          True           } (LeftOffset: '';     RightOffset: Offset),
+    { caBeforeValue       True           True           True           False          } (LeftOffset: '';     RightOffset: Offset),
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caBeforeValue       True           True           True           True           } (LeftOffset: '';     RightOffset: Offset),
+    { caAfterValue        False          False          False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False          False          False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False          False          True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False          False          True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False          True           False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False          True           False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False          True           True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        False          True           True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True           False          False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True           False          False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True           False          True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True           False          True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True           True           False          False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True           True           False          True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True           True           True           False          } (LeftOffset: Offset; RightOffset: ''    ),
+    { caAfterValue        True           True           True           True           } (LeftOffset: Offset; RightOffset: ''    ),
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caAfterParam        False          False          False          False          } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False          False          False          True           } (LeftOffset: '';     RightOffset: ''    ),
+    { caAfterParam        False          False          True           False          } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        False          False          True           True           } (LeftOffset: '';     RightOffset: ''    ),
+    { caAfterParam        False          True           False          False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        False          True           False          True           } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        False          True           True           False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        False          True           True           True           } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True           False          False          False          } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        True           False          False          True           } (LeftOffset: '';     RightOffset: ''    ),
+    { caAfterParam        True           False          True           False          } (LeftOffset: CRLF;   RightOffset: ''    ),
+    { caAfterParam        True           False          True           True           } (LeftOffset: '';     RightOffset: ''    ),
+    { caAfterParam        True           True           False          False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True           True           False          True           } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True           True           True           False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caAfterParam        True           True           True           True           } (LeftOffset: Offset; RightOffset: Offset),
+    { Anchor              Nested         SingleString   FirstParam     LastParam         LeftOffset          RightOffset        }
+    { caInsideEmptyParams False          False          False          False          } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False          False          False          True           } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False          False          True           False          } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False          False          True           True           } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams False          True           False          False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams False          True           False          True           } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams False          True           True           False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams False          True           True           True           } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True           False          False          False          } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams True           False          False          True           } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams True           False          True           False          } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams True           False          True           True           } (LeftOffset: CRLF;   RightOffset: CRLF  ),
+    { caInsideEmptyParams True           True           False          False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True           True           False          True           } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True           True           True           False          } (LeftOffset: Offset; RightOffset: Offset),
+    { caInsideEmptyParams True           True           True           True           } (LeftOffset: Offset; RightOffset: Offset)
+    { Anchor              Nested         SingleString   FirstParam     LastParam      }
 
   );
 
@@ -406,13 +479,9 @@ var
   LeftOffset, RightOffset: String;
 begin
 
-  { TODO 1 -oVasilyevSM -cuUserParams: Карта требует расширения. }
   if Length(_Value) > 0 then begin
 
     RA_OffsetSetting[_OffsetInfoKey].Get(LeftOffset, RightOffset);
-
-    if (_Anchor in [caBeforeParam, caBeforeName]) and not _Nested and (not _SingleString or _FirstParam) then
-      LeftOffset := '';
 
     if not _SingleString then begin
 

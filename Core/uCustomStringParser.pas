@@ -126,17 +126,17 @@ type
     { Ќа данный момент повода здесь что-то добавить нет. }
   end;
 
+  TErrorsAssist = (eaLocating, eaNativeException);
+  TErrorsAssists = set of TErrorsAssist;
+
   ICustomStringParser = interface ['{2BFFF59C-28FF-40A6-A42A-DA4AB854ECB4}']
 
-    function GetLocated: Boolean;
-    procedure SetLocated(_Value: Boolean);
-    function GetNativeException: Boolean;
-    procedure SetNativeException(_Value: Boolean);
+    function GetErrorsAssists: TErrorsAssists;
+    procedure SetErrorsAssists(_Value: TErrorsAssists);
     function GetProgressEvent: TProgressEvent;
     procedure SetProgressEvent(_Value: TProgressEvent);
 
-    property Located: Boolean read GetLocated write SetLocated;
-    property NativeException: Boolean read GetNativeException write SetNativeException;
+    property ErrorsAssists: TErrorsAssists read GetErrorsAssists write SetErrorsAssists;
     property ProgressEvent: TProgressEvent read GetProgressEvent write SetProgressEvent;
 
   end;
@@ -187,8 +187,7 @@ type
 
     FNestedLevel: Word;
     FProgressEvent: TProgressEvent;
-    FLocated: Boolean;
-    FNativeException: Boolean;
+    FErrorsAssists: TErrorsAssists;
 
     FKeyWords: TKeyWordList;
     FRegions: TRegionList;
@@ -212,10 +211,8 @@ type
     function GetRest: Int64; inline;
 
     { ICustomStringParser }
-    function GetLocated: Boolean;
-    procedure SetLocated(_Value: Boolean);
-    function GetNativeException: Boolean;
-    procedure SetNativeException(_Value: Boolean);
+    function GetErrorsAssists: TErrorsAssists;
+    procedure SetErrorsAssists(_Value: TErrorsAssists);
     function GetProgressEvent: TProgressEvent;
     procedure SetProgressEvent(_Value: TProgressEvent);
 
@@ -276,8 +273,7 @@ type
     property CursorStanding: TStanding read FCursorStanding;
     property ElementStart: Int64 read FElementStart;
     property RegionStart: Int64 read FRegionStart;
-    property Located: Boolean read GetLocated write SetLocated;
-    property NativeException: Boolean read GetNativeException write SetNativeException;
+    property ErrorsAssists: TErrorsAssists read GetErrorsAssists write SetErrorsAssists;
     property ProgressEvent: TProgressEvent read FProgressEvent write FProgressEvent;
 
   end;
@@ -721,7 +717,7 @@ end;
 
 procedure TCustomStringParser.CheckPoint;
 begin
-  if Located then
+  if eaLocating in ErrorsAssists then
     Locator.CheckPoint(Cursor);
 end;
 
@@ -771,24 +767,14 @@ begin
   Result := SrcLen - Cursor + 1;
 end;
 
-function TCustomStringParser.GetLocated: Boolean;
+function TCustomStringParser.GetErrorsAssists: TErrorsAssists;
 begin
-  Result := FLocated;
+  Result := FErrorsAssists;
 end;
 
-procedure TCustomStringParser.SetLocated(_Value: Boolean);
+procedure TCustomStringParser.SetErrorsAssists(_Value: TErrorsAssists);
 begin
-  FLocated := _Value;
-end;
-
-function TCustomStringParser.GetNativeException: Boolean;
-begin
-  Result := FNativeException;
-end;
-
-procedure TCustomStringParser.SetNativeException(_Value: Boolean);
-begin
-  FNativeException := _Value;
+  FErrorsAssists := _Value;
 end;
 
 function TCustomStringParser.GetProgressEvent: TProgressEvent;
@@ -902,12 +888,11 @@ begin
   Result := inherited Clone;
 
   TCustomStringParser(Result).SetSource(Source);
-  TCustomStringParser(Result).FCursor         := Cursor;
-  TCustomStringParser(Result).Located         := Located;
-  TCustomStringParser(Result).NativeException := NativeException;
-  TCustomStringParser(Result).Locator         := Locator;
-  TCustomStringParser(Result).ProgressEvent   := ProgressEvent;
-  TCustomStringParser(Result).FNestedLevel    := NestedLevel + 1;
+  TCustomStringParser(Result).FCursor       := Cursor;
+  TCustomStringParser(Result).ErrorsAssists := ErrorsAssists;
+  TCustomStringParser(Result).Locator       := Locator;
+  TCustomStringParser(Result).ProgressEvent := ProgressEvent;
+  TCustomStringParser(Result).FNestedLevel  := NestedLevel + 1;
 
 end;
 
@@ -994,7 +979,7 @@ var
   Location: TLocation;
 begin
 
-  if Located and not Nested then
+  if (eaLocating in ErrorsAssists) and not Nested then
     Locator := TLocator.Create;
   try
 
@@ -1006,12 +991,12 @@ begin
 
       on E: Exception do begin
 
-        if not Located or Nested then
+        if not (eaLocating in ErrorsAssists) or Nested then
           raise;
 
         Location := Locator.Location(Source);
         { TODO 5 -oVasilyevSM -cuCustomStringParser:  огда ошибка возникает при считывании из ресурса, здесь утечка. }
-        if NativeException then raise ExceptClass(E.ClassType).CreateFmt('%s. %s', [E.Message, Location.Text])
+        if eaNativeException in ErrorsAssists then raise ExceptClass(E.ClassType).CreateFmt('%s. %s', [E.Message, Location.Text])
         else raise ELocatedException.Create(ExceptClass(E.ClassType), E.Message, Location);
 
       end;
@@ -1019,7 +1004,7 @@ begin
     end;
 
   finally
-    if Located and not Nested then
+    if (eaLocating in ErrorsAssists) and not Nested then
       FreeAndNil(FLocator);
   end;
 
