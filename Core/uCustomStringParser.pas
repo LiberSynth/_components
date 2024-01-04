@@ -128,7 +128,6 @@ type
 
   ICustomStringParser = interface ['{2BFFF59C-28FF-40A6-A42A-DA4AB854ECB4}']
 
-    procedure SetSource(const _Source: String);
     function GetLocated: Boolean;
     procedure SetLocated(_Value: Boolean);
     function GetNativeException: Boolean;
@@ -255,8 +254,8 @@ type
 
     procedure AcceptControl(_Sender: TCustomParser); override;
 
-    { ICustomStringParser }
-    procedure SetSource(const _Source: String);
+    procedure SetSource(const _Data); override;
+    procedure FreeContext(var _Data); override;
 
     { События для потомков }
     procedure KeyEvent(const _KeyWord: TKeyWord); virtual;
@@ -919,10 +918,15 @@ begin
   CheckPoint;
 end;
 
-procedure TCustomStringParser.SetSource(const _Source: String);
+procedure TCustomStringParser.SetSource(const _Data);
 begin
-  FSource := _Source;
+  FSource := String(_Data);
   FSrcLen := Length(FSource);
+end;
+
+procedure TCustomStringParser.FreeContext(var _Data);
+begin
+  String(_Data) := '';
 end;
 
 procedure TCustomStringParser.KeyEvent(const _KeyWord: TKeyWord);

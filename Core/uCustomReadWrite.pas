@@ -37,6 +37,7 @@ type
     конкретикой. Взаимодействие исполняется через интерфейсы. При считывании Parser - ведущий, Reader - ведомый. При
     сохранении - наоборот, Renderer - ведущий, Writer - ведомый. }
 
+  { Синтаксический и семантический разбор }
   TCustomParser = class abstract (TIntfObject)
 
   strict private
@@ -49,6 +50,8 @@ type
 
     procedure RetrieveTargerInterface(_Receiver: TIntfObject); virtual; abstract;
     procedure FreeTargerInterface; virtual; abstract;
+    procedure SetSource(const _Data); virtual; abstract;
+    procedure FreeContext(var _Data); virtual; abstract;
     procedure Read; virtual; abstract;
     procedure Terminate;
 
@@ -61,6 +64,7 @@ type
 
   TCustomParserClass = class of TCustomParser;
 
+  { Интерпретация в объектный контекст }
   TCustomReader = class abstract (TIntfObject)
 
   public
@@ -73,6 +77,7 @@ type
 
   TCustomReaderClass = class of TCustomReader;
 
+  { Запись внешнего контекста }
   TCustomWriter = class abstract (TIntfObject)
 
   public
@@ -83,6 +88,7 @@ type
 
   TCustomWriterClass = class of TCustomWriter;
 
+  { Компиляция внешнего контекста }
   TCustomCompiler = class abstract (TIntfObject)
 
   public

@@ -179,6 +179,8 @@ var
 
   end;
 
+var
+  Splitter: String;
 begin
 
   with _Param as TUserParam do begin
@@ -203,7 +205,8 @@ begin
       Result := _Param.AsString;
     end;
 
-    if CheckLastCRLF(AfterValue) then ParamSplitter := '';
+    if CheckLastCRLF(AfterValue) then Splitter := ''
+    else Splitter := ParamSplitter;
 
     Result := Format(ParamFormat, [
 
@@ -211,7 +214,7 @@ begin
         {  1 } ParamDataTypeToStr(_Param.DataType),
         {  2 } Result,
         {  3 } _BeforeAssigningSpace,
-        {  4 } ParamSplitter,
+        {  4 } Splitter,
         {  5 } BeforeParam,
         {  6 } BeforeName,
         {  7 } AfterName,

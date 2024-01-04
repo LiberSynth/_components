@@ -103,8 +103,8 @@ type
   TStoreMethod    = (smLSNIString, smClassicIni, smBLOB, smCustom);
   TCommentSupport = (csNone, csStockFormat, csOriginarFormat);
 
-  TGetCustomSourceProc = procedure (var _Value) of object;
-  TSetCustomSourceProc = procedure (const _Value) of object;
+  TGetCustomContextProc = procedure (var _Data) of object;
+  TSetCustomContextProc = procedure (const _Data) of object;
 
   TLSIni = class(TComponent)
 
@@ -120,8 +120,8 @@ type
     FCommentSupport: TCommentSupport;
     FPathSeparator: Char;
     FStrictDataTypes: Boolean;
-    FGetCustomSource: TGetCustomSourceProc;
-    FSetCustomSource: TSetCustomSourceProc;
+    FGetCustomContext: TGetCustomContextProc;
+    FSetCustomContext: TSetCustomContextProc;
     FProgress: TProgressEvent;
 
     FParams: TParams;
@@ -133,9 +133,9 @@ type
     function CompilerClass: TCustomCompilerClass;
     function WriterClass: TCustomWriterClass;
     function SourceFile: String;
-    function GetSourceString: String;
-    function DoGetCustomSourceString: String;
-    procedure DoSetCustomSourceString(const _Value);
+    function GetSource: Pointer;
+    procedure DoGetCustomContext(var _Data);
+    procedure DoSetCustomContext(const _Value);
 
     procedure SetCommentSupport(const _Value: TCommentSupport);
     procedure SetSourceType(const _Value: TSourceType);
@@ -143,7 +143,7 @@ type
     procedure SetErrorsLocating(const _Value: Boolean);
     procedure SetStrictDataTypes(const _Value: Boolean);
 
-    procedure SetParserSource(_Parser: TCustomParser);
+    procedure SetParserContext(_Parser: TCustomParser);
 
     procedure SaveContent(_Writer: TCustomWriter);
 
@@ -174,9 +174,8 @@ type
     property SourcePath: String read FSourcePath write FSourcePath;
     property PathSeparator: Char read FPathSeparator write FPathSeparator default '.';
     property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes default False;
-    property GetCustomSource: TGetCustomSourceProc read FGetCustomSource write FGetCustomSource default nil;
-    { TODO 1 -oVasilyevSM -cuLSIni: Название события! }
-    property SetCustomSource: TSetCustomSourceProc read FSetCustomSource write FSetCustomSource default nil;
+    property GetCustomContext: TGetCustomContextProc read FGetCustomContext write FGetCustomContext default nil;
+    property SetCustomContext: TSetCustomContextProc read FSetCustomContext write FSetCustomContext default nil;
     property Progress: TProgressEvent read FProgress write FProgress default nil;
 
   end;
@@ -326,10 +325,10 @@ begin
 
   Result := Map[SourceType, StoreMethod, CommentSupport];
 
-//  if Result = TCustomWriter then
-//    raise EUncompletedMethod.Create;
-//  if not Assigned(Result) then
-//    raise EComponentException.Create('Impossible combination of properties. There are no blobs with comments.');
+  if Result = TCustomWriter then
+    raise EUncompletedMethod.Create;
+  if not Assigned(Result) then
+    raise EComponentException.Create('Impossible combination of properties. There are no blobs with comments.');
 
 end;
 
@@ -339,19 +338,28 @@ begin
   else Result := SourcePath;
 end;
 
-function TLSIni.GetSourceString: String;
+function TLSIni.GetSource: Pointer;
 begin
 
-  if StoreMethod = smBLOB then
-    raise EComponentException.Create('Impossible combination: blob reading and string source.');
-
-  Result := '';
+  Result := nil;
   case SourceType of
 
-    stFile:                Result := FileToStr(SourceFile);
-    stRegistryStructured:  raise EComponentException.Create('Impossible combination: registry reading and string source.');
+    stFile:
+
+      case StoreMethod of
+
+        smLSNIString: String(Result) := FileToStr(SourceFile);
+        smClassicIni: String(Result) := FileToStr(SourceFile);
+//        smBLOB: ;
+//        smCustom: ;
+
+      else
+        raise EUncompletedMethod.Create;
+      end;
+
+//    stRegistryStructured: ;
 //    stRegistrySingleParam: ;
-    stCustom: Result := DoGetCustomSourceString; { Именно здесь - строка. GetSourceBLOB - BLOB. }
+    stCustom: DoGetCustomContext(Result);
 
   else
     raise EUncompletedMethod.Create;
@@ -359,16 +367,16 @@ begin
 
 end;
 
-function TLSIni.DoGetCustomSourceString: String;
+procedure TLSIni.DoGetCustomContext(var _Data);
 begin
-  if Assigned(FGetCustomSource) then
-    FGetCustomSource(Result);
+  if Assigned(FGetCustomContext) then
+    FGetCustomContext(_Data);
 end;
 
-procedure TLSIni.DoSetCustomSourceString(const _Value);
+procedure TLSIni.DoSetCustomContext(const _Value);
 begin
-  if Assigned(FSetCustomSource) then
-    FSetCustomSource(_Value);
+  if Assigned(FSetCustomContext) then
+    FSetCustomContext(_Value);
 end;
 
 procedure TLSIni.SetCommentSupport(const _Value: TCommentSupport);
@@ -442,10 +450,15 @@ begin
 
 end;
 
-procedure TLSIni.SetParserSource(_Parser: TCustomParser);
+procedure TLSIni.SetParserContext(_Parser: TCustomParser);
 var
   CustomStringParser: ICustomStringParser;
+  Context: Pointer;
 begin
+
+  Context := GetSource;
+  _Parser.SetSource(Context);
+  _Parser.FreeContext(Context);
 
   if _Parser.GetInterface(ICustomStringParser, CustomStringParser) then
 
@@ -455,7 +468,6 @@ begin
       CustomStringParser.NativeException := NativeException;
       CustomStringParser.ProgressEvent   := Progress;
 
-      CustomStringParser.SetSource(GetSourceString);
       Exit;
 
     finally
@@ -504,7 +516,7 @@ begin
     if _Writer.GetInterface(IStringWriter, StringWriter) then begin
 
       Content := StringWriter.Content;
-      DoSetCustomSourceString(Content);
+      DoSetCustomContext(Content);
 
     end else raise EUncompletedMethod.Create; { if _Writer.GetInterface(IBLOBWriter, BLOBWriter) then }
 
@@ -549,7 +561,7 @@ begin
       try
 
         ParamsReader.RetrieveParser(Parser);
-        SetParserSource(Parser);
+        SetParserContext(Parser);
 
         Parser.RetrieveTargerInterface(Reader);
         try
