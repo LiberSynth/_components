@@ -25,8 +25,6 @@ unit uLSNIDCStringParamsCompiler;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 1 -oVasilyevSM -cuLSNIDCStringParamsCompiler: Уборка }
-
 interface
 
 uses
@@ -46,6 +44,7 @@ type
 
     function CheckLastCRLF(const _Value: String): Boolean;
     function FormatParamsValue(const _Value, _InsideEmptyParams: String; _SingleString, _LastIsShort: Boolean): String;
+
     property Typed: Boolean read FTyped write FTyped;
     property SingleString: Boolean read FSingleString write FSingleString;
 
@@ -105,25 +104,6 @@ type
 
 { TLSNIDCStringParamsCompiler }
 
-procedure TLSNIDCStringParamsCompiler.Prepare;
-const
-
-  SC_VALUE_TYPED   = '%5:s%6:s%0:s%7:s: %8:s%1:s%9:s%3:s= %10:s%2:s%11:s%4:s%12:s';
-  SC_VALUE_UNTYPED = '%5:s%6:s%0:s%7:s%3:s= %10:s%2:s%11:s%4:s%12:s';
-
-begin
-
-  Typed        := not (soTypesFree in Options);
-  SingleString := soSingleString in Options;
-
-  if Typed then ParamFormat := SC_VALUE_TYPED
-  else ParamFormat := SC_VALUE_UNTYPED;
-
-  if SingleString then ParamSplitter := '; '
-  else ParamSplitter := CRLF;
-
-end;
-
 function TLSNIDCStringParamsCompiler.CheckLastCRLF(const _Value: String): Boolean;
 var
   L: Integer;
@@ -149,6 +129,25 @@ begin
     if _SingleString then Result := Format('(%s)', [Result])
     else if CheckLastCRLF(Result) then Result := Format('(%s)', [CRLF + ShiftText(Result, 1)])
     else Result := Format('(%s)', [CRLF + ShiftText(Result, 1) + CRLF]);
+
+end;
+
+procedure TLSNIDCStringParamsCompiler.Prepare;
+const
+
+  SC_VALUE_TYPED   = '%5:s%6:s%0:s%7:s: %8:s%1:s%9:s%3:s= %10:s%2:s%11:s%4:s%12:s';
+  SC_VALUE_UNTYPED = '%5:s%6:s%0:s%7:s%3:s= %10:s%2:s%11:s%4:s%12:s';
+
+begin
+
+  Typed        := not (soTypesFree in Options);
+  SingleString := soSingleString in Options;
+
+  if Typed then ParamFormat := SC_VALUE_TYPED
+  else ParamFormat := SC_VALUE_UNTYPED;
+
+  if SingleString then ParamSplitter := '; '
+  else ParamSplitter := CRLF;
 
 end;
 

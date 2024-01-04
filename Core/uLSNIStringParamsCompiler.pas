@@ -25,8 +25,6 @@ unit uLSNIStringParamsCompiler;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 1 -oVasilyevSM -cuLSNIStringParamsCompiler: Уборка }
-
 interface
 
 uses
@@ -65,7 +63,6 @@ type
   public
 
     function Clone: TCustomCompiler; override;
-
     procedure Run; override;
 
     property Options: TSaveToStringOptions read FOptions write FOptions;
@@ -75,6 +72,64 @@ type
 implementation
 
 { TLSNIStringParamsCompiler }
+
+function TLSNIStringParamsCompiler.FormatParamsValue(const _Value: String): String;
+begin
+
+  Result := _Value;
+  if not (soSingleString in Options) then begin
+
+    if (Length(_Value) > 0) then
+      Result := Result + CRLF;
+
+    Result := CRLF + ShiftText(Result, 1);
+
+  end;
+
+  Result := Format('(%s)', [Result]);
+
+end;
+
+procedure TLSNIStringParamsCompiler.Prepare;
+const
+
+  SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
+  SC_VALUE_TYPED   = '%0:s: %1:s = %2:s%3:s';
+
+begin
+
+  if soTypesFree in Options then ParamFormat := SC_VALUE_UNTYPED
+  else ParamFormat := SC_VALUE_TYPED;
+  if soSingleString in Options then ParamSplitter := '; '
+  else ParamSplitter := CRLF;
+
+end;
+
+function TLSNIStringParamsCompiler.FormatParam(_Param: TParam; _First, _Last: Boolean): String;
+begin
+
+  if _Last then ParamSplitter := '';
+
+  case _Param.DataType of
+
+    dtAnsiString: Result := FormatStringValue(_Param.AsString);
+    dtString:     Result := FormatStringValue(_Param.AsString);
+    dtParams:     Result := FormatParamsValue(CompileNestedParams(_Param.AsParams));
+
+  else
+    Result := _Param.AsString;
+  end;
+
+  Result := Format(ParamFormat, [
+
+      _Param.Name,
+      ParamDataTypeToStr(_Param.DataType),
+      Result,
+      ParamSplitter
+
+  ]);
+
+end;
 
 function TLSNIStringParamsCompiler.FormatStringValue(const _Value: String): String;
 begin
@@ -95,23 +150,6 @@ begin
 
   then Result := QuoteStr(_Value)
   else Result := _Value;
-
-end;
-
-function TLSNIStringParamsCompiler.FormatParamsValue(const _Value: String): String;
-begin
-
-  Result := _Value;
-  if not (soSingleString in Options) then begin
-
-    if (Length(_Value) > 0) then
-      Result := Result + CRLF;
-
-    Result := CRLF + ShiftText(Result, 1);
-
-  end;
-
-  Result := Format('(%s)', [Result]);
 
 end;
 
@@ -160,47 +198,6 @@ begin
   finally
     Writer.Free;
   end;
-
-end;
-
-procedure TLSNIStringParamsCompiler.Prepare;
-const
-
-  SC_VALUE_UNTYPED = '%0:s = %2:s%3:s';
-  SC_VALUE_TYPED   = '%0:s: %1:s = %2:s%3:s';
-
-begin
-
-  if soTypesFree in Options then ParamFormat := SC_VALUE_UNTYPED
-  else ParamFormat := SC_VALUE_TYPED;
-  if soSingleString in Options then ParamSplitter := '; '
-  else ParamSplitter := CRLF;
-
-end;
-
-function TLSNIStringParamsCompiler.FormatParam(_Param: TParam; _First, _Last: Boolean): String;
-begin
-
-  if _Last then ParamSplitter := '';
-
-  case _Param.DataType of
-
-    dtAnsiString: Result := FormatStringValue(_Param.AsString);
-    dtString:     Result := FormatStringValue(_Param.AsString);
-    dtParams:     Result := FormatParamsValue(CompileNestedParams(_Param.AsParams));
-
-  else
-    Result := _Param.AsString;
-  end;
-
-  Result := Format(ParamFormat, [
-
-      _Param.Name,
-      ParamDataTypeToStr(_Param.DataType),
-      Result,
-      ParamSplitter
-
-  ]);
 
 end;
 

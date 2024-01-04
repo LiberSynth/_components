@@ -337,9 +337,6 @@ type
   protected
 
     function ParamClass: TParamClass; virtual;
-    { TODO 1 -oVasilyevSM -cuParams: Убрать }
-    function FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String; virtual;
-
     property Nested: Boolean read FNested write FNested;
 
   public
@@ -384,9 +381,6 @@ type
     function AddList(const _Path: String): TMultiParamList;
     procedure DeleteValue(const _Path: String);
     procedure Clear;
-
-    { TODO 1 -oVasilyevSM -cuParams: Убрать }
-    function SaveToString: String;
 
     property DataType[const _Path: String]: TParamDataType read GetDataType;
     property IsNull[const _Path: String]: Boolean read GetIsNull write SetIsNull;
@@ -686,7 +680,7 @@ begin
       dtString:     Result := String       (FData       );
       dtBLOB:       Result := BLOBToHexStr (AsBLOB      );
       dtData:       Result := DataToByteStr(AsData      );
-      dtParams:     Result := TParams(FData).SaveToString;
+      dtParams:     Result := '<Params>';
 
     else
       raise EUncompletedMethod.Create;
@@ -1966,11 +1960,6 @@ begin
   Result := TParam;
 end;
 
-function TParams.FormatParam(_Param: TParam; _Value: String; _First, _Last: Boolean): String;
-begin
-  Result := '';
-end;
-
 function TParams.Clone: TParams;
 begin
   Result := TParamsClass(ClassType).Create(PathSeparator);
@@ -2220,55 +2209,6 @@ end;
 procedure TParams.Clear;
 begin
   Items.Clear;
-end;
-
-function TParams.SaveToString: String;
-
-  function _QuoteString(_Param: TParam): String;
-  begin
-
-    Result := _Param.AsString;
-
-    if _Param.DataType in [dtAnsiString, dtString] then
-
-      if
-
-          { Заключаем в кавычки по необходимости. Это только строки с этими символами: }
-          (Pos(CR,  Result) > 0) or
-          (Pos(LF,  Result) > 0) or
-          (Pos(';', Result) > 0) or
-          (Pos('=', Result) > 0) or
-          (Pos(':', Result) > 0) or
-          { Интересный случай, пока они не вложенные, все работает. Но вложенные воспринимают ")" как конец свей
-            вложенности, а остаток начинает мастер дочитывать. Поэтому, для порядку обе скобки суем в кавычки. }
-          (Pos('(', Result) > 0) or
-          (Pos(')', Result) > 0)
-
-      then Result := QuoteStr(Result);
-
-  end;
-
-var
-  Param: TParam;
-  Value: String;
-  Index: Integer;
-  First, Last: Boolean;
-begin
-
-  Result := '';
-  for Param in Items do begin
-
-    if Param.DataType = dtParams then Value := Param.AsParams.SaveToString
-    else Value := _QuoteString(Param);
-
-    Index := Items.IndexOf(Param);
-    First := Index = 0;
-    Last  := Index = Items.Count - 1;
-
-    Result := Result + FormatParam(Param, Value, First, Last);
-
-  end;
-
 end;
 
 end.
