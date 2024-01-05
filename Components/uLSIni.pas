@@ -25,6 +25,7 @@ unit uLSIni;
 (*                                                                                         *)
 (*******************************************************************************************)
 
+{ TODO 1 -oVasilyevSM: Свойства As... }
 { TODO 3 -oVasilyevSM: Нужен формализованный способ выполнять преднастройку для нетипизованных параметров.Примерно через
   вызов функций RegisterParam или просто присвоением. Считывание уже поддерживает такой режим, ему просто нужны все
   параметры, назначенные перед загрузкой. Вот это назначение и надо сделать удобным. }
@@ -37,6 +38,9 @@ unit uLSIni;
 
   Парсер знает, из чего считывать, но не знает, во что.
   Ридер - знает во что, но не знает, из чего.
+  Райтер по команде компайлера складывает контекст и отдает.
+  Компайлер проходит по объекту и кусками отдает райтеру результат нужного типа.
+
   Масштаб трагедии (без учета Typed и Untyped):
 
   CustomParser +
@@ -51,30 +55,28 @@ unit uLSIni;
       NTVBLOBParser -
     CustomRegistryParser -
       StructuredRegistryParser -
-      CustomSingleParamRegistryParser -
-        SingleStringParamRegistryParser -
-        SingleBLOBParamRegistryParser -
-  CustomReader
+
+  CustomReader +
     ParamsReader +
     UserParamsReader +
     OFParamsReader -
 
   CustomWriter +
-    CustomStringWriter -
-      LSNIParamsWriter -
-        LSNIDCParamsWriter -
-        LSNIOFParamsWriter -
-      INIParamsWriter -
-        INIDCParamsWriter -
-        INIOFParamsWriter -
-    CustomBLOBWriter -
-      NTVBLOBWriter -
-    CustomRegistryWriter~
-      CustomParamsRegistryWriter~
-        ParamsStructuredRegistryWriter~
-        CustomParamsSingleParamRegistryWriter~
-          ParamsSingleStringParamRegistryWriter~
-          ParamsSingleBLOBParamRegistryWriter~
+    StringWriter +
+    BLOBWriter -
+    RegistryWriter -
+
+  CustomCompiler +
+    CustomParamsCompiler +
+      CustomStringParamsCompiler +
+        LSNIStringParamsCompiler +
+          LSNIDCStringParamsCompiler +
+          LSNIOFStringParamsCompiler -
+        INIStringParamsCompiler -
+          INIDCStringParamsCompiler -
+          INIOFStringParamsCompiler -
+      BLOBParamsCompiler -
+      RegistryParamsCompiler -
 
 }
 
@@ -158,7 +160,6 @@ type
     procedure Load;
     procedure Save;
 
-    { TODO 3 -oVasilyevSM -cuLSIni: Скорее всего убрать в прайват. }
     property Params: TParams read FParams write FParams;
 
   published

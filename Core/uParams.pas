@@ -237,6 +237,7 @@ type
       function Append: Integer;
       procedure Delete(_Index: Integer);
 
+      property Items[_Index: Integer]: TParam read GetItems; default;
       property Count: Integer read GetCount;
 
       property DataType[_Index: Integer]: TParamDataType read GetDataType write SetDataType;
@@ -254,8 +255,6 @@ type
       property AsBLOB[_Index: Integer]: BLOB read GetAsBLOB write SetAsBLOB;
       property AsData[_Index: Integer]: TData read GetAsData write SetAsData;
       property AsParams[_Index: Integer]: TParams read GetAsParams write SetAsParams;
-
-      property Items[_Index: Integer]: TParam read GetItems; default;
 
     end;
 
@@ -346,6 +345,13 @@ type
 
     function Clone: TParams;
 
+    { Для передачи без разбора типов }
+    procedure AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
+    procedure Assign(_Source: TParams; _ForceAdding: Boolean = True);
+    function AddList(const _Path: String): TMultiParamList;
+    procedure DeleteValue(const _Path: String);
+    procedure Clear;
+
     { v Функции и свойства для основной работы v }
     function FindDataType(const _Path: String; var _Value: TParamDataType): Boolean;
     function FindIsNull(const _Path: String; var _Value: Boolean): Boolean;
@@ -375,12 +381,12 @@ type
     function AsDataDef(const _Path: String; _Default: TData): TData;
     function AsParamsDef(const _Path: String; _Default: TParams): TParams;
 
-    { Для передачи без разбора типов }
-    procedure AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
-    procedure Assign(_Source: TParams; _ForceAdding: Boolean = True);
-    function AddList(const _Path: String): TMultiParamList;
-    procedure DeleteValue(const _Path: String);
-    procedure Clear;
+    property PathSeparator: Char read FPathSeparator;
+    { TODO 5 -oVasilyevSM -cuParams: Сделать бы default, а то бесит это Items повсюду. }
+    property Items: TParamList read FItems;
+    property Count: Integer read GetCount;
+    { False - значение конвернтируется хэлпером в имеющийся тип, True - значение перезаписывается с новым типом. }
+    property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes;
 
     property DataType[const _Path: String]: TParamDataType read GetDataType;
     property IsNull[const _Path: String]: Boolean read GetIsNull write SetIsNull;
@@ -397,13 +403,6 @@ type
     property AsData[const _Path: String]: TData read GetAsData write SetAsData;
     property AsParams[const _Path: String]: TParams read GetAsParams write SetAsParams;
     property List[const _Path: String]: TMultiParamList read GetList;
-
-    property PathSeparator: Char read FPathSeparator;
-    property Items: TParamList read FItems; { TODO 5 -oVasilyevSM -cuParams: Сделать бы default, а то бесит это Items повсюду. }
-    property Count: Integer read GetCount;
-    { StrictDataTypes: False - значение конвернтируется хэлпером в имеющийся тип, True - значение записывается с новым
-      типом. }
-    property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes;
 
   end;
 
@@ -1966,6 +1965,67 @@ begin
   TParams(Result).StrictDataTypes := StrictDataTypes;
 end;
 
+procedure TParams.AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
+var
+  Dst: TParam;
+begin
+
+  if _ForceAdding then Dst := Add(_Name)
+  else Dst := GetParam(_Name);
+
+  Dst.AssignValue(_Source, Self, _ForceAdding);
+
+end;
+
+procedure TParams.Assign(_Source: TParams; _ForceAdding: Boolean);
+var
+  Src: TParam;
+begin
+  for Src in _Source.Items do
+    AssignValue(Src.Name, Src, _ForceAdding);
+end;
+
+function TParams.AddList(const _Path: String): TMultiParamList;
+var
+  PathRest: String;
+  Params: TParams;
+begin
+
+  PathRest := _Path;
+  Params   := GetPath(PathRest);
+
+  with Params.ListHolder do
+    if not Find(PathRest, Result) then
+      Result := Add(PathRest, Params);
+
+end;
+
+procedure TParams.DeleteValue(const _Path: String);
+var
+  PathRest: String;
+  Params: TParams;
+  Param: TParam;
+begin
+
+  PathRest := _Path;
+  if FindPath(PathRest, Params) then
+
+    with Params, Items do begin
+
+      Param := ParamByName(PathRest);
+      Delete(IndexOf(Param));
+
+    end
+
+  else raise EParamsException.CreateFmt('Param %s not found', [_Path]);
+
+end;
+
+procedure TParams.Clear;
+begin
+  Items.Clear;
+end;
+
 function TParams.FindDataType(const _Path: String; var _Value: TParamDataType): Boolean;
 var
   P: TParam;
@@ -2148,67 +2208,6 @@ function TParams.AsParamsDef(const _Path: String; _Default: TParams): TParams;
 begin
   if not FindParams(_Path, Result) then
     Result := _Default;
-end;
-
-procedure TParams.AssignValue(const _Name: String; _Source: TParam; _ForceAdding: Boolean);
-var
-  Dst: TParam;
-begin
-
-  if _ForceAdding then Dst := Add(_Name)
-  else Dst := GetParam(_Name);
-
-  Dst.AssignValue(_Source, Self, _ForceAdding);
-
-end;
-
-procedure TParams.Assign(_Source: TParams; _ForceAdding: Boolean);
-var
-  Src: TParam;
-begin
-  for Src in _Source.Items do
-    AssignValue(Src.Name, Src, _ForceAdding);
-end;
-
-function TParams.AddList(const _Path: String): TMultiParamList;
-var
-  PathRest: String;
-  Params: TParams;
-begin
-
-  PathRest := _Path;
-  Params   := GetPath(PathRest);
-
-  with Params.ListHolder do
-    if not Find(PathRest, Result) then
-      Result := Add(PathRest, Params);
-
-end;
-
-procedure TParams.DeleteValue(const _Path: String);
-var
-  PathRest: String;
-  Params: TParams;
-  Param: TParam;
-begin
-
-  PathRest := _Path;
-  if FindPath(PathRest, Params) then
-
-    with Params, Items do begin
-
-      Param := ParamByName(PathRest);
-      Delete(IndexOf(Param));
-
-    end
-
-  else raise EParamsException.CreateFmt('Param %s not found', [_Path]);
-
-end;
-
-procedure TParams.Clear;
-begin
-  Items.Clear;
 end;
 
 end.
