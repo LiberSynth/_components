@@ -30,7 +30,7 @@ interface
 uses
   { LiberSynth }
   uTypes, uParams, uCustomReadWrite, uCustomStringParser, uLSNIStringParser, uLSNIDCStringParser, uParamsReader,
-  uUserParamsReader, uStringWriter, uCustomParamsCompiler, uLSNIStringParamsCompiler, uLSNIDCStringParamsCompiler;
+  uDCParamsReader, uStringWriter, uCustomParamsCompiler, uLSNIStringParamsCompiler, uLSNIDCStringParamsCompiler;
 
 { TODO 5 -oVasilyevSM -cuParamsReadWriteUtils: Можно сделать одну рабочую функцию. }
 procedure LSNIStrToParams(
@@ -95,11 +95,11 @@ end;
 
 procedure LSNIDCStrToParams(const Source: String; Params: TParams; ErrorsAssists: TErrorsAssists; ProgressEvent: TProgressEvent);
 var
-  Reader: TUserParamsReader;
+  Reader: TDCParamsReader;
   Parser: TLSNIDCStringParser;
 begin
 
-  Reader := TUserParamsReader.Create;
+  Reader := TDCParamsReader.Create;
   try
 
     Reader.RetrieveParams(Params);

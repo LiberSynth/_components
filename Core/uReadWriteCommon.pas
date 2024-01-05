@@ -29,7 +29,7 @@ interface
 
 type
 
-  { Name - Type - Value reader interface. Maintains nested reading. }
+  { Name-Type-Value reader interface. Maintains nested reading. }
   INTVReader = interface ['{6585B06A-2103-42FD-8581-9F650B603FD0}']
 
     procedure ReadName(const _Element: String);
@@ -40,8 +40,8 @@ type
 
   end;
 
-  { Comments reader interface. Maintains comments. }
-  IUserParamsReader = interface ['{C1A83F9A-2CEA-441E-B3DA-AE9022D8DFBC}']
+  { Name-Type-Value-Comments reader interface. Maintains direct comments. }
+  INTVCommentsReader = interface ['{C1A83F9A-2CEA-441E-B3DA-AE9022D8DFBC}']
 
     procedure AddNameComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
     procedure AddTypeComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);

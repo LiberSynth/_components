@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils,
   { LiberSynth }
-  uLSNIStringParamsCompiler, uConsts, uParams, uUserParams, uStrUtils, uDataUtils;
+  uLSNIStringParamsCompiler, uConsts, uParams, uDCParams, uStrUtils, uDataUtils;
 
 type
 
@@ -182,7 +182,7 @@ var
   Splitter: String;
 begin
 
-  with _Param as TUserParam do begin
+  with _Param as TDCParam do begin
 
     BeforeParam       := Comments.GetBlock(caBeforeParam,       Typed, SingleString, _First, _Last, Nested);
     BeforeName        := Comments.GetBlock(caBeforeName,        Typed, SingleString, _First, _Last, Nested);

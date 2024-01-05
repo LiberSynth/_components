@@ -1,4 +1,4 @@
-unit uUserParamsReader;
+unit uDCParamsReader;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -31,15 +31,15 @@ uses
   { VCL }
   SysUtils,
   { LiberSynth }
-  uParamsReader, uParams, uUserParams, uReadWriteCommon;
+  uParamsReader, uParams, uDCParams, uReadWriteCommon;
 
 type
 
-  TUserParamsReader = class(TParamsReader, IUserParamsReader)
+  TDCParamsReader = class(TParamsReader, INTVCommentsReader)
 
   strict private
 
-    FCurrentParam: TUserParam;
+    FCurrentParam: TDCParam;
     FCurrentComments: TCommentList;
 
     { IUserParamsReader }
@@ -50,7 +50,7 @@ type
     procedure SourceEnd;
     procedure ElementTerminated;
 
-    property CurrentParam: TUserParam read FCurrentParam write FCurrentParam;
+    property CurrentParam: TDCParam read FCurrentParam write FCurrentParam;
     property CurrentComments: TCommentList read FCurrentComments;
 
   protected
@@ -72,19 +72,19 @@ implementation
 
 { TUserParamsReader }
 
-constructor TUserParamsReader.Create;
+constructor TDCParamsReader.Create;
 begin
   inherited Create;
   FCurrentComments := TCommentList.Create;
 end;
 
-destructor TUserParamsReader.Destroy;
+destructor TDCParamsReader.Destroy;
 begin
   FreeAndNil(FCurrentComments);
   inherited Destroy;
 end;
 
-procedure TUserParamsReader.AddNameComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
+procedure TDCParamsReader.AddNameComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
 begin
   if _Before then
     CurrentComments.AddComment(_Value, _Opening, _Closing, caBeforeName, _Short)
@@ -92,7 +92,7 @@ begin
     CurrentComments.AddComment(_Value, _Opening, _Closing, caAfterName, _Short);
 end;
 
-procedure TUserParamsReader.AddTypeComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
+procedure TDCParamsReader.AddTypeComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
 begin
   if _Before then
     CurrentComments.AddComment(_Value, _Opening, _Closing, caBeforeType, _Short)
@@ -100,7 +100,7 @@ begin
     CurrentComments.AddComment(_Value, _Opening, _Closing, caAfterType, _Short);
 end;
 
-procedure TUserParamsReader.AddValueComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
+procedure TDCParamsReader.AddValueComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
 begin
   if _Before then
     CurrentComments.AddComment(_Value, _Opening, _Closing, caBeforeValue, _Short)
@@ -108,7 +108,7 @@ begin
     CurrentComments.AddComment(_Value, _Opening, _Closing, caAfterValue, _Short);
 end;
 
-procedure TUserParamsReader.DetachBefore;
+procedure TDCParamsReader.DetachBefore;
 var
   i: Integer;
 begin
@@ -121,7 +121,7 @@ begin
 
 end;
 
-procedure TUserParamsReader.SourceEnd;
+procedure TDCParamsReader.SourceEnd;
 var
   i: Integer;
 begin
@@ -141,7 +141,7 @@ begin
 
 end;
 
-procedure TUserParamsReader.ElementTerminated;
+procedure TDCParamsReader.ElementTerminated;
 begin
 
   if Assigned(CurrentParam) then
@@ -157,21 +157,21 @@ begin
 
 end;
 
-procedure TUserParamsReader.BeforeReadParam(_Param: TParam);
+procedure TDCParamsReader.BeforeReadParam(_Param: TParam);
 begin
   inherited BeforeReadParam(_Param);
-  (_Param as TUserParam).Comments.Clear;
+  (_Param as TDCParam).Comments.Clear;
 end;
 
-procedure TUserParamsReader.AfterReadParam(_Param: TParam);
+procedure TDCParamsReader.AfterReadParam(_Param: TParam);
 begin
   inherited AfterReadParam(_Param);
-  CurrentParam := _Param as TUserParam;
+  CurrentParam := _Param as TDCParam;
   CurrentParam.Comments.AddRange(CurrentComments);
   CurrentComments.Clear;
 end;
 
-procedure TUserParamsReader.AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader);
+procedure TDCParamsReader.AfterNestedReading(_Param: TParam; _NestedReader: TParamsReader);
 var
   Comment: TComment;
   NestedComments: TCommentList;
@@ -182,7 +182,7 @@ begin
   { „тение вложенного блока завершено и обычные комментарии уже розданы внутренним параметрам. «десь остаютс€ только
     "бесхозные", когда вложенных параметров не было совсем. ќтдаем их параметру-мастеру как InsideEmptyParams. }
 
-  NestedComments := (_NestedReader as TUserParamsReader).CurrentComments;
+  NestedComments := (_NestedReader as TDCParamsReader).CurrentComments;
 
   for Comment in NestedComments do
     with Comment do
@@ -192,9 +192,9 @@ begin
 
 end;
 
-procedure TUserParamsReader.RetrieveParams(_Value: TParams);
+procedure TDCParamsReader.RetrieveParams(_Value: TParams);
 begin
-  if not (_Value is TUserParams) then
+  if not (_Value is TDCParams) then
     raise EParamsReadException.Create('Output params must be a class TUserParams object.');
   inherited RetrieveParams(_Value);
 end;

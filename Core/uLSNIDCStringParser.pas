@@ -50,7 +50,7 @@ type
   strict private
 
     FCommentTerminatedValue: Boolean;
-    FUserParamsReader: IUserParamsReader;
+    FUserParamsReader: INTVCommentsReader;
 
     procedure LineEnd;
 
@@ -67,7 +67,7 @@ type
     function ReadComment: String;
 
     property CommentTerminatedValue: Boolean read FCommentTerminatedValue write FCommentTerminatedValue;
-    property UserParamsReader: IUserParamsReader read FUserParamsReader write FUserParamsReader;
+    property UserParamsReader: INTVCommentsReader read FUserParamsReader write FUserParamsReader;
 
   protected
 
@@ -240,7 +240,7 @@ begin
   inherited RetrieveTargerInterface(_Receiver);
   { «десь запрашиваем интерфейс м€гко, потом провер€ем его присутствие по месту вызова и, в результате, получаем
     возможность чтени€ с отбросом комментариев простым созданием парсера соответствующего класса. }
-  _Receiver.GetInterface(IUserParamsReader, FUserParamsReader);
+  _Receiver.GetInterface(INTVCommentsReader, FUserParamsReader);
 end;
 
 procedure TLSNIDCStringParser.FreeTargerInterface;

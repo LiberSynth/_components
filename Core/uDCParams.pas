@@ -1,4 +1,4 @@
-unit uUserParams;
+unit uDCParams;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -25,10 +25,11 @@ unit uUserParams;
 (*                                                                                         *)
 (*******************************************************************************************)
 
-{ TODO 1 -oVasilyevSM -cuUserParams: -> DCParams }
 { TODO 5 -oVasilyevSM -cuUserParams: Есть еще один кейс - пустой файл только с комментариями }
 { TODO 5 -oVasilyevSM -cuUserParams: Задача: Нужны параметры, хранящие исходное форматирование. Всю строку между
   элементами запоминать в объект и потом выбрасывать обратно в строку в исходном виде, что бы там ни было. }
+
+{ Direct commented params }
 
 interface
 
@@ -85,7 +86,7 @@ type
 
   end;
 
-  TUserParam = class(TParam)
+  TDCParam = class(TParam)
 
   strict private
 
@@ -107,7 +108,7 @@ type
 
   { Этот класс никому НЕ должен: уметь быстро обрабатывать большие хранилища. Если формат LSNI используется как
     мини-база, не нужно там держать комментарии никому. }
-  TUserParams = class(TParams)
+  TDCParams = class(TParams)
 
   protected
 
@@ -192,36 +193,36 @@ begin
   inherited Add(TComment.Create(_Text, _Opening, _Closing, _Anchor, _Short));
 end;
 
-{ TUserParam }
+{ TDCParam }
 
-constructor TUserParam.Create;
+constructor TDCParam.Create;
 begin
   inherited Create(_Name, _PathSeparator);
   FComments := TCommentList.Create;
 end;
 
-destructor TUserParam.Destroy;
+destructor TDCParam.Destroy;
 begin
   FreeAndNil(FComments);
   inherited Destroy;
 end;
 
-procedure TUserParam.AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean);
+procedure TDCParam.AssignValue(_Source: TParam; _Host: TParams; _ForceAdding: Boolean);
 begin
 
   inherited AssignValue(_Source, _Host, _ForceAdding);
 
   Comments.Clear;
-  if _Source is TUserParam then
-    Comments.AddRange(TUserParam(_Source).Comments);
+  if _Source is TDCParam then
+    Comments.AddRange(TDCParam(_Source).Comments);
 
 end;
 
-{ TUserParams }
+{ TDCParams }
 
-function TUserParams.ParamClass: TParamClass;
+function TDCParams.ParamClass: TParamClass;
 begin
-  Result := TUserParam;
+  Result := TDCParam;
 end;
 
 end.
