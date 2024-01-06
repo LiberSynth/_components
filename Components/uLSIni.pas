@@ -83,8 +83,8 @@ uses
   { VCL }
   SysUtils, Classes,
   { LiberSynth }
-  uComponentTypes, uTypes, uCore, uFileUtils, uParams, uUserParams, uCustomReadWrite, uCustomStringParser,
-  uLSNIStringParser, uLSNIDCStringParser, uParamsReader, uUserParamsReader, uStringWriter, uCustomParamsCompiler,
+  uComponentTypes, uTypes, uCore, uFileUtils, uParams, uDCParams, uCustomReadWrite, uCustomStringParser,
+  uLSNIStringParser, uLSNIDCStringParser, uParamsReader, uDCParamsReader, uStringWriter, uCustomParamsCompiler,
   uLSNIStringParamsCompiler, uLSNIDCStringParamsCompiler;
 
 type
@@ -119,7 +119,8 @@ type
     FStrictDataTypes: Boolean;
     FGetCustomContext: TGetCustomContextProc;
     FSetCustomContext: TSetCustomContextProc;
-    FProgress: TProgressEvent;
+    FReadProgress: TProgressEvent;
+    FWriteProgress: TProgressEvent;
     FLSNISaveOptions: TLSNISaveOptions;
 
     FParams: TParams;
@@ -172,7 +173,8 @@ type
     property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes default False;
     property GetCustomContext: TGetCustomContextProc read FGetCustomContext write FGetCustomContext default nil;
     property SetCustomContext: TSetCustomContextProc read FSetCustomContext write FSetCustomContext default nil;
-    property Progress: TProgressEvent read FProgress write FProgress default nil;
+    property ReadProgress: TProgressEvent read FReadProgress write FReadProgress default nil;
+    property WriteProgress: TProgressEvent read FWriteProgress write FWriteProgress default nil;
     property LSNISaveOptions: TLSNISaveOptions read FLSNISaveOptions write FLSNISaveOptions;
 
   end;
@@ -216,7 +218,7 @@ begin
   case CommentSupport of
 
     csNone:        Result := TParams;
-    csStockFormat: Result := TUserParams;
+    csStockFormat: Result := TDCParams;
 //    csOriginalFormat:  Result := ;
 
   else
@@ -231,7 +233,7 @@ const
   Map: array [TCommentSupport] of TCustomReaderClass = (
 
       { csNone           } TParamsReader,
-      { csStockFormat    } TUserParamsReader,
+      { csStockFormat    } TDCParamsReader,
       { csOriginarFormat } TCustomReader
 
   );
@@ -468,7 +470,7 @@ begin
   if _Parser.GetInterface(ICustomStringParser, CustomStringParser) then begin
 
     CustomStringParser.ErrorsAssists := ErrorsAssists;
-    CustomStringParser.ProgressEvent := Progress;
+    CustomStringParser.ProgressEvent := ReadProgress;
 
     Exit;
 
@@ -606,6 +608,7 @@ begin
       try
 
         CustomParamsCompiler.RetrieveParams(Params);
+        CustomParamsCompiler.RetrieveProgressEvent(WriteProgress);
 
       finally
         CustomParamsCompiler := nil;

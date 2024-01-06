@@ -52,7 +52,6 @@ type
   strict private
 
     FOptions: TLSNISaveOptions;
-    FNested: Boolean;
     FParamFormat: String;
     FParamSplitter: String;
 
@@ -69,7 +68,6 @@ type
     function FormatStringValue(const _Value: String): String;
     function CompileNestedParams(_NestedParams: TParams): String;
 
-    property Nested: Boolean read FNested write FNested;
     property ParamFormat: String read FParamFormat write FParamFormat;
     property ParamSplitter: String read FParamSplitter write FParamSplitter;
 
@@ -198,6 +196,7 @@ begin
       try
 
         CustomParamsCompiler.RetrieveParams(_NestedParams);
+        CustomParamsCompiler.RetrieveProgressProcess(DoProgressEvent, TotalCount, CurrentStep);
 
       finally
         CustomParamsCompiler := nil;

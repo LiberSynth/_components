@@ -49,8 +49,20 @@ procedure LSNIDCStrToParams(
     ProgressEvent: TProgressEvent = nil
 
 );
-function ParamsToLSNIStr(Params: TParams; Options: TLSNISaveOptions = []): String;
-function ParamsToLSNIDCStr(Params: TParams; Options: TLSNISaveOptions = []): String;
+function ParamsToLSNIStr(
+
+    Params: TParams;
+    Options: TLSNISaveOptions = [];
+    ProgressEvent: TProgressEvent = nil
+
+): String;
+function ParamsToLSNIDCStr(
+
+    Params: TParams;
+    Options: TLSNISaveOptions = [];
+    ProgressEvent: TProgressEvent = nil
+
+): String;
 
 implementation
 
@@ -132,7 +144,7 @@ begin
 
 end;
 
-function ParamsToLSNIStr(Params: TParams; Options: TLSNISaveOptions): String;
+function ParamsToLSNIStr(Params: TParams; Options: TLSNISaveOptions; ProgressEvent: TProgressEvent): String;
 var
   Writer: TStringWriter;
   Compiler: TLSNIStringParamsCompiler;
@@ -147,6 +159,7 @@ begin
       Compiler.Options := Options;
       Compiler.RetrieveWriter(Writer);
       Compiler.RetrieveParams(Params);
+      Compiler.ProgressEvent := ProgressEvent;
       Compiler.Run;
 
     finally
@@ -161,7 +174,7 @@ begin
 
 end;
 
-function ParamsToLSNIDCStr(Params: TParams; Options: TLSNISaveOptions): String;
+function ParamsToLSNIDCStr(Params: TParams; Options: TLSNISaveOptions; ProgressEvent: TProgressEvent): String;
 var
   Writer: TStringWriter;
   Compiler: TLSNIDCStringParamsCompiler;
@@ -176,6 +189,7 @@ begin
       Compiler.Options := Options;
       Compiler.RetrieveWriter(Writer);
       Compiler.RetrieveParams(Params);
+      Compiler.ProgressEvent := ProgressEvent;
       Compiler.Run;
 
     finally

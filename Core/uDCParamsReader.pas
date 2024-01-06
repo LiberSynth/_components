@@ -42,7 +42,7 @@ type
     FCurrentParam: TDCParam;
     FCurrentComments: TCommentList;
 
-    { IUserParamsReader }
+    { INTVCommentsReader }
     procedure AddNameComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
     procedure AddTypeComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);
     procedure AddValueComment(const _Value, _Opening, _Closing: String; _Short, _Before: Boolean);

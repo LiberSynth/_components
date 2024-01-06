@@ -33,13 +33,9 @@ uses
   { LiberSynth }
   uConsts, uTypes, uDataUtils;
 
-{ v Проверка v }
-{ TODO 2 -oVasilyevSM -cuStrUtils: Продолжение следует: Integer, BigInt, Float, Extended, DateTime, AnsiString, String,
-  BLOB, Data. И не просто написать, а применить.  }
 function StrIsBoolean(const S: String): Boolean;
 function StrIsGUID(const Value: String): Boolean;
-function IsHexStr(const Value: String): Boolean;
-{ ^ Проверка ^ }
+function StrIsHex(const Value: String): Boolean;
 
 { v Преобразование основных типов данных в визуальную строку и обратно. Полный набор. v }
 function BooleanToStr(Value: Boolean): String;
@@ -178,7 +174,7 @@ begin
 
 end;
 
-function IsHexStr(const Value: String): Boolean;
+function StrIsHex(const Value: String): Boolean;
 begin
   Result := (Length(Value) > 2) and (Copy(Value, 1, 2) = '0x');
 end;
@@ -542,7 +538,7 @@ var
   B: Byte;
 begin
 
-  if not IsHexStr(Value) then
+  if not StrIsHex(Value) then
     raise EConvertError.CreateFmt('''%s'' is not a hex string', [Value]);
 
   SetLength(Result, (Length(Value) - 2) div 2);

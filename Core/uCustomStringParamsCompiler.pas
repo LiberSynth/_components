@@ -66,6 +66,7 @@ end;
 
 procedure TCustomStringParamsCompiler.CompileParam(_Param: TParam; _First, _Last: Boolean);
 begin
+  inherited CompileParam(_Param, _First, _Last);
   StringWriter.Write(FormatParam(_Param, _First, _Last));
 end;
 
