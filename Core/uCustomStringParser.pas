@@ -29,9 +29,9 @@ interface
 
 uses
   { VCL }
-  SysUtils, Generics.Collections,
+  SysUtils, Generics.Collections, Windows,
   { LiberSynth }
-  uConsts, uTypes, uCore, uCustomReadWrite, uDataUtils;
+  uConsts, uTypes, uCore, uCustomReadWrite, uDataUtils, uStrUtils;
 
 type
 
@@ -55,6 +55,21 @@ type
   end;
 
   TKeyWordList = class(TList<TKeyWord>)
+
+  strict private
+
+    FMaxKeyLength: Word;
+    FMapStr: String;
+    FMap: TIntegerArray;
+
+  private
+
+    procedure Prepare;
+
+    property MaxKeyLength: Word read FMaxKeyLength write FMaxKeyLength;
+    property MapStr: String read FMapStr write FMapStr;
+    property Map: TIntegerArray read FMap;
+
   end;
 
   TCustomStringParser = class;
@@ -220,7 +235,7 @@ type
 
   private
 
-    function IsCursorKey(const _KeyWord: TKeyWord): Boolean;
+    function IsCursorKey(const _KeyWord: TKeyWord): Boolean; inline;
 
     property Regions: TRegionList read FRegions;
 
@@ -398,6 +413,38 @@ begin
       (_Value.KeyTypeInternal = KeyTypeInternal) and
       (_Value.StrValue        = StrValue       ) and
       (_Value.KeyLength       = KeyLength      );
+
+end;
+
+{ TKeyWordList }
+
+procedure TKeyWordList.Prepare;
+var
+  i, j: Word;
+  KeyWord: TKeyWord;
+begin
+
+  MaxKeyLength := 0;
+  for KeyWord in Self do
+    MaxKeyLength := Max(MaxKeyLength, KeyWord.KeyLength);
+
+  i := MaxKeyLength;
+  while i > 0 do begin
+
+    for KeyWord in Self do
+
+      if KeyWord.KeyLength = i then begin
+
+        MapStr := MapStr + KeyWord.StrValue;
+        for j := 1 to i do
+          if j = 1 then AddToIntArray(FMap, IndexOf(KeyWord))
+          else AddToIntArray(FMap, -1);
+
+      end;
+
+    Dec(i);
+
+  end;
 
 end;
 
@@ -617,6 +664,8 @@ var
   CursorKey: TKeyWord;
 begin
 
+  KeyWords.Prepare;
+
   while not Eof and not Terminated do begin
 
     if not CheckRegions then
@@ -648,17 +697,24 @@ end;
 
 function TCustomStringParser.GetCursorKey(var _Value: TKeyWord): Boolean;
 var
-  KeyWord: TKeyWord;
+  i, p: Integer;
 begin
 
-  for KeyWord in KeyWords do
+  i := KeyWords.MaxKeyLength;
 
-    if IsCursorKey(KeyWord) then begin
+  while i > 0 do begin
 
-      _Value := KeyWord;
+    p := Pos(Copy(Source, Cursor, i), KeyWords.MapStr);
+    if p > 0 then begin
+
+      _Value := KeyWords[KeyWords.Map[p - 1]];
       Exit(True);
 
     end;
+
+    Dec(i);
+
+  end;
 
   Result := False;
 
@@ -790,7 +846,7 @@ end;
 function TCustomStringParser.IsCursorKey(const _KeyWord: TKeyWord): Boolean;
 begin
   with _KeyWord do
-    Result := (KeyType <> ktNone) and (StrValue = Copy(Source, Cursor, KeyLength));
+    Result := (KeyTypeInternal <> Integer(ktNone)) and (StrValue = Copy(Source, Cursor, KeyLength));
 end;
 
 procedure TCustomStringParser.InitParser;
