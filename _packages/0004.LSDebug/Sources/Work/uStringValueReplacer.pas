@@ -28,8 +28,8 @@ unit uStringValueReplacer;
 interface
 
 uses
-  { VDebugPackage }
-  uClasses, uCustomVizualizers;
+  { Liber Synth }
+  uClasses, uCustomVizualizers, uCleanDebuggerString;
 
 type
 
@@ -59,52 +59,37 @@ uses
 { TStringValueReplacer }
 
 function TStringValueReplacer.GetCustomReplacementValue(const _Expression, _TypeName, _EvalResult: String): String;
-var
-  S: String;
-
-  procedure _CheckTerminated;
-  var
-    L: Integer;
-    Term: String;
-  begin
-
-    L := Length(S);
-    Term := Copy(S, L - 5, 6);
-    if (Pos('#$D', Term) > 0) or (Pos('#$A', Term) > 0) then
-      Result := Result + CRLF;
-
-  end;
-
-var
-  L: Integer;
-  i: Integer;
+//var
+//  S: String;
+//  L, i: Integer;
 begin
 
-  { TODO -oVasilyevSM -cVDebug : 4000 и RealMax читать из ини }
+  { TODO 4 -oVasilyevSM -cVDebug : 4000 и RealMax читать из ини }
+  Result := CleanDebuggerString(_EvalResult);
 
-  Result := Evaluator.Evaluate(Format('Length(%s)', [_Expression]));
-
-  if TryStrToInt(Result, L) then begin
-
-    Result := '';
-    i := 0;
-
-    while (i < L) and (i < 400{RealMax}) do begin
-
-      if i mod 40 = 0 then begin
-
-        S := Evaluator.Evaluate(Format('Copy(%s, %d, 40)', [_Expression, i + 1]));
-
-        Result := Result + PureValueText(S);
-        _CheckTerminated;
-
-      end;
-
-      Inc(i);
-
-    end;
-
-  end else Result := PureValueText(_EvalResult);
+//  Result := Evaluator.Evaluate(Format('Length(%s)', [_Expression]));
+//
+//  if TryStrToInt(Result, L) then begin
+//
+//    Result := '';
+//    i := 0;
+//
+//    while (i < L) and (i < 400{RealMax}) do begin
+//
+//      if i mod 40 = 0 then begin
+//
+//        S := Evaluator.Evaluate(Format('Copy(%s, %d, 40)', [_Expression, i + 1]));
+//
+//        Result := Result + PureValueText(S);
+//        _CheckTerminated;
+//
+//      end;
+//
+//      Inc(i);
+//
+//    end;
+//
+//  end else Result := PureValueText(_EvalResult);
 
 end;
 

@@ -44,6 +44,7 @@ contains
   uViewerFormHelper in 'Custom\uViewerFormHelper.pas',
   uCustomVizualizers in 'Custom\uCustomVizualizers.pas',
   uStringValueReplacer in 'Work\uStringValueReplacer.pas',
-  uGUIDValueReplacer in 'Work\uGUIDValueReplacer.pas';
+  uGUIDValueReplacer in 'Work\uGUIDValueReplacer.pas',
+  uCleanDebuggerString in 'Common\uCleanDebuggerString.pas';
 
 end.
