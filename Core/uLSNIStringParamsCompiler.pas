@@ -35,6 +35,7 @@ uses
 
 type
 
+  { TODO 3 -oVasilyevSM -cCore: Это надо хранить в более общем юните. }
   TLSNISaveOption  = (soSingleString, soForceQuoteStrings, soTypesFree);
   TLSNISaveOptions = set of TLSNISaveOption;
 

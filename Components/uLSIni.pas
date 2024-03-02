@@ -126,6 +126,7 @@ type
     FParams: TParams;
 
     procedure InitDefaultProperties;
+    procedure InitComponent;
     function ParamsClass: TParamsClass;
     function ReaderClass: TCustomReaderClass;
     function ParserClass: TCustomParserClass;
@@ -171,11 +172,12 @@ type
     property SourcePath: String read FSourcePath write FSourcePath;
     property PathSeparator: Char read FPathSeparator write FPathSeparator default '.';
     property StrictDataTypes: Boolean read FStrictDataTypes write SetStrictDataTypes default False;
+    property LSNISaveOptions: TLSNISaveOptions read FLSNISaveOptions write FLSNISaveOptions;
+
     property GetCustomContext: TGetCustomContextProc read FGetCustomContext write FGetCustomContext default nil;
     property SetCustomContext: TSetCustomContextProc read FSetCustomContext write FSetCustomContext default nil;
     property ReadProgress: TProgressEvent read FReadProgress write FReadProgress default nil;
     property WriteProgress: TProgressEvent read FWriteProgress write FWriteProgress default nil;
-    property LSNISaveOptions: TLSNISaveOptions read FLSNISaveOptions write FLSNISaveOptions;
 
   end;
 
@@ -192,8 +194,13 @@ end;
 
 constructor TLSIni.Create(_Owner: TComponent);
 begin
+
   inherited Create(_Owner);
+
   InitDefaultProperties;
+  if not Assigned(_Owner) or not (csLoading in _Owner.ComponentState) then
+    InitComponent;
+
 end;
 
 destructor TLSIni.Destroy;
@@ -209,6 +216,17 @@ begin
   FSourceType    := stFile;
   FErrorsAssists := [eaLocating];
   FPathSeparator := '.';
+
+end;
+
+procedure TLSIni.InitComponent;
+begin
+
+  FParams := ParamsClass.Create(PathSeparator);
+  FParams.StrictDataTypes := StrictDataTypes;
+
+  if AutoLoad then
+    Load;
 
 end;
 
@@ -528,19 +546,9 @@ end;
 
 procedure TLSIni.Loaded;
 begin
-
   inherited Loaded;
-
-  if not (csDesigning in ComponentState) then begin
-
-    FParams := ParamsClass.Create(PathSeparator);
-    FParams.StrictDataTypes := StrictDataTypes;
-
-    if AutoLoad then
-      Load;
-
-  end;
-
+  if not (csDesigning in ComponentState) then
+    InitComponent;
 end;
 
 procedure TLSIni.Load;
