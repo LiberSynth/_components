@@ -74,9 +74,9 @@ function LevelUp(const Path: String): String;
 function PureFileName(const FileName: String): String; { without path and extension }
 function ExeName: String;
 function ExeDir: String;
-function PackageFileName: String;
-function PackageName: String;
-function PackageDir: String;
+function PackageFileName(Instance: LongWord): String;
+function PackageName(Instance: LongWord): String;
+function PackageDir(Instance: LongWord): String;
 
 function GetFileAttributes_(const FileName: String): TFileAttributes;
 procedure SetFileAttributes_(const FileName: String; FileAttributes: TFileAttributes);
@@ -221,23 +221,23 @@ begin
   Result := ExtractFileDir(ParamStr(0));
 end;
 
-function PackageFileName: String;
+function PackageFileName(Instance: LongWord): String;
 begin
 
   SetLength(Result, MAX_PATH);
-  GetModuleFileName(HInstance, PChar(Result), MAX_PATH);
+  GetModuleFileName(Instance, PChar(Result), MAX_PATH);
   SetLength(Result, StrLen(PChar(Result)));
 
 end;
 
-function PackageName: String;
+function PackageName(Instance: LongWord): String;
 begin
-  Result := PureFileName(PackageFileName);
+  Result := PureFileName(PackageFileName(Instance));
 end;
 
-function PackageDir: String;
+function PackageDir(Instance: LongWord): String;
 begin
-  Result := ExtractFileDir(PackageFileName);
+  Result := ExtractFileDir(PackageFileName(Instance));
 end;
 
 function FileInfo(const FileName: String; FileInfoKey: TFileInfoKey): String;

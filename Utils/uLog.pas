@@ -1,6 +1,5 @@
 unit uLog;
 
-
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
 (*           /\    \        /\    \        /\    \        /\    \        /\    \           *)
@@ -38,6 +37,17 @@ uses
 procedure WriteLog(const Value: String);
 procedure WriteLogFmt(const Value: String; const Args: array of const);
 procedure WriteError(E: Exception);
+{
+
+  Если лог вызывается из библиотеки, надо принудительно проинициализировать его в этой библиотеки со ссылкой на
+  экземпляр этот пакета, чтобы файл лога создавался с именем библиотеки, которая вызывает лог, а не с именем библиотеки,
+  возвращающей пути. Причем, для каждого модуля создается свой экземпляр лога, поэтому можно не беспокоиться, о том, что
+  он будет какой-то один для всей связки. Каждый модуль сохраняет сообщения в свой файл <имя модуля>.log рядом с
+  модулем. Просто вызывайте этот метод где-нибудь в инициализации каждого модуля кроме хоста и все.
+
+}
+procedure ForceLogInit(Instance: LongWord);
+function LogFileName(Instance: LongWord): String;
 
 implementation
 
@@ -68,7 +78,7 @@ type
 
   private
 
-    constructor Create;
+    constructor Create(Instance: LongWord = 0);
     destructor Destroy; override;
 
     procedure WriteLog(const Value: String);
@@ -84,7 +94,10 @@ begin
 
   inherited Create;
 
-  FLogFileName :=Format('%s\%s.log', [PackageDir, PackageName]);
+  if Instance = 0 then
+    Instance := HInstance;
+
+  FLogFileName := uLog.LogFileName(Instance);
   FLock := TCriticalSection.Create;
 
 end;
@@ -219,6 +232,16 @@ procedure WriteError(E: Exception);
 begin
   _CheckLogVar;
   Log.WriteError(E);
+end;
+
+procedure ForceLogInit(Instance: LongWord);
+begin
+  Log := TLog.Create(Instance);
+end;
+
+function LogFileName(Instance: LongWord): String;
+begin
+  Result := Format('%s\%s.log', [PackageDir(Instance), PackageName(Instance)]);
 end;
 
 initialization
