@@ -48,8 +48,8 @@ type
 
     constructor Create; virtual;
 
-    procedure RetrieveTargerInterface(_Receiver: TIntfObject); virtual; abstract;
-    procedure FreeTargerInterface; virtual; abstract;
+    procedure RetrieveTargerInterface(_Receiver: TIntfObject); virtual;
+    procedure FreeTargerInterface; virtual;
     procedure SetSource(const _Data); virtual; abstract;
     procedure FreeContext(var _Data); virtual; abstract;
     procedure Read; virtual; abstract;
@@ -115,6 +115,16 @@ implementation
 constructor TCustomParser.Create;
 begin
   inherited Create;
+end;
+
+procedure TCustomParser.RetrieveTargerInterface(_Receiver: TIntfObject);
+begin
+  raise ECustomReadWriteException.Create('Override this method.');
+end;
+
+procedure TCustomParser.FreeTargerInterface;
+begin
+  raise ECustomReadWriteException.Create('Override this method.');
 end;
 
 procedure TCustomParser.Terminate;

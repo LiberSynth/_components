@@ -30,14 +30,16 @@ interface
 uses
   { VCL }
   SysUtils, ToolsAPI,
-  { VDebugPackage }
-  uCustom;
+  { LiberSynth }
+  uCustom, uCore;
 
 type
 
+  { TODO 2 -oVasilyevSM -cVDebug : Перенаследовать и переименовать в  Exception. }
   EEvaluateError = class(Exception);
   EModifyError = class(Exception);
   EModifyRemoteMemoryError = class(Exception);
+  ELSDebugException = class(ECoreException);
 
   TEvaluateResult = record
 
@@ -130,8 +132,6 @@ function CurrentThread: IOTAThread;
 implementation
 
 uses
-  { Utils }
-  uLog,
   { VDebugPackage }
   uProjectConsts, uCommon;
 
@@ -239,9 +239,6 @@ begin
     SetLength(ResultStr, IC_EvalResultStrLength);
     ExprStr := _Expression;
     EvaluateResult := CurrentThread.Evaluate(_Expression, PChar(ResultStr), Length(ResultStr) - 1, CanModify, True, '', ResultAddress, ResultSize, ResVal);
-    {$IFDEF DEBUG}
-    WriteLogFmt('EvaluateResult: %d; ResVal: %d', [Integer(EvaluateResult), ResVal]);
-    {$ENDIF}
     SetLength(ResultStr, StrLen(PChar(ResultStr)));
 
   end;
@@ -380,9 +377,6 @@ begin
     SetLength(ResultStr, IC_EvalResultStrLength);
     ExprStr := _ValueStr;
     ModifyResult := CurrentThread.Modify(_ValueStr, PChar(ResultStr), Length(ResultStr) - 1, ResVal);
-    {$IFDEF DEBUG}
-    WriteLogFmt('EvaluateResult: %d; ResVal: %d', [Integer(ModifyResult), ResVal]);
-    {$ENDIF}
     SetLength(ResultStr, StrLen(PChar(ResultStr)));
 
   end;

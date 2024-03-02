@@ -200,7 +200,7 @@ begin
 
   try
 
-    WriteLogFmt('%s: ', [E.ClassName, E.Message]);
+    WriteLogFmt('%s: %s', [E.ClassName, E.Message]);
 
   except
   end;

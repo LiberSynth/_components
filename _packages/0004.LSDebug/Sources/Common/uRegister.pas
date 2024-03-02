@@ -41,8 +41,11 @@ uses
 
 var
 
+  { TODO 1 -oVasilyevSM -cVDebug : Реплэйсер для типа Variant }
+  { TODO 3 -oVasilyevSM -cVDebug : uses to trim }
+
   { Не нужно пытаться обработать TDateTime. Среда не вызывает методы интерфейса для этого типа по неизвестным причинам. }
-  { TODO -oVasilyevSM -cVDebug : Похоже, проблема была в том, что для TDateTime уже объявлен визуализатор }
+  { TODO 2 -oVasilyevSM -cVDebug : Похоже, проблема была в том, что для TDateTime уже объявлен визуализатор }
 
   StringValueReplacer: TStringValueReplacer;
   GUIDValueReplacer:   TGUIDValueReplacer;

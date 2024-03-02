@@ -31,8 +31,6 @@ uses
   { LSL }
   uCore, uCustomReadWrite, uCustomStringParser, uStrUtils, uConsts, uFileUtils;
 
-  { TODO 1 -oVasilyevSM -cuCleanText: Проверить CursorStanding. }
-
 function CleanDebuggerString(const Value: String): String;
 
 implementation
@@ -41,16 +39,16 @@ type
 
   TKeyType = ( { inherits from uCustomStringParser.TKeyType }
 
-      ktNone, ktSourceEnd, ktLineEnd, ktStringBorder, ktHexPrefix, ktEndBreak
+      ktNone, ktSourceEnd, ktLineEnd, ktStringBorder, ktDecimalPrefix, ktEndBreak
 
   );
   TKeyTypes = set of TKeyType;
 
 const
 
-  KWR_QUOTE_SINGLE: TKeyWord = (KeyTypeInternal: Integer(ktStringBorder); StrValue: '''';  KeyLength: Length('''' ));
-  KWR_HEX_PREFIX:   TKeyWord = (KeyTypeInternal: Integer(ktHexPrefix   ); StrValue: '#$';  KeyLength: Length('#$' ));
-  KWR_END_BREAK:    TKeyWord = (KeyTypeInternal: Integer(ktEndBreak    ); StrValue: '...'; KeyLength: Length('...'));
+  KWR_QUOTE_SINGLE:   TKeyWord = (KeyTypeInternal: Integer(ktStringBorder ); StrValue: '''';  KeyLength: Length('''' ));
+  KWR_DECIMAL_PREFIX: TKeyWord = (KeyTypeInternal: Integer(ktDecimalPrefix); StrValue: '#';   KeyLength: Length('#'  ));
+  KWR_END_BREAK:      TKeyWord = (KeyTypeInternal: Integer(ktEndBreak     ); StrValue: '...'; KeyLength: Length('...'));
 
 type
 
@@ -68,7 +66,7 @@ type
 
   end;
 
-  TElementType = (etString, etHex, etEndBreak);
+  TElementType = (etString, etDecimal, etEndBreak);
 
   TDebuggerStringParser = class(TCustomStringParser)
 
@@ -79,7 +77,7 @@ type
     FResultValue: String;
 
     function ReadString: String;
-    function ReadHex: String;
+    function ReadDecimal: String;
     procedure SendString(const _Value: String);
 
   private
@@ -147,13 +145,20 @@ begin
   Result := ReadElement;
   if DoublingChar > #0 then
     Result := UndoubleStr(Result, DoublingChar);
-  StrToFile(Result, 'C:\WorkLS\LogC.txt');
 end;
 
-function TDebuggerStringParser.ReadHex: String;
+function TDebuggerStringParser.ReadDecimal: String;
+var
+  Value: String;
 begin
-  Result := HexCharStrToStr(SC_HEX_CHAR_SIGN + ReadElement);
-  StrToFile(Result, 'C:\WorkLS\LogC.txt');
+
+  Value := ReadElement;
+
+  if (Length(Value) > 0) and (Value[1] = '$') then
+    Result := HexCharStrToStr(SC_DECIMAL_CHAR_SIGN + ReadElement)
+  else
+    Result := Char(StrToInt(ReadElement));
+
 end;
 
 procedure TDebuggerStringParser.SendString(const _Value: String);
@@ -168,8 +173,8 @@ begin
 
   with KeyWords do begin
 
-    Add(KWR_HEX_PREFIX);
-    Add(KWR_END_BREAK );
+    Add(KWR_DECIMAL_PREFIX);
+    Add(KWR_END_BREAK     );
 
   end;
 
@@ -180,12 +185,12 @@ end;
 
 function TDebuggerStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
 begin
-  Result := _KeyWord.TypeInSet([ktHexPrefix, ktSourceEnd]);
+  Result := _KeyWord.TypeInSet([ktDecimalPrefix, ktSourceEnd]);
 end;
 
 function TDebuggerStringParser.ElementTerminatingKey(_KeyWord: TKeyWord): Boolean;
 begin
-  Result := _KeyWord.TypeInSet([ktHexPrefix, ktEndBreak, ktSourceEnd]);
+  Result := _KeyWord.TypeInSet([ktDecimalPrefix, ktEndBreak, ktSourceEnd]);
 end;
 
 procedure TDebuggerStringParser.ToggleElement(_KeyWord: TKeyWord);
@@ -193,9 +198,9 @@ begin
 
   case _KeyWord.KeyType of
 
-    ktStringBorder: ElementType := etString;
-    ktHexPrefix:    ElementType := etHex;
-    ktEndBreak:     ElementType := etEndBreak;
+    ktStringBorder:  ElementType := etString;
+    ktDecimalPrefix: ElementType := etDecimal;
+    ktEndBreak:      ElementType := etEndBreak;
 
   end;
 
@@ -208,9 +213,9 @@ begin
 
   case ElementType of
 
-    etString:   SendString(ReadString);
-    etHex:      SendString(ReadHex   );
-    etEndBreak: SendString('...'     );
+    etString:   SendString(ReadString );
+    etDecimal:  SendString(ReadDecimal);
+    etEndBreak: SendString('...'      );
 
   end;
 
@@ -277,6 +282,7 @@ end;
 function CleanDebuggerString(const Value: String): String;
 begin
 
+  { Здесь ридер не нужен, поскольку сбор результата статичен. }
   with TDebuggerStringParser.Create do
 
     try

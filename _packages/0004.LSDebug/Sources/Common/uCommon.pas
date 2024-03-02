@@ -30,11 +30,15 @@ interface
 uses
   { VCL }
   SysUtils,
-  { Liber Synth }
-  uParams, uLSIni;
+  { LiberSynth }
+  {$IFDEF DEBUG}
+  uLog,
+  {$ENDIF}
+  uParams, uLSIni, uClasses, uLSNIStringParamsCompiler;
 
 { Сохраняемые параметры пакета }
 function PackageParams: TParams;
+function PackageParamsFile: String;
 
 function FormatException(E: Exception): String;
 function WrapMessage(const Wrapper, ErrorMessage: String): String;
@@ -52,64 +56,90 @@ implementation
 
 uses
   { Utils }
-  uFileUtils, uLog,
+  uFileUtils,
   { VDebugPackage }
   uProjectConsts;
 
 { Сохраняемые параметры пакета }
 
-function ParamsFilePath: String;
+var
+  LSIni: TLSIni = nil;
+  DefaultParams: TParams = nil;
+
+procedure _InitDefaultParams(Params: TParams);
+begin
+
+  Params.AsInteger['StringValueReplacer.ResultLengthLimit'  ] := 102400;
+  Params.AsInteger['StringValueReplacer.MaxEvaluatingLength'] :=   4096;
+
+end;
+
+procedure _InitParams;
+begin
+
+  try
+
+    LSIni := TLSIni.Create(nil);
+    with LSIni do begin
+
+      SourcePath := PackageParamsFile;
+      LSNISaveOptions := LSNISaveOptions + [soTypesFree];
+      _InitDefaultParams(Params);
+      Load;
+
+    end;
+
+  except
+
+    on E: Exception do begin
+
+      DefaultParams := TParams.Create;
+      _InitDefaultParams(DefaultParams);
+
+      {$IFDEF DEBUG}
+      WriteError(E);
+      {$ENDIF}
+
+    end;
+
+  end;
+
+end;
+
+procedure _FinParams;
+begin
+
+  try
+
+    LSIni.Save;
+    FreeAndNil(LSIni);
+
+  except
+    {$IFDEF DEBUG}
+    on E: Exception do
+      WriteError(E);
+    {$ENDIF}
+  end;
+
+end;
+
+function PackageParams: TParams;
+begin
+  if Assigned(LSIni) then Result := LSIni.Params
+  else Result := DefaultParams;
+end;
+
+function PackageParamsFile: String;
 var
   Folder: String;
 begin
 
   if GetSpecialFolder(Folder, sfAppData) then
 
-    Result := Format('%0:s\%1:s\%2:s\%2:s.ini', [Folder, 'LiberSynth', PackageName])
+    Result := Format('%0:s\%1:s\%2:s\%2:s.ini', [Folder, 'LiberSynth', PackageName(HInstance)])
 
   else Result := '';
 
-end;
-
-//var
-//  LSIni: TLSIni = nil;
-
-procedure LoadParams;
-begin
-
-//  try
-//
-//    LSIni.SourcePath := FileToStr(ParamsFilePath);
-//    LSIni.Load;
-//
-//  except
-//    on E: Exception do
-//      WriteError(E);
-//  end;
-
-end;
-
-procedure SaveParams;
-begin
-
-  { TODO 5 -oVasilyevSM -cLSDebug: Поправить }
-
-//  try
-//
-//    LSIni.Save;
-//
-//  except
-//    on E: Exception do
-//      WriteError(E);
-//  end;
-
-end;
-
-function PackageParams: TParams;
-begin
-  Result := nil;
-//  if not Assigned(LSIni) or not Assigned(LSIni.Params) then raise Exception.Create('Ini file is not loaded.');
-//  Result := LSIni.Params;
 end;
 
 function FormatException(E: Exception): String;
@@ -158,26 +188,14 @@ end;
 
 initialization
 
-//  try
-//
-//    LSIni := TLSIni.Create(nil);
-//    LoadParams;
-//
-//  except
-//  end;
+  _InitParams;
+  {$IFDEF DEBUG}
+  ForceLogInit(HInstance);
+  {$ENDIF}
 
 finalization
 
-//  try
-//
-//    if Assigned(LSIni) then begin
-//
-//      SaveParams;
-//      FreeAndNil(LSIni);
-//
-//    end;
-//
-//  except
-//  end;
+  _FinParams;
+  FreeAndNil(DefaultParams);
 
 end.
