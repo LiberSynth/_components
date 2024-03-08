@@ -58,26 +58,19 @@ type
 
   strict private
 
-  type
-
-    TKeyWordMap = array of TStringArray;
-    TKeyWordMapKey = array of TIntegerArray;
-
   strict private
 
     FMaxKeyLength: Word;
-    FMap: TKeyWordMap;
-    FMapKey: TKeyWordMapKey;
-
-    function IndexOfStrValue(const _StrValue: String): Integer;
 
   private
 
-    procedure Prepare;
+    function SortedSearch(const _StrValue: String): Integer; inline;
 
     property MaxKeyLength: Word read FMaxKeyLength write FMaxKeyLength;
-    property Map: TKeyWordMap read FMap;
-    property MapKey: TKeyWordMapKey read FMapKey;
+
+  public
+
+    procedure Add(_KeyWord: TKeyWord);
 
   end;
 
@@ -319,7 +312,7 @@ type
 
   end;
 
-  { Этот класс используется, когда CustomStringParser.NativeException = False. Он позволит спозиционировать курсор в
+  { Этот класс используется, когда CustomStringParser.NativeException = False. Он позволяет спозиционировать курсор в
    контроле с источником, чтобы указать на место ошибки. }
   ELocatedException = class(EReadException)
 
@@ -427,43 +420,63 @@ end;
 
 { TKeyWordList }
 
-function TKeyWordList.IndexOfStrValue(const _StrValue: String): Integer;
+function TKeyWordList.SortedSearch(const _StrValue: String): Integer;
 var
-  i: Integer;
+  Index, Comp, Prev, Step: Integer;
+  D: Double;
+  Last: Boolean;
 begin
 
-  for i := 0 to Count - 1 do
-    if Self[i].StrValue = _StrValue then
-      Exit(i);
+  { Опасная функция. Прибыль 7%. }
+  Prev := 0;
+  Index := Count div 2;
+  Last := False;
+
+  repeat
+
+    Comp := CompareStr(_StrValue, Self[Index].StrValue);
+    if Comp = 0 then Exit(Index);
+
+    D := Abs(Index - Prev) / 2;
+    if D = 0.5 then begin
+
+      if Last then Step := 0
+      else begin
+
+        Step := 1;
+        Last := True;
+
+      end;
+
+    end else Step := Round(D);
+    Prev := Index;
+
+    if Comp > 0 then Inc(Index, Step)
+    else Dec(Index, Step);
+
+  until Step = 0;
 
   Result := -1;
 
 end;
 
-procedure TKeyWordList.Prepare;
+procedure TKeyWordList.Add(_KeyWord: TKeyWord);
 var
-  i: Word;
-  KeyWord: TKeyWord;
-  S: String;
+  i: Integer;
 begin
 
-  MaxKeyLength := 0;
-  for KeyWord in Self do
-    MaxKeyLength := Max(MaxKeyLength, KeyWord.KeyLength);
+  FMaxKeyLength := Max(FMaxKeyLength, Length(_KeyWord.StrValue));
 
-  SetLength(FMap,    MaxKeyLength);
-  SetLength(FMapKey, MaxKeyLength);
+  for i := 0 to Count - 1 do
 
-  for i := 1 to MaxKeyLength do begin
+    if CompareStr(_KeyWord.StrValue, Self[i].StrValue) < 0 then begin
 
-    for KeyWord in Self do
-      if KeyWord.KeyLength = i then
-        AddToStrArray(Map[i - 1], KeyWord.StrValue, False, False, True);
+      inherited Insert(i, _KeyWord);
+      Exit;
 
-    for S in Map[i - 1] do
-      AddToIntArray(MapKey[i - 1], IndexOfStrValue(S));
+    end;
 
-  end;
+  inherited Add(_KeyWord);
 
 end;
 
@@ -683,8 +696,6 @@ var
   CursorKey: TKeyWord;
 begin
 
-  KeyWords.Prepare;
-
   while not Eof and not Terminated do begin
 
     if not CheckRegions then
@@ -721,10 +732,10 @@ begin
 
   for i := KeyWords.MaxKeyLength downto 1 do begin
 
-    Index := FindInStrArray(Copy(Source, Cursor, i), KeyWords.Map[i - 1]);
+    Index := KeyWords.SortedSearch(Copy(Source, Cursor, i));
     if Index > -1 then begin
 
-      _Value := KeyWords[KeyWords.MapKey[i - 1][Index]];
+      _Value := KeyWords[Index];
       Exit(True);
 
     end;

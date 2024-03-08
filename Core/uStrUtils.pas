@@ -139,7 +139,6 @@ function IntersectStrArrays(const ArrayA, ArrayB: TStringArray): TStringArray;
 function ExcludeFromStrArray(const ArrayFrom, ArrayToExclude: TStringArray): TStringArray;
 function ConcatStrArrays(const ArrayA, ArrayB: TStringArray; Distinct: Boolean = False; Sorted: Boolean = False): TStringArray;
 function SortStrArray(const Value: TStringArray): TStringArray;
-function FindInStrArray(const Value: String; const StrArray: TStringArray): Integer; inline;
 procedure DelimStrToArray(var StrArray: TStringArray; Value: String; const Delimiter: String = ';'; Sorted: Boolean = False); overload;
 function DelimStrToArray(const Value: String; const Delimiter: String = ';'; Sorted: Boolean = False): TStringArray; overload;
 function ArrayToDelimStr(const StrArray: TStringArray; const Delimiter: String = ';'): String;
@@ -1204,6 +1203,7 @@ begin
 
       for i := Low(StrArray) to High(StrArray) do
 
+        { TODO 4 -oVasilyevSM -cuStrUtils: CompareStr? }
         if CompareText(StrArray[i], Value) > 0 then begin
 
           Result := i;
@@ -1279,31 +1279,6 @@ begin
 
   for S in Value do
     AddToStrArray(Result, S, True);
-
-end;
-
-function FindInStrArray(const Value: String; const StrArray: TStringArray): Integer;
-var
-  Index, Comp, Prev, Step: Integer;
-begin
-
-  Prev := 0;
-  Index := Length(StrArray) div 2;
-
-  repeat
-
-    Comp := CompareStr(Value, StrArray[Index]);
-    if Comp = 0 then Exit(Index);
-
-    Step := Abs(Index - Prev) div 2;
-    Prev := Index;
-
-    if Comp > 0 then Inc(Index, Step)
-    else Dec(Index, Step);
-
-  until Step = 0;
-
-  Result := -1;
 
 end;
 
