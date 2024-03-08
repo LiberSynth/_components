@@ -64,7 +64,8 @@ type
 
   private
 
-    function SortedSearch(const _StrValue: String): Integer; inline;
+    {$HINTS OFF}function Search(const _StrValue: String): Integer; inline;{$HINTS ON}
+    function SearchSorted(const _StrValue: String): Integer; inline;
 
     property MaxKeyLength: Word read FMaxKeyLength write FMaxKeyLength;
 
@@ -420,16 +421,29 @@ end;
 
 { TKeyWordList }
 
-function TKeyWordList.SortedSearch(const _StrValue: String): Integer;
+function TKeyWordList.Search(const _StrValue: String): Integer;
 var
-  Index, Comp, Prev, Step: Integer;
-  D: Double;
+  i: Integer;
+begin
+
+  for i := 0 to Count - 1 do
+    if Self[i].StrValue = _StrValue then
+      Exit(i);
+
+  Result := -1;
+
+end;
+
+function TKeyWordList.SearchSorted(const _StrValue: String): Integer;
+var
+  Index, LowBound, HighBound, Comp, Prev: Integer;
   Last: Boolean;
 begin
 
-  { Опасная функция. Прибыль 7%. }
-  Prev := 0;
-  Index := Count div 2;
+  { Опасная функция. Прибыль на коротких списках 2.46%. }
+  LowBound := 0;
+  HighBound := Count - 1;
+  Index := HighBound div 2;
   Last := False;
 
   repeat
@@ -437,24 +451,22 @@ begin
     Comp := CompareStr(_StrValue, Self[Index].StrValue);
     if Comp = 0 then Exit(Index);
 
-    D := Abs(Index - Prev) / 2;
-    if D = 0.5 then begin
+    if Comp > 0 then LowBound := Index
+    else HighBound := Index;
 
-      if Last then Step := 0
-      else begin
-
-        Step := 1;
-        Last := True;
-
-      end;
-
-    end else Step := Round(D);
     Prev := Index;
+    Index := LowBound + (HighBound - LowBound) div 2;
 
-    if Comp > 0 then Inc(Index, Step)
-    else Dec(Index, Step);
+    if (Index = Prev) and not Last then begin
 
-  until Step = 0;
+      if Comp > 0 then Inc(Index)
+      else Dec(Index);
+
+      Last := True;
+
+    end;
+
+  until Index = Prev;
 
   Result := -1;
 
@@ -732,7 +744,7 @@ begin
 
   for i := KeyWords.MaxKeyLength downto 1 do begin
 
-    Index := KeyWords.SortedSearch(Copy(Source, Cursor, i));
+    Index := KeyWords.SearchSorted(Copy(Source, Cursor, i));
     if Index > -1 then begin
 
       _Value := KeyWords[Index];
