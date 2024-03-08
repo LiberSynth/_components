@@ -428,8 +428,7 @@ begin
   for KeyWord in Self do
     MaxKeyLength := Max(MaxKeyLength, KeyWord.KeyLength);
 
-  i := MaxKeyLength;
-  while i > 0 do begin
+  for i := 1 to MaxKeyLength do begin
 
     for KeyWord in Self do
 
@@ -441,8 +440,6 @@ begin
           else AddToIntArray(FMap, -1);
 
       end;
-
-    Dec(i);
 
   end;
 
@@ -700,9 +697,8 @@ var
   i, p: Integer;
 begin
 
-  i := KeyWords.MaxKeyLength;
-
-  while i > 0 do begin
+  { TODO 2 -oVasilyevSM -cuCustomStringParser: Нужна оптимизация с сортированным списком значений. }
+  for i := KeyWords.MaxKeyLength downto 1 do begin
 
     p := Pos(Copy(Source, Cursor, i), KeyWords.MapStr);
     if p > 0 then begin
@@ -711,8 +707,6 @@ begin
       Exit(True);
 
     end;
-
-    Dec(i);
 
   end;
 

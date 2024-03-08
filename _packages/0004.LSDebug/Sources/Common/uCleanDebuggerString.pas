@@ -39,7 +39,7 @@ type
 
   TKeyType = ( { inherits from uCustomStringParser.TKeyType }
 
-      ktNone, ktSourceEnd, ktLineEnd, ktStringBorder, ktDecimalPrefix, ktEndBreak
+      ktNone, ktSourceEnd, ktLineEnd, ktStringBorder, ktDecimalPrefix, ktHexPrefix, ktEndBreak
 
   );
   TKeyTypes = set of TKeyType;
@@ -48,6 +48,7 @@ const
 
   KWR_QUOTE_SINGLE:   TKeyWord = (KeyTypeInternal: Integer(ktStringBorder ); StrValue: '''';  KeyLength: Length('''' ));
   KWR_DECIMAL_PREFIX: TKeyWord = (KeyTypeInternal: Integer(ktDecimalPrefix); StrValue: '#';   KeyLength: Length('#'  ));
+  KWR_HEX_PREFIX:     TKeyWord = (KeyTypeInternal: Integer(ktHexPrefix);     StrValue: '#$';  KeyLength: Length('#$' ));
   KWR_END_BREAK:      TKeyWord = (KeyTypeInternal: Integer(ktEndBreak     ); StrValue: '...'; KeyLength: Length('...'));
 
 type
@@ -66,7 +67,7 @@ type
 
   end;
 
-  TElementType = (etString, etDecimal, etEndBreak);
+  TElementType = (etString, etDecimal, etHex, etEndBreak);
 
   TDebuggerStringParser = class(TCustomStringParser)
 
@@ -78,6 +79,7 @@ type
 
     function ReadString: String;
     function ReadDecimal: String;
+    function ReadHex: String;
     procedure SendString(const _Value: String);
 
   private
@@ -148,17 +150,13 @@ begin
 end;
 
 function TDebuggerStringParser.ReadDecimal: String;
-var
-  Value: String;
 begin
+  Result := Char(StrToInt(ReadElement));
+end;
 
-  Value := ReadElement;
-
-  if (Length(Value) > 0) and (Value[1] = '$') then
-    Result := HexCharStrToStr(SC_DECIMAL_CHAR_SIGN + ReadElement)
-  else
-    Result := Char(StrToInt(ReadElement));
-
+function TDebuggerStringParser.ReadHex: String;
+begin
+  Result := HexCharStrToStr(SC_HEX_CHAR_SIGN + ReadElement)
 end;
 
 procedure TDebuggerStringParser.SendString(const _Value: String);
@@ -174,6 +172,7 @@ begin
   with KeyWords do begin
 
     Add(KWR_DECIMAL_PREFIX);
+    Add(KWR_HEX_PREFIX    );
     Add(KWR_END_BREAK     );
 
   end;
@@ -185,12 +184,12 @@ end;
 
 function TDebuggerStringParser.ElementProcessingKey(_KeyWord: TKeyWord): Boolean;
 begin
-  Result := _KeyWord.TypeInSet([ktDecimalPrefix, ktSourceEnd]);
+  Result := _KeyWord.TypeInSet([ktDecimalPrefix, ktHexPrefix, ktSourceEnd]);
 end;
 
 function TDebuggerStringParser.ElementTerminatingKey(_KeyWord: TKeyWord): Boolean;
 begin
-  Result := _KeyWord.TypeInSet([ktDecimalPrefix, ktEndBreak, ktSourceEnd]);
+  Result := _KeyWord.TypeInSet([ktDecimalPrefix, ktHexPrefix, ktEndBreak, ktSourceEnd]);
 end;
 
 procedure TDebuggerStringParser.ToggleElement(_KeyWord: TKeyWord);
@@ -200,6 +199,7 @@ begin
 
     ktStringBorder:  ElementType := etString;
     ktDecimalPrefix: ElementType := etDecimal;
+    ktHexPrefix:     ElementType := etHex;
     ktEndBreak:      ElementType := etEndBreak;
 
   end;
@@ -215,6 +215,7 @@ begin
 
     etString:   SendString(ReadString );
     etDecimal:  SendString(ReadDecimal);
+    etHex:      SendString(ReadHex    );
     etEndBreak: SendString('...'      );
 
   end;

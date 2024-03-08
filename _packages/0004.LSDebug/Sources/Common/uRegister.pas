@@ -62,8 +62,8 @@ begin
 
   GetDebuggerServices;
 
-  _RegisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer),       TStringValueReplacer       );
-  _RegisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer),         TGUIDValueReplacer         );
+  _RegisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer), TStringValueReplacer);
+  _RegisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer),   TGUIDValueReplacer  );
 
 end;
 
@@ -76,8 +76,8 @@ procedure Unregister;
 
 begin
 
-  _UnregisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer       ));
-  _UnregisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer         ));
+  _UnregisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer));
+  _UnregisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer  ));
 
 end;
 
