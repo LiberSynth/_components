@@ -58,17 +58,26 @@ type
 
   strict private
 
+  type
+
+    TKeyWordMap = array of TStringArray;
+    TKeyWordMapKey = array of TIntegerArray;
+
+  strict private
+
     FMaxKeyLength: Word;
-    FMapStr: String;
-    FMap: TIntegerArray;
+    FMap: TKeyWordMap;
+    FMapKey: TKeyWordMapKey;
+
+    function IndexOfStrValue(const _StrValue: String): Integer;
 
   private
 
     procedure Prepare;
 
     property MaxKeyLength: Word read FMaxKeyLength write FMaxKeyLength;
-    property MapStr: String read FMapStr write FMapStr;
-    property Map: TIntegerArray read FMap;
+    property Map: TKeyWordMap read FMap;
+    property MapKey: TKeyWordMapKey read FMapKey;
 
   end;
 
@@ -418,28 +427,41 @@ end;
 
 { TKeyWordList }
 
+function TKeyWordList.IndexOfStrValue(const _StrValue: String): Integer;
+var
+  i: Integer;
+begin
+
+  for i := 0 to Count - 1 do
+    if Self[i].StrValue = _StrValue then
+      Exit(i);
+
+  Result := -1;
+
+end;
+
 procedure TKeyWordList.Prepare;
 var
-  i, j: Word;
+  i: Word;
   KeyWord: TKeyWord;
+  S: String;
 begin
 
   MaxKeyLength := 0;
   for KeyWord in Self do
     MaxKeyLength := Max(MaxKeyLength, KeyWord.KeyLength);
 
+  SetLength(FMap,    MaxKeyLength);
+  SetLength(FMapKey, MaxKeyLength);
+
   for i := 1 to MaxKeyLength do begin
 
     for KeyWord in Self do
+      if KeyWord.KeyLength = i then
+        AddToStrArray(Map[i - 1], KeyWord.StrValue, False, False, True);
 
-      if KeyWord.KeyLength = i then begin
-
-        MapStr := MapStr + KeyWord.StrValue;
-        for j := 1 to i do
-          if j = 1 then AddToIntArray(FMap, IndexOf(KeyWord))
-          else AddToIntArray(FMap, -1);
-
-      end;
+    for S in Map[i - 1] do
+      AddToIntArray(MapKey[i - 1], IndexOfStrValue(S));
 
   end;
 
@@ -694,16 +716,15 @@ end;
 
 function TCustomStringParser.GetCursorKey(var _Value: TKeyWord): Boolean;
 var
-  i, p: Integer;
+  i, Index: Integer;
 begin
 
-  { TODO 2 -oVasilyevSM -cuCustomStringParser: Нужна оптимизация с сортированным списком значений. }
   for i := KeyWords.MaxKeyLength downto 1 do begin
 
-    p := Pos(Copy(Source, Cursor, i), KeyWords.MapStr);
-    if p > 0 then begin
+    Index := FindInStrArray(Copy(Source, Cursor, i), KeyWords.Map[i - 1]);
+    if Index > -1 then begin
 
-      _Value := KeyWords[KeyWords.Map[p - 1]];
+      _Value := KeyWords[KeyWords.MapKey[i - 1][Index]];
       Exit(True);
 
     end;

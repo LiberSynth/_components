@@ -126,7 +126,7 @@ function StrToArray(Value: String; const Delimiter: String = ';'; DelimBehind: B
 function ArrayToStr(const StrArray: TStringArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String; overload;
 function ArrayToStr(const IntArray: TIntegerArray; const Delimiter: String = ';'; DelimBehind: Boolean = False): String; overload;
 function Contains(const StrArray: TStringArray; const Value: String): Boolean;
-procedure AddToStrArray(
+function AddToStrArray(
 
     var StrArray: TStringArray;
     const Value: String;
@@ -134,11 +134,12 @@ procedure AddToStrArray(
     Distinct: Boolean = False;
     Sorted: Boolean = False
 
-);
+): Integer;
 function IntersectStrArrays(const ArrayA, ArrayB: TStringArray): TStringArray;
 function ExcludeFromStrArray(const ArrayFrom, ArrayToExclude: TStringArray): TStringArray;
 function ConcatStrArrays(const ArrayA, ArrayB: TStringArray; Distinct: Boolean = False; Sorted: Boolean = False): TStringArray;
 function SortStrArray(const Value: TStringArray): TStringArray;
+function FindInStrArray(const Value: String; const StrArray: TStringArray): Integer; inline;
 procedure DelimStrToArray(var StrArray: TStringArray; Value: String; const Delimiter: String = ';'; Sorted: Boolean = False); overload;
 function DelimStrToArray(const Value: String; const Delimiter: String = ';'; Sorted: Boolean = False): TStringArray; overload;
 function ArrayToDelimStr(const StrArray: TStringArray; const Delimiter: String = ';'): String;
@@ -1183,9 +1184,9 @@ begin
 
 end;
 
-procedure AddToStrArray(var StrArray: TStringArray; const Value: String; IgnoreEmpty, Distinct, Sorted: Boolean);
+function AddToStrArray(var StrArray: TStringArray; const Value: String; IgnoreEmpty, Distinct, Sorted: Boolean): Integer;
 var
-  L, i, Index: Integer;
+  L, i: Integer;
 begin
 
   if
@@ -1199,34 +1200,35 @@ begin
 
     if Sorted then begin
 
-      Index := -1;
+      Result := -1;
 
       for i := Low(StrArray) to High(StrArray) do
 
         if CompareText(StrArray[i], Value) > 0 then begin
 
-          Index := i;
+          Result := i;
           Break;
 
         end;
 
-      if Index = -1 then Index := L;
+      if Result = -1 then Result := L;
 
       SetLength(StrArray, L + 1);
 
-      for i := High(StrArray) downto Index + 1 do
+      for i := High(StrArray) downto Result + 1 do
         StrArray[i] := StrArray[i - 1];
 
-      StrArray[Index] := Value;
+      StrArray[Result] := Value;
 
     end else begin
 
       SetLength(StrArray, L + 1);
       StrArray[L] := Value;
+      Result := L;
 
     end;
 
-  end;
+  end else Result := -1;
 
 end;
 
@@ -1277,6 +1279,31 @@ begin
 
   for S in Value do
     AddToStrArray(Result, S, True);
+
+end;
+
+function FindInStrArray(const Value: String; const StrArray: TStringArray): Integer;
+var
+  Index, Comp, Prev, Step: Integer;
+begin
+
+  Prev := 0;
+  Index := Length(StrArray) div 2;
+
+  repeat
+
+    Comp := CompareStr(Value, StrArray[Index]);
+    if Comp = 0 then Exit(Index);
+
+    Step := Abs(Index - Prev) div 2;
+    Prev := Index;
+
+    if Comp > 0 then Inc(Index, Step)
+    else Dec(Index, Step);
+
+  until Step = 0;
+
+  Result := -1;
 
 end;
 
