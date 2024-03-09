@@ -467,7 +467,10 @@ begin
 
   Expr := ExpressionToRemoteModify(_Address, _TypeName);
   StrResult := Evaluate(Expr, CanModify);
-  if not CanModify then raise EModifyRemoteMemoryError.CreateFmt(SC_CanNotModifyError, [Expr]);
+
+  if not CanModify then
+    raise EModifyRemoteMemoryError.CreateFmt(SC_CanNotModifyError, [Expr]);
+
   SuccessRes := SuccessEmptyEvaluateResult;
 
   if (Length(SuccessRes) > 0) and not SameText(StrResult, SuccessRes) then

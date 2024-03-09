@@ -45,6 +45,7 @@ contains
   uCustomVizualizers in 'Custom\uCustomVizualizers.pas',
   uStringValueReplacer in 'Work\uStringValueReplacer.pas',
   uGUIDValueReplacer in 'Work\uGUIDValueReplacer.pas',
-  uCleanDebuggerString in 'Common\uCleanDebuggerString.pas';
+  uCleanDebuggerString in 'Common\uCleanDebuggerString.pas',
+  uVariantValueReplacer in 'Work\uVariantValueReplacer.pas';
 
 end.

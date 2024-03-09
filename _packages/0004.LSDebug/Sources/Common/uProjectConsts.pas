@@ -57,10 +57,19 @@ const
 
       'TGUID value replacer for Delphi';
 
+  SC_VariantValueReplacer_Name =
+
+      'Variant value replacer for Delphi';
+
   SC_GUIDValueReplacer_Description =
 
       'Заменитель значения типа TGUID для отладчика Дельфи. Для выражения с ключом ''d'' ' +
       'заменяет дефолтное представление GUID в виде записи его строковым представлением.';
+
+  SC_VariantValueReplacer_Description =
+
+      'Заменитель значения типа Variant для отладчика Дельфи. Для выражения с ключом ''d'' ' +
+      'заменяет дефолтное представление Variant его развернутым содержимым.';
 
 implementation
 

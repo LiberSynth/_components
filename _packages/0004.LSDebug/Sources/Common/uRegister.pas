@@ -37,18 +37,17 @@ uses
   { VDebugPackage }
   uClasses, uCustomVizualizers,
   { Visualizer units }
-  uStringValueReplacer, uGUIDValueReplacer;
+  uStringValueReplacer, uVariantValueReplacer, uGUIDValueReplacer;
 
 var
 
   { TODO 1 -oVasilyevSM -cVDebug : Реплэйсер для типа Variant }
   { TODO 3 -oVasilyevSM -cVDebug : uses to trim }
-
-  { Не нужно пытаться обработать TDateTime. Среда не вызывает методы интерфейса для этого типа по неизвестным причинам. }
   { TODO 2 -oVasilyevSM -cVDebug : Похоже, проблема была в том, что для TDateTime уже объявлен визуализатор }
 
-  StringValueReplacer: TStringValueReplacer;
-  GUIDValueReplacer:   TGUIDValueReplacer;
+  StringValueReplacer:  TStringValueReplacer;
+  GUIDValueReplacer:    TGUIDValueReplacer;
+  VariantValueReplacer: TVariantValueReplacer;
 
 procedure Register;
 
@@ -62,8 +61,9 @@ begin
 
   GetDebuggerServices;
 
-  _RegisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer), TStringValueReplacer);
-  _RegisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer),   TGUIDValueReplacer  );
+  _RegisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer ), TStringValueReplacer );
+  _RegisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer   ), TGUIDValueReplacer   );
+  _RegisterVizualizer(TCustomDebuggerVisualizer(VariantValueReplacer), TVariantValueReplacer);
 
 end;
 
@@ -76,8 +76,9 @@ procedure Unregister;
 
 begin
 
-  _UnregisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer));
-  _UnregisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer  ));
+  _UnregisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer ));
+  _UnregisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer   ));
+  _UnregisterVizualizer(TCustomDebuggerVisualizer(VariantValueReplacer));
 
 end;
 
