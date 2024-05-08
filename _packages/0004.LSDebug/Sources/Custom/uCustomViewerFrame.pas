@@ -41,7 +41,7 @@ type
 
   private
 
-    FEvaluator: TEvaluator;
+    FEvaluator: TCustomEvaluator;
     FOwningForm: TCustomForm;
     FAvailableState: TAvailableState;
     FClosedProc: TOTAVisualizerClosedProcedure;
@@ -52,20 +52,20 @@ type
     procedure RefreshVisualizer(const Expression, TypeName, EvalResult: String);
     procedure SetClosedCallBack(ClosedProc: TOTAVisualizerClosedProcedure);
 
-    function GetEvaluator: TEvaluator;
+    function GetEvaluator: TCustomEvaluator;
 
   protected
 
     procedure SetParent(_Parent: TWinControl); override;
     procedure ShowData(const _Expression, _TypeName, _EvalResult: String); virtual; abstract;
 
-    property Evaluator: TEvaluator read GetEvaluator;
+    property Evaluator: TCustomEvaluator read GetEvaluator;
     property OwningForm: TCustomForm read FOwningForm;
 
   public
 
     procedure SetForm(_Form: TCustomForm);
-    procedure SetProperties(_Evaluator: TEvaluator; const _ParamsSectionName: String); virtual;
+    procedure SetProperties(_Evaluator: TCustomEvaluator; const _ParamsSectionName: String); virtual;
     procedure RefreshFrame(const _Expression, _TypeName, _EvalResult: String);
     procedure SaveParams(const _ParamsSectionName: String); virtual;
 
@@ -88,9 +88,10 @@ begin
   if Assigned(FOwningForm) then FOwningForm.Close;
 end;
 
-function TCustomViewerFrame.GetEvaluator: TEvaluator;
+function TCustomViewerFrame.GetEvaluator: TCustomEvaluator;
 begin
-  if not Assigned(FEvaluator) then raise Exception.Create(SC_EvaluatorNotAssigned);
+  if not Assigned(FEvaluator) then
+    raise ELSDebugException.Create('Evaluator not assigned.');
   Result := FEvaluator;
 end;
 
@@ -126,7 +127,7 @@ begin
   FClosedProc := ClosedProc;
 end;
 
-procedure TCustomViewerFrame.SetProperties(_Evaluator: TEvaluator; const _ParamsSectionName: String);
+procedure TCustomViewerFrame.SetProperties(_Evaluator: TCustomEvaluator; const _ParamsSectionName: String);
 begin
   FEvaluator := _Evaluator;
 end;

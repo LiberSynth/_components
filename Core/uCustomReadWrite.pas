@@ -134,6 +134,7 @@ end;
 
 function TCustomParser.Clone: TCustomParser;
 begin
+  { TODO 1 -oVasilyevSM -cClone: Кстати, здесь обещана возможность использовать Assign объекта TPersistent. Проверить бы. }
   Result := TCustomParserClass(ClassType).Create;
 end;
 

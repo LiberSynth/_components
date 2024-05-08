@@ -35,7 +35,7 @@ const
   SC_ErrorFormat     = 'Error: %s';
   SC_WrapperFormat   = '%s (%s)';
 
-  SC_EvaluatorNotAssigned = 'Evaluator not assigned';
+  IC_EvalResultStrLength  = 16384;
   SC_FormCaption          = '%s for %s';
   IC_MaxHistoryCount      = 30;
 

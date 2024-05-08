@@ -39,9 +39,9 @@ type
 
   private
 
-    FEvaluator: TEvaluator;
+    FEvaluator: TCustomEvaluator;
 
-    function GetEvaluator: TEvaluator;
+    function GetEvaluator: TCustomEvaluator;
 
   protected
 
@@ -52,8 +52,8 @@ type
     function GetVisualizerName: String; virtual;
     function GetVisualizerDescription: String; virtual;
 
-    function EvaluatorClass: TEvaluatorClass; virtual;
-    property Evaluator: TEvaluator read GetEvaluator;
+    function EvaluatorClass: TCustomEvaluatorClass; virtual;
+    property Evaluator: TCustomEvaluator read GetEvaluator;
 
   public
 
@@ -103,7 +103,7 @@ uses
 
 constructor TCustomDebuggerVisualizer.Create;
 var
-  EC: TEvaluatorClass;
+  EC: TCustomEvaluatorClass;
 begin
 
   inherited Create;
@@ -119,15 +119,16 @@ begin
   inherited Destroy;
 end;
 
-function TCustomDebuggerVisualizer.GetEvaluator: TEvaluator;
+function TCustomDebuggerVisualizer.GetEvaluator: TCustomEvaluator;
 begin
-  if not Assigned(FEvaluator) then raise Exception.Create(SC_EvaluatorNotAssigned);
+  if not Assigned(FEvaluator) then
+    raise ELSDebugException.Create('Evaluator not assigned.');
   Result := FEvaluator;
 end;
 
-function TCustomDebuggerVisualizer.EvaluatorClass: TEvaluatorClass;
+function TCustomDebuggerVisualizer.EvaluatorClass: TCustomEvaluatorClass;
 begin
-  Result := TEvaluator;
+  Result := TCustomEvaluator;
 end;
 
 function TCustomDebuggerVisualizer.GetSupportedTypeCount: Integer;

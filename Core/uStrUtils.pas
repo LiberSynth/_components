@@ -157,6 +157,12 @@ function IsHexCharStr(const Value: String): Boolean;
 function HexCharStrToStr(const Value: String): String;
 
 function WrapGUIDStr(var Value: String): Boolean;
+{ GUID без "-". }
+function GUIDToKey(Value: TGUID): String;
+{ Новый GUID без "-". }
+function NewKey: String;
+{ Уникальное имя }
+function UniqueName(const DesirableName: String): String;
 
 function GetFloatStr(const S: String): String;
 
@@ -1461,6 +1467,31 @@ begin
   Result := StrIsGUID(Value);
   if Result and (Length(Value) = 36) then
     Value := Format('{%s}', [Value]);
+end;
+
+function GUIDToKey(Value: TGUID): String;
+var
+  i: Byte;
+  Temp: String;
+begin
+
+  Temp := GUIDToStr(Value);
+
+  Result := '';
+  for i := 1 to Length(Temp) do
+    if Temp[i] <> '-' then
+      Result := Result + Temp[i];
+
+end;
+
+function NewKey: String;
+begin
+  Result := GUIDToKey(TGUID.NewGuid);
+end;
+
+function UniqueName(const DesirableName: String): String;
+begin
+  Result := Format('%s_%s', [DesirableName, NewKey]);
 end;
 
 function GetFloatStr(const S: String): String;

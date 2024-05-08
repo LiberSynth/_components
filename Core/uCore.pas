@@ -31,7 +31,9 @@ interface
 
 uses
   { VCL }
-  SysUtils;
+  SysUtils, Rtti,
+  { LiberSynth }
+  uTypes;
 
 type
 
@@ -71,6 +73,15 @@ type
   public
 
     class function Get<T>(Index: T; const _Map: array of String): String;
+
+  end;
+
+  ArrayConverter<T> = record
+
+  public
+
+    class function Encode(const _Value: TArray<T>): TConstArray; static;
+    class function Decode(const _Value: array of const): TArray<T>; static;
 
   end;
 
@@ -154,6 +165,32 @@ begin
     raise ECoreException.CreateFmt('Matrix error. Index %d is out of range %d..%d.', [B, Low(_Map), High(_Map)]);
 
   Result := _Map[B];
+
+end;
+
+{ ArrayConverter }
+
+class function ArrayConverter<T>.Encode(const _Value: TArray<T>): TConstArray;
+var
+  i: Integer;
+begin
+
+  SetLength(Result, Length(_Value));
+
+//  for i := Low(Result) to High(Result) do
+//    Result[i] := TValue.From<T>(_Value[i]).AsVarRec;
+
+end;
+
+class function ArrayConverter<T>.Decode(const _Value: array of const): TArray<T>;
+var
+  i: Integer;
+begin
+
+  SetLength(Result, Length(_Value));
+
+//  for i := Low(Result) to High(Result) do
+//    Result[i] := TValue(_Value[i]).AsType<T>;
 
 end;
 

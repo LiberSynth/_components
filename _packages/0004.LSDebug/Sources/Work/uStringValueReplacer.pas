@@ -142,7 +142,6 @@ begin
 
     on E: Exception do begin
 
-      WriteError(E);
       WriteLog(LogMessage);
       raise;
 

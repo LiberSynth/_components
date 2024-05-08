@@ -29,10 +29,11 @@ interface
 
 type
 
-  TData = TArray<Byte>;
-
+  TData         = TArray<Byte>;
+  TByteArray    = TArray<Byte>;
   TIntegerArray = TArray<Integer>;
-  TStringArray = TArray<String>;
+  TStringArray  = TArray<String>;
+  TConstArray   = TArray<TVarRec>;
 
   BLOB = RawByteString; { RawByteString is too long to write everywhere. }
 

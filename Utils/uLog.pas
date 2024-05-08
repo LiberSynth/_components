@@ -36,11 +36,11 @@ uses
 
 procedure WriteLog(const Value: String);
 procedure WriteLogFmt(const Value: String; const Args: array of const);
-procedure WriteError(E: Exception);
+procedure WriteException(E: Exception);
 {
 
-  Если лог вызывается из библиотеки, надо принудительно проинициализировать его в этой библиотеки со ссылкой на
-  экземпляр этот пакета, чтобы файл лога создавался с именем библиотеки, которая вызывает лог, а не с именем библиотеки,
+  Если лог вызывается из библиотеки, надо принудительно проинициализировать его в этой библиотеке со ссылкой на
+  экземпляр этого пакета, чтобы файл лога создавался с именем библиотеки, которая вызывает лог, а не с именем библиотеки,
   возвращающей пути. Причем, для каждого модуля создается свой экземпляр лога, поэтому можно не беспокоиться, о том, что
   он будет какой-то один для всей связки. Каждый модуль сохраняет сообщения в свой файл <имя модуля>.log рядом с
   модулем. Просто вызывайте этот метод где-нибудь в инициализации каждого модуля кроме хоста и все.
@@ -83,7 +83,7 @@ type
 
     procedure WriteLog(const Value: String);
     procedure WriteLogFmt(const Value: String; const Args: array of const);
-    procedure WriteError(E: Exception);
+    procedure WriteException(E: Exception);
 
   end;
 
@@ -195,7 +195,7 @@ begin
 
 end;
 
-procedure TLog.WriteError(E: Exception);
+procedure TLog.WriteException(E: Exception);
 begin
 
   try
@@ -228,10 +228,10 @@ begin
   Log.WriteLogFmt(Value, Args);
 end;
 
-procedure WriteError(E: Exception);
+procedure WriteException(E: Exception);
 begin
   _CheckLogVar;
-  Log.WriteError(E);
+  Log.WriteException(E);
 end;
 
 procedure ForceLogInit(Instance: LongWord);

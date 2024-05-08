@@ -29,12 +29,14 @@ interface
 
 uses
   { VCL }
-  SysUtils,
+  SysUtils, AppEvnts, Classes,
   { LiberSynth }
   {$IFDEF DEBUG}
   uLog,
   {$ENDIF}
-  uParams, uLSIni, uClasses, uLSNIStringParamsCompiler;
+  uFileUtils, uParams, uLSIni, uLSNIStringParamsCompiler,
+  { VDebugPackage }
+  uProjectConsts, uClasses;
 
 { Сохраняемые параметры пакета }
 function PackageParams: TParams;
@@ -54,15 +56,24 @@ function ClearExpressionKey(const Expression: String): String;
 
 implementation
 
-uses
-  { Utils }
-  uFileUtils,
-  { VDebugPackage }
-  uProjectConsts;
+type
 
-{ Сохраняемые параметры пакета }
+  TAppEventsHolder = class(TComponent)
+
+  strict private
+
+    FAppEvents: TApplicationEvents;
+
+    procedure AppException(_Sender: TObject; _E: Exception);
+
+  public
+
+    constructor Create; reintroduce;
+
+  end;
 
 var
+  AppEventsHolder: TAppEventsHolder = nil;
   LSIni: TLSIni = nil;
   DefaultParams: TParams = nil;
 
@@ -72,6 +83,16 @@ begin
   Params.AsInteger['StringValueReplacer.ResultLengthLimit'  ] := 102400;
   Params.AsInteger['StringValueReplacer.MaxEvaluatingLength'] :=   4096;
 
+end;
+
+procedure _InitAppEvents;
+begin
+  AppEventsHolder := TAppEventsHolder.Create;
+end;
+
+procedure _FinAppEvents;
+begin
+  FreeAndNil(AppEventsHolder);
 end;
 
 procedure _InitParams;
@@ -96,10 +117,6 @@ begin
       DefaultParams := TParams.Create;
       _InitDefaultParams(DefaultParams);
 
-      {$IFDEF DEBUG}
-      WriteError(E);
-      {$ENDIF}
-
     end;
 
   end;
@@ -108,19 +125,8 @@ end;
 
 procedure _FinParams;
 begin
-
-  try
-
-    LSIni.Save;
-    FreeAndNil(LSIni);
-
-  except
-    {$IFDEF DEBUG}
-    on E: Exception do
-      WriteError(E);
-    {$ENDIF}
-  end;
-
+  LSIni.Save;
+  FreeAndNil(LSIni);
 end;
 
 function PackageParams: TParams;
@@ -186,8 +192,28 @@ begin
 
 end;
 
+{ TAppEventsHolder }
+
+constructor TAppEventsHolder.Create;
+begin
+
+  inherited Create(nil);
+
+  FAppEvents := TApplicationEvents.Create(Self);
+  FAppEvents.OnException := AppException;
+
+end;
+
+procedure TAppEventsHolder.AppException(_Sender: TObject; _E: Exception);
+begin
+  {$IFDEF DEBUG}
+  WriteException(_E);
+  {$ENDIF}
+end;
+
 initialization
 
+  _InitAppEvents;
   _InitParams;
   {$IFDEF DEBUG}
   ForceLogInit(HInstance);
@@ -195,6 +221,7 @@ initialization
 
 finalization
 
+  _FinAppEvents;
   _FinParams;
   FreeAndNil(DefaultParams);
 

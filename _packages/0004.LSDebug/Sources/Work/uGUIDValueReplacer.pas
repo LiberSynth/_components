@@ -43,7 +43,6 @@ type
     function GetVisualizerDescription: String; override;
 
     function GetCustomReplacementValue(const _Expression, _TypeName, _EvalResult: String): String; override;
-    function EvaluatorClass: TEvaluatorClass; override;
 
   end;
 
@@ -55,79 +54,31 @@ uses
   { VDebugPackage }
   uProjectConsts, uCommon;
 
-type
-
-  TGUIDEvaluator = class(TEvaluator)
-
-  private
-
-    FGUIDPart: String;
-
-  protected
-
-    function ExpressionToRemoteModify(_Address: Cardinal; const _TypeName: String): String; override;
-    function SuccessEmptyEvaluateResult: String; override;
-    procedure ModifyRemoteMemory(_Address: Cardinal; const _ModifyExpression: String; const _TypeName: String); override;
-    function MemoryEvaluateValue(_ValueAddress: Cardinal; const _EvalResult: String): String; override;
-
-  end;
-
-{ TGUIDEvaluator }
-
-function TGUIDEvaluator.ExpressionToRemoteModify(_Address: Cardinal; const _TypeName: String): String;
-begin
-  Result := inherited ExpressionToRemoteModify(_Address, _TypeName) + FGUIDPart;
-end;
-
-function TGUIDEvaluator.SuccessEmptyEvaluateResult: String;
-begin
-  Result := '0';
-end;
-
-procedure TGUIDEvaluator.ModifyRemoteMemory(_Address: Cardinal; const _ModifyExpression, _TypeName: String);
-
-  procedure _ModifyGUIDPart(const _PartName: String);
-  begin
-
-    FGUIDPart := '.' + _PartName;
-    inherited ModifyRemoteMemory(_Address, _ModifyExpression + FGUIDPart, _TypeName);
-
-  end;
-
-begin
-
-  _ModifyGUIDPart('D1'   );
-  _ModifyGUIDPart('D2'   );
-  _ModifyGUIDPart('D3'   );
-  _ModifyGUIDPart('D4[0]');
-  _ModifyGUIDPart('D4[1]');
-  _ModifyGUIDPart('D4[2]');
-  _ModifyGUIDPart('D4[3]');
-  _ModifyGUIDPart('D4[4]');
-  _ModifyGUIDPart('D4[5]');
-  _ModifyGUIDPart('D4[6]');
-  _ModifyGUIDPart('D4[7]');
-
-end;
-
-function TGUIDEvaluator.MemoryEvaluateValue(_ValueAddress: Cardinal; const _EvalResult: String): String;
-var
-  G: TGUID;
-begin
-  CurrentProcess.ReadProcessMemory(_ValueAddress, SizeOf(TGUID), G);
-  Result := GUIDToStr(G);
-end;
-
 { TGUIDValueReplacer }
 
-function TGUIDValueReplacer.EvaluatorClass: TEvaluatorClass;
-begin
-  Result := TGUIDEvaluator;
-end;
-
 function TGUIDValueReplacer.GetCustomReplacementValue(const _Expression, _TypeName, _EvalResult: String): String;
+var
+  Value: TGUID;
 begin
-  Result := Evaluator.MemoryEvaluate(_Expression, _TypeName, _EvalResult);
+
+  with Evaluator do begin
+
+      ReadSingleContext(_Expression + '.D1',    'LongWord', SizeOf(LongWord), Value.D1   );
+      ReadSingleContext(_Expression + '.D2',    'Word',     SizeOf(Word),     Value.D2   );
+      ReadSingleContext(_Expression + '.D3',    'Word',     SizeOf(Word),     Value.D3   );
+      ReadSingleContext(_Expression + '.D4[0]', 'Byte',     SizeOf(Byte),     Value.D4[0]);
+      ReadSingleContext(_Expression + '.D4[1]', 'Byte',     SizeOf(Byte),     Value.D4[1]);
+      ReadSingleContext(_Expression + '.D4[2]', 'Byte',     SizeOf(Byte),     Value.D4[2]);
+      ReadSingleContext(_Expression + '.D4[3]', 'Byte',     SizeOf(Byte),     Value.D4[3]);
+      ReadSingleContext(_Expression + '.D4[4]', 'Byte',     SizeOf(Byte),     Value.D4[4]);
+      ReadSingleContext(_Expression + '.D4[5]', 'Byte',     SizeOf(Byte),     Value.D4[5]);
+      ReadSingleContext(_Expression + '.D4[6]', 'Byte',     SizeOf(Byte),     Value.D4[6]);
+      ReadSingleContext(_Expression + '.D4[7]', 'Byte',     SizeOf(Byte),     Value.D4[7]);
+
+  end;
+
+  Result := GUIDToStr(Value);
+
 end;
 
 procedure TGUIDValueReplacer.GetSupportedType(_Index: Integer; var _TypeName: String; var _AllDescendants: Boolean);

@@ -102,7 +102,7 @@ function BLOBToFloat(const Value: BLOB): Double;
 function BLOBToExtended(const Value: BLOB): Extended;
 function BLOBToDateTime(const Value: BLOB): TDateTime;
 function BLOBToGUID(const Value: BLOB): TGUID;
-function BLOBToData(const Value: BLOB): TData;
+function BLOBToData(const Value: BLOB; Size: Integer = 0): TData;
 
 function DataToBoolean(const Value: TData): Boolean;
 function DataToInt(const Value: TData): Integer;
@@ -111,7 +111,7 @@ function DataToFloat(const Value: TData): Double;
 function DataToExtended(const Value: TData): Extended; //
 function DataToDateTime(const Value: TData): TDateTime;
 function DataToGUID(const Value: TData): TGUID;
-function DataToBLOB(const Value: TData): BLOB;
+function DataToBLOB(const Value: TData; Size: Integer = 0): BLOB;
 { ^ Преобразование основных типов данных друг в друга. Полный набор. ^ }
 
 function DataToAnsiStr(const Value: TData): AnsiString;
@@ -503,12 +503,16 @@ begin
   Move(Value[1], Result, SizeOf(Result));
 end;
 
-function BLOBToData(const Value: BLOB): TData;
+function BLOBToData(const Value: BLOB; Size: Integer): TData;
 begin
-  SetLength(Result, Length(Value));
-  Move(Value[1], Result[0], Length(Value));
-end;
 
+  if Size = 0 then
+    Size := Length(Value);
+
+  SetLength(Result, Size);
+  Move(Value[1], Result[0], Size);
+
+end;
 
 function DataToBoolean(const Value: TData): Boolean;
 begin
@@ -567,10 +571,15 @@ begin
   Move(Value[0], Result, SizeOf(Result));
 end;
 
-function DataToBLOB(const Value: TData): BLOB;
+function DataToBLOB(const Value: TData; Size: Integer): BLOB;
 begin
-  SetLength(Result, Length(Value));
-  Move(Value[0], Result[1], Length(Value));
+
+  if Size = 0 then
+    Size := Length(Value);
+
+  SetLength(Result, Size);
+  Move(Value[0], Result[1], Size);
+
 end;
 
 function DataToAnsiStr(const Value: TData): AnsiString;

@@ -126,13 +126,13 @@ end;
 
 function TKeyWordHelper.GetKeyType: TKeyType;
 begin
-  Result := TKeyType(KeyTypeInternal)
+  Result := TKeyType(KeyTypeInternal);
 end;
 
 procedure TKeyWordHelper.SetKeyType(const _Value: TKeyType);
 begin
   if Integer(_Value) <> KeyTypeInternal then
-    KeyTypeInternal := Integer(_Value)
+    KeyTypeInternal := Integer(_Value);
 end;
 
 function TKeyWordHelper.TypeInSet(const _Set: TKeyTypes): Boolean;
