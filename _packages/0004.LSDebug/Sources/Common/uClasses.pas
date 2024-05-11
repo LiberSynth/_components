@@ -132,6 +132,7 @@ type
 
     function AllocRemoteMemory(_Size: Cardinal): NativeInt;
     procedure FreeRemoteMemory(_Address: NativeInt);
+
     function VariableExpression(const _Name: String): String;
     function InsertVariables(const _Expression: String): String;
 
@@ -155,26 +156,6 @@ type
     procedure ReadFunction(const _Function, _TypeName: String; _Size: Cardinal; var _Result);
     procedure ReadSingleContext(const _Expression, _TypeName: String; _Size: Cardinal; var _Result);
     procedure ReadSingleFunction(const _Expression, _Function, _ContextTypeName, _ResultTypeName: String; _ContextSize, _ResultSize: Cardinal; var _Result);
-
-  end;
-
-  { TODO 2 -oVasilyevSM -cTEvaluator: Нужен новый класс, который будет иметь набор удобных методов для перетаскивания
-    исследуемого объекта (любого типа) в память отладчика. Типа, выделить память в отлаживаемом процессе, положить туда
-    значение и считать его с помощью CurrentProcess.ReadProcessMemory. И тогда можно исследовать что угодно. Сейчас тут
-    хрен поймешь, чего ему надо. }
-  TEvaluatorOld = class(TCustomEvaluator)
-
-  public
-
-    function MemoryEvaluate(const _Expression, _TypeName, _EvalResult: String): String;
-    function ExpressionToRemoteModify(_Address: Cardinal; const _TypeName: String): String; virtual;
-    function DataTypePointerName(const _TypeName: String): String; virtual;
-    function SuccessEmptyEvaluateResult: String; virtual;
-    function RemoteAllocExpression(const _TypeName: String): String; virtual;
-    function AllocRemoteMemory(const _TypeName: String): Cardinal;
-    procedure FreeRemoteMemory(_Address: Cardinal);
-    procedure ModifyRemoteMemory(_Address: Cardinal; const _ModifyExpression, _TypeName: String); virtual;
-    function MemoryEvaluateValue(_ValueAddress: Cardinal; const _EvalResult: String): String; virtual;
 
   end;
 
@@ -410,6 +391,34 @@ begin
 
 end;
 
+function TCustomEvaluator.VariableExpression(const _Name: String): String;
+begin
+  Result := FVariableList.Get(_Name).Expression;
+end;
+
+function TCustomEvaluator.InsertVariables(const _Expression: String): String;
+var
+  Item: TVariable;
+begin
+
+  Result := _Expression;
+  for Item in FVariableList do begin
+
+    Result := StringReplace(
+
+        Result,
+        Format('<%s>', [Item.Name]),
+        Item.Expression,
+        [rfReplaceAll, rfIgnoreCase]
+
+    );
+
+    WriteLogFmt('_Expression = %s; Item.Name = %s; Item.Expression = %s; ', [_Expression, Item.Name, Item.Expression]);
+
+  end;
+
+end;
+
 function TCustomEvaluator.Evaluate(const _Expression: String; var _EvaluateResult: TEvaluateResult): String;
 var
   EvaluateResult: TOTAEvaluateResult;
@@ -566,30 +575,6 @@ begin
   Result := Modify(_ValueStr, MR);
 end;
 
-function TCustomEvaluator.VariableExpression(const _Name: String): String;
-begin
-  Result := FVariableList.Get(_Name).Expression;
-end;
-
-function TCustomEvaluator.InsertVariables(const _Expression: String): String;
-var
-  Item: TVariable;
-begin
-
-  Result := _Expression;
-  for Item in FVariableList do
-
-    Result := StringReplace(
-
-        Result,
-        Format('<%s>', [Item.Name]),
-        Item.Expression,
-        [rfReplaceAll, rfIgnoreCase]
-
-    );
-
-end;
-
 procedure TCustomEvaluator.InitVariable(const _Name, _TypeName: String; _Size: Cardinal; const _Expression: String);
 var
   Address: NativeInt;
@@ -690,6 +675,7 @@ end;
 procedure TCustomEvaluator.ReadFunction(const _Function, _TypeName: String; _Size: Cardinal; var _Result);
 var
   Address: NativeInt;
+  ValueStr: String;
 begin
 
   { Для лога. }
@@ -701,7 +687,8 @@ begin
     try
 
       Evaluate(TVariable.Expression(_TypeName, Address));
-      Modify(InsertVariables(_Function));
+      ValueStr := InsertVariables(_Function);
+      Modify(ValueStr);
 
       CurrentProcess.ReadProcessMemory(Address, _Size, _Result);
 
@@ -711,7 +698,7 @@ begin
 
   finally
     {$IFDEF DEBUG}
-    WriteLogFmt('TCustomEvaluator.ReadFunction: _Function = %s; _TypeName = %s; _Size = %d; Address = %d', [_Function, _TypeName, _Size, Address]);
+    WriteLogFmt('TCustomEvaluator.ReadFunction: _Function = %s; _TypeName = %s; _Size = %d; Address = %d; ValueStr = %s', [_Function, _TypeName, _Size, Address, ValueStr]);
     {$ENDIF}
   end;
 
@@ -769,134 +756,6 @@ begin
     {$ENDIF}
   end;
 
-end;
-
-{ TEvaluatorOld }
-
-function TEvaluatorOld.RemoteAllocExpression(const _TypeName: String): String;
-const
-  { AllocMem, потому что она заполняет память нулями }
-  SC_AllocExpr = 'Cardinal(AllocMem(SizeOf(%s)))';
-begin
-  Result := Format(SC_AllocExpr, [_TypeName]);
-end;
-
-function TEvaluatorOld.AllocRemoteMemory(const _TypeName: String): Cardinal;
-const
-  SC_AllocError = 'Remote allocate memory error (%s)';
-var
-  StrResult: String;
-begin
-
-  StrResult := Evaluate(RemoteAllocExpression(_TypeName));
-  try
-
-    Result := StrToInt(StrResult);
-
-  except
-    raise EModifyRemoteMemoryException.CreateFmt(SC_AllocError, [StrResult]);
-  end;
-
-end;
-
-function TEvaluatorOld.DataTypePointerName(const _TypeName: String): String;
-var
-  L: Integer;
-begin
-
-  L := Length(_TypeName);
-
-  if L > 0 then
-
-    if _TypeName[1] = 'T' then Result := 'P' + Copy(_TypeName, 2, L)
-    else Result := 'P' + _TypeName
-
-  else Result := '';
-
-end;
-
-function TEvaluatorOld.ExpressionToRemoteModify(_Address: Cardinal; const _TypeName: String): String;
-const
-  SC_ExpressionToModify = '%s(%d)^';
-begin
-  Result := Format(SC_ExpressionToModify, [DataTypePointerName(_TypeName), _Address]);
-end;
-
-procedure TEvaluatorOld.FreeRemoteMemory(_Address: Cardinal);
-const
-
-  SC_FreeExpr = 'FreeMem(Pointer(%d))';
-  SC_SuccessEvalRes = '(no value)';
-  SC_FreeError = 'Remote free memory error (%s)';
-
-var
-  StrResult: String;
-begin
-
-  StrResult := Evaluate(Format(SC_FreeExpr, [_Address]));
-  if not SameText(StrResult, SC_SuccessEvalRes) then
-    raise EModifyRemoteMemoryException.CreateFmt(SC_FreeError, [StrResult]);
-
-end;
-
-function TEvaluatorOld.MemoryEvaluate(const _Expression, _TypeName, _EvalResult: String): String;
-var
-  ValueAddress: Cardinal;
-begin
-
-  try
-
-    ValueAddress := AllocRemoteMemory(_TypeName);
-    try
-
-      ModifyRemoteMemory(ValueAddress, _Expression, _TypeName);
-      Result := MemoryEvaluateValue(ValueAddress, _EvalResult);
-
-    finally
-      FreeRemoteMemory(ValueAddress);
-    end;
-
-  except
-    on E: Exception do
-      Result := FormatException(E);
-  end;
-
-end;
-
-function TEvaluatorOld.MemoryEvaluateValue(_ValueAddress: Cardinal; const _EvalResult: String): String;
-begin
-  Result := _EvalResult;
-end;
-
-procedure TEvaluatorOld.ModifyRemoteMemory(_Address: Cardinal; const _ModifyExpression, _TypeName: String);
-const
-
-  SC_ModifyError = 'Modify remote memory error (%s)';
-  SC_CanNotModifyError = 'Can not modify value ''%s''';
-
-var
-  Expr, StrResult, SuccessRes: String;
-  CanModify: Boolean;
-begin
-
-  Expr := ExpressionToRemoteModify(_Address, _TypeName);
-  StrResult := Evaluate(Expr, CanModify);
-
-  if not CanModify then
-    raise EModifyRemoteMemoryException.CreateFmt(SC_CanNotModifyError, [Expr]);
-
-  SuccessRes := SuccessEmptyEvaluateResult;
-
-  if (Length(SuccessRes) > 0) and not SameText(StrResult, SuccessRes) then
-    raise EModifyRemoteMemoryException.CreateFmt(SC_ModifyError, [StrResult]);
-
-  Modify(_ModifyExpression);
-
-end;
-
-function TEvaluatorOld.SuccessEmptyEvaluateResult: String;
-begin
-  Result := '';
 end;
 
 end.

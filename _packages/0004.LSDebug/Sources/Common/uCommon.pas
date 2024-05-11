@@ -80,6 +80,7 @@ var
 procedure _InitDefaultParams(Params: TParams);
 begin
 
+  Params.AsString ['StringValueReplacer.Method'             ] := 'DirectMemoryValue';
   Params.AsInteger['StringValueReplacer.ResultLengthLimit'  ] := 102400;
   Params.AsInteger['StringValueReplacer.MaxEvaluatingLength'] :=   4096;
 

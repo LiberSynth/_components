@@ -29,7 +29,7 @@ interface
 
 uses
   { VCL }
-  SysUtils,
+  SysUtils, Windows,
   { LiberSynth }
   uClasses, uCustomVizualizers, uCleanDebuggerString, uDataUtils, uProjectConsts, uConsts,
   {$IFDEF DEBUG}
@@ -45,6 +45,8 @@ type
   strict private
 
     function ExpressionLength(const _Expression: String): Integer;
+    function DirectMemoryValue(const _Expression: String): String;
+    function IteratedResearch(const _Expression, _EvalResult: String): String;
 
   protected
 
@@ -62,6 +64,116 @@ implementation
 { TStringValueReplacer }
 
 function TStringValueReplacer.GetCustomReplacementValue(const _Expression, _TypeName, _EvalResult: String): String;
+var
+  Method: String;
+begin
+
+  Method := PackageParams.AsString['StringValueReplacer.Method'];
+
+  if SameText(Method, 'DirectMemoryValue') then
+
+    Result := DirectMemoryValue(_Expression)
+
+  else if SameText(Method, 'IteratedResearch') then
+
+    Result := IteratedResearch(_Expression, _EvalResult)
+
+  else Result := inherited GetCustomReplacementValue(_Expression, _TypeName, _EvalResult);
+
+end;
+
+function TStringValueReplacer.ExpressionLength(const _Expression: String): Integer;
+var
+  S: String;
+begin
+
+  try
+
+    S := Evaluator.Evaluate(Format('Length(%s)', [_Expression]));
+    Result := StrToInt(S);
+
+  except
+    Result := -1;
+  end;
+
+end;
+
+function TStringValueReplacer.DirectMemoryValue(const _Expression: String): String;
+var
+  Len: Integer;
+  Address: NativeInt;
+  Data: PWideChar;
+  LogMessage: String;
+begin
+
+  try
+
+    LogMessage := 'String replacing started.' + CRLF;
+
+    with Evaluator do begin
+
+      Len := ExpressionLength(_Expression);
+
+      LogMessage := Format('Value length = %d' + CRLF, [Len]);
+
+      { Инициализация переменной в памяти отлаживаемого процесса. }
+      InitVariable('Context', 'String', Len * 2, _Expression);
+      try
+
+        LogMessage := 'Context initialized in debugging process memory.' + CRLF;
+
+        { Получение адреса первого символа строки }
+        ReadFunction(
+
+            'NativeInt(@(<Context>[1]))',
+            'NativeInt',
+            SizeOf(NativeInt),
+            Address
+
+        );
+
+        LogMessage := Format('Address of first character is %d.' + CRLF, [Address]);
+
+        Data := AllocMem(Len * 2);
+        try
+
+          LogMessage := 'Local value memory allocated.' + CRLF;
+
+          { Считывание строки из памяти отлаживаемого процесса }
+          CurrentProcess.ReadProcessMemory(Address, Len * 2, Data^);
+          LogMessage := 'Value read from debugging process memory.' + CRLF;
+
+          Result := Copy(Data, 1, Len);
+          LogMessage := 'Result is retrieved.' + CRLF;
+
+        finally
+          FreeMem(Data, Len * 2);
+          LogMessage := 'Local memory freed.' + CRLF;
+        end;
+
+      finally
+        FinVariable('<Context>');
+        LogMessage := 'Context finalized in debugging process memory.' + CRLF;
+      end;
+
+    end;
+
+    LogMessage := LogMessage + 'String replacing completed.' + CRLF;
+
+  except
+
+    on E: Exception do begin
+
+      WriteLog(LogMessage);
+      raise;
+
+    end;
+
+  end;
+
+end;
+
+function TStringValueReplacer.IteratedResearch(const _Expression, _EvalResult: String): String;
 const
 
   SC_MESSAGE = '[To see more results increase the param %s: StringValueReplacer.ResultLengthLimit. But be ready to wait longer.]';
@@ -136,7 +248,7 @@ begin
 
     end;
 
-    LogMessage := LogMessage + 'String replacing completed.';
+    LogMessage := LogMessage + 'String replacing completed.' + CRLF;
 
   except
 
@@ -147,22 +259,6 @@ begin
 
     end;
 
-  end;
-
-end;
-
-function TStringValueReplacer.ExpressionLength(const _Expression: String): Integer;
-var
-  S: String;
-begin
-
-  try
-
-    S := Evaluator.Evaluate(Format('Length(%s)', [_Expression]));
-    Result := StrToInt(S);
-
-  except
-    Result := -1;
   end;
 
 end;
