@@ -31,7 +31,9 @@ uses
   { VCL }
   SysUtils, ToolsAPI, Generics.Collections,
   { LiberSynth }
-  uCustom, uCore, uLog, uStrUtils;
+  uCore, uLog, uStrUtils,
+  { LSDebug }
+  uCustom, uCommon, uProjectConsts;
 
 type
 
@@ -174,10 +176,6 @@ function CurrentProcess: IOTAProcess;
 function CurrentThread: IOTAThread;
 
 implementation
-
-uses
-  { VDebugPackage }
-  uProjectConsts, uCommon;
 
 var
   DbgrServices: IOTADebuggerServices;
@@ -434,6 +432,7 @@ begin
 
     with _EvaluateResult do begin
 
+      { TODO 3 -oVasilyevSM -cuClasses: А это нормально вообще? А если там больше? }
       SetLength(ResultStr, IC_EvalResultStrLength);
       ExprStr := _Expression;
       EvaluateResult := CurrentThread.Evaluate(_Expression, PChar(ResultStr), Length(ResultStr) - 1, CanModify, True, '', ResultAddress, ResultSize, ResVal);
@@ -517,6 +516,7 @@ begin
 
     with _ModifyResult do begin
 
+      { TODO 3 -oVasilyevSM -cuClasses: А это нормально вообще? А если там больше? }
       SetLength(ResultStr, IC_EvalResultStrLength);
       ExprStr := _ValueStr;
       EvaluateResult := CurrentThread.Modify(_ValueStr, PChar(ResultStr), Length(ResultStr) - 1, ResVal);

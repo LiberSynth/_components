@@ -29,9 +29,9 @@ interface
 
 uses
   { VCL }
-  ToolsAPI,
-  { VDebugPackage }
-  uClasses, uViewerFormHelper;
+  SysUtils, Forms, ToolsAPI,
+  { LSDebug }
+  uClasses, uCommon, uCustom, uCustomViewerFrame, uViewerFormHelper;
 
 type
 
@@ -68,6 +68,14 @@ type
 
   protected
 
+    function GetAllExpressionsReplacement: Boolean; virtual;
+
+  strict private
+
+    property AllExpressionsReplacement: Boolean read GetAllExpressionsReplacement;
+
+  protected
+
     { IOTADebuggerVisualizerValueReplacer }
     function GetReplacementValue(const _Expression, _TypeName, _EvalResult: String): String;
 
@@ -92,12 +100,6 @@ type
   end;
 
 implementation
-
-uses
-  { VCL }
-  SysUtils, Forms,
-  { VDebugPackage }
-  uProjectConsts, uCommon, uCustom, uCustomViewerFrame;
 
 { TCustomDebuggerVisualizer }
 
@@ -156,10 +158,15 @@ end;
 
 { TCustomValueReplacer }
 
+function TCustomValueReplacer.GetAllExpressionsReplacement: Boolean;
+begin
+  Result := False;
+end;
+
 function TCustomValueReplacer.GetReplacementValue(const _Expression, _TypeName, _EvalResult: String): String;
 begin
 
-  if CheckVDPExpressionKey(_Expression) then
+  if AllExpressionsReplacement or CheckCustomExpressionKey(_Expression) then
 
     try
 

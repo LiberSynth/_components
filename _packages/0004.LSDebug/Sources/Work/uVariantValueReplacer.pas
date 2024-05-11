@@ -65,10 +65,6 @@ type
 
 implementation
 
-uses
-  { VDebugPackage }
-  uProjectConsts;
-
 { TVariantValueReplacer }
 
 function TVariantValueReplacer.FormatVariant(_VarType: TVarType; const _Expression, _Default: String): String;
@@ -305,18 +301,23 @@ end;
 
 procedure TVariantValueReplacer.GetSupportedType(_Index: Integer; var _TypeName: String; var _AllDescendants: Boolean);
 begin
-  _AllDescendants := True;
   _TypeName := 'Variant';
+  _AllDescendants := True;
 end;
 
 function TVariantValueReplacer.GetVisualizerName: String;
 begin
-  Result := SC_VariantValueReplacer_Name;
+  Result := 'Variant value replacer for Delphi';
 end;
 
 function TVariantValueReplacer.GetVisualizerDescription: String;
 begin
-  Result := SC_VariantValueReplacer_Description;
+
+  Result :=
+
+      'Variant value replacer for the Delphi debugger. For expression with key ''d'' replaces the default ' +
+      'representation of the Variant with its expanded content.';
+
 end;
 
 function TVariantValueReplacer.GetCustomReplacementValue(const _Expression, _TypeName, _EvalResult: String): String;

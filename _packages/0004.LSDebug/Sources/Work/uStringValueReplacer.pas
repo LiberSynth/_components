@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, Windows,
   { LiberSynth }
-  uClasses, uCustomVizualizers, uCleanDebuggerString, uDataUtils, uProjectConsts, uConsts,
+  uClasses, uCustomVizualizers, uCleanDebuggerString, uDataUtils, uConsts,
   {$IFDEF DEBUG}
   uLog,
   {$ENDIF}
@@ -266,17 +266,22 @@ end;
 procedure TStringValueReplacer.GetSupportedType(_Index: Integer; var _TypeName: String; var _AllDescendants: Boolean);
 begin
   _TypeName := 'string';
-  _AllDescendants := False;
-end;
-
-function TStringValueReplacer.GetVisualizerDescription: String;
-begin
-  Result := SC_StringValueReplacer_Description;
+  _AllDescendants := True;
 end;
 
 function TStringValueReplacer.GetVisualizerName: String;
 begin
-  Result := SC_StringValueReplacer_Name;
+  Result := 'String value replacer for Delphi';
+end;
+
+function TStringValueReplacer.GetVisualizerDescription: String;
+begin
+
+  Result :=
+
+      'String value replacer for Delphi debugger. For expression with key ''d'' it replaces the default hexadecimal ' +
+      'representation of the special characters to the regular string as it is.';
+
 end;
 
 end.

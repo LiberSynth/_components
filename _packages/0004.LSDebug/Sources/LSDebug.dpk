@@ -47,6 +47,7 @@ contains
   uGUIDValueReplacer in 'Work\uGUIDValueReplacer.pas',
   uVariantValueReplacer in 'Work\uVariantValueReplacer.pas',
   uCleanDebuggerString in 'Common\uCleanDebuggerString.pas',
-  uFormatVariant in 'Common\uFormatVariant.pas';
+  uFormatVariant in 'Common\uFormatVariant.pas',
+  uDateTimeValueReplacer in 'Work\uDateTimeValueReplacer.pas';
 
 end.

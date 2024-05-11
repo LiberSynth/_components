@@ -1,4 +1,4 @@
-unit uRegister;
+unit uDateTimeValueReplacer;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -27,68 +27,78 @@ unit uRegister;
 
 interface
 
-procedure Register;
+uses
+  { VCL }
+  SysUtils,
+  { LSDebug }
+  uCustomVizualizers, uCommon, uStrUtils, uDataUtils;
+
+type
+
+  TDateTimeValueReplacer = class(TCustomValueReplacer)
+
+  protected
+
+    function GetAllExpressionsReplacement: Boolean; override;
+
+    { IOTADebuggerVisualizer }
+    procedure GetSupportedType(_Index: Integer; var _TypeName: String; var _AllDescendants: Boolean); override;
+    function GetVisualizerName: String; override;
+    function GetVisualizerDescription: String; override;
+
+    function GetCustomReplacementValue(const _Expression, _TypeName, _EvalResult: String): String; override;
+
+  end;
 
 implementation
 
-uses
-  { VCL }
-  ToolsAPI,
-  { VDebugPackage }
-  uClasses, uCustomVizualizers,
-  { Visualizer units }
-  uStringValueReplacer, uVariantValueReplacer, uGUIDValueReplacer, uDateTimeValueReplacer;
+{ TDateTimeValueReplacer }
 
+function TDateTimeValueReplacer.GetAllExpressionsReplacement: Boolean;
+begin
+  Result := True;
+end;
+
+procedure TDateTimeValueReplacer.GetSupportedType(_Index: Integer; var _TypeName: String; var _AllDescendants: Boolean);
+begin
+  _TypeName := 'TDateTime';
+  _AllDescendants := True;
+end;
+
+function TDateTimeValueReplacer.GetVisualizerName: String;
+begin
+  Result := 'TDateTime value replacer for Delphi';
+end;
+
+function TDateTimeValueReplacer.GetVisualizerDescription: String;
+begin
+
+  Result :=
+
+      'TDateTime value replacer for Delphi debugger. For expression with key ''d'', replaces the default date-time ' +
+      'representation with its string representation in the specified format.';
+
+end;
+
+function TDateTimeValueReplacer.GetCustomReplacementValue(const _Expression, _TypeName, _EvalResult: String): String;
 var
-
-  { TODO 1 -oVasilyevSM -cVDebug : Реплэйсер для типа Variant }
-  { TODO 3 -oVasilyevSM -cVDebug : uses to trim }
-  { TODO 2 -oVasilyevSM -cVDebug : Похоже, проблема была в том, что для TDateTime уже объявлен визуализатор }
-
-  StringValueReplacer:  TStringValueReplacer;
-  GUIDValueReplacer:    TGUIDValueReplacer;
-  VariantValueReplacer: TVariantValueReplacer;
-  DateTimeValueReplacer: TDateTimeValueReplacer;
-
-procedure Register;
-
-  procedure _RegisterVizualizer(var _Value: TCustomDebuggerVisualizer; _Class: TCustomDebuggerVisualizerClass);
-  begin
-    _Value := _Class.Create;
-    DebuggerServices.RegisterDebugVisualizer(_Value as IOTADebuggerVisualizer);
-  end;
-
+  DateTime: TDateTime;
 begin
 
-  GetDebuggerServices;
+  with Evaluator do begin
 
-  _RegisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer  ), TStringValueReplacer  );
-  _RegisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer    ), TGUIDValueReplacer    );
-  _RegisterVizualizer(TCustomDebuggerVisualizer(VariantValueReplacer ), TVariantValueReplacer );
-  _RegisterVizualizer(TCustomDebuggerVisualizer(DateTimeValueReplacer), TDateTimeValueReplacer);
+    InitVariable('Context', 'TDateTime', SizeOf(TDateTime), _Expression);
+    try
 
-end;
+      ReadVariable('Context', DateTime);
+      Result := FormatDateTimeEx(PackageParams.AsString['Common.DateTimeFormat'], DateTime);
 
-procedure Unregister;
+    finally
+      FinVariable('Context');
+    end;
 
-  procedure _UnregisterVizualizer(var _Value: TCustomDebuggerVisualizer);
-  begin
-    DebuggerServices.UnregisterDebugVisualizer(_Value as IOTADebuggerVisualizer);
   end;
 
-begin
-
-  _UnregisterVizualizer(TCustomDebuggerVisualizer(StringValueReplacer  ));
-  _UnregisterVizualizer(TCustomDebuggerVisualizer(GUIDValueReplacer    ));
-  _UnregisterVizualizer(TCustomDebuggerVisualizer(VariantValueReplacer ));
-  _UnregisterVizualizer(TCustomDebuggerVisualizer(DateTimeValueReplacer));
-
 end;
-
-initialization
-
-finalization
-
-  Unregister;
 
 end.

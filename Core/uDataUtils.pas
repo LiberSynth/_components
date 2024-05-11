@@ -163,6 +163,8 @@ procedure Invert(var Value: Byte); overload;
 procedure Invert(var Value: Word); overload;
 procedure Invert(var Value: Integer); overload;
 
+function SecondFraction(Value: TDateTime): Double;
+
 implementation
 
 function BooleanToInt(Value: Boolean): Integer;
@@ -1039,6 +1041,24 @@ begin
   for i := 0 to 31 do
     Result := Result xor (1 shl i);
   Value := Result;
+end;
+
+function SecondFraction(Value: TDateTime): Double;
+const
+
+  IC_SecondsInDay = 24 * 60 * 60;
+
+var
+  Time, RoundedTime: TDateTime;
+  H, N, S, Z: Word;
+begin
+
+  Time := Value - Trunc(Value);
+  DecodeTime(Time, H, N, S, Z);
+  RoundedTime := EncodeTime(H, N, S, 0);
+
+  Result := (Time - RoundedTime) * IC_SecondsInDay;
+
 end;
 
 end.

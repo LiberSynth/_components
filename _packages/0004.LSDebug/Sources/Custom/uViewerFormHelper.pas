@@ -29,9 +29,12 @@ interface
 
 uses
   { VCL }
-  Forms, Classes,
-  { VDebugPackage }
-  uCustom, uCustomViewerFrame;
+  SysUtils, Classes, Forms, Controls,
+  { LiberSynth }
+  uDataUtils,
+  { LSDebug }
+  uCustom, uCommon, uCustomViewerFrame, uProjectConsts;
+
 
 type
 
@@ -74,12 +77,6 @@ type
   TViewerFormHelperClass = class of TViewerFormHelper;
 
 implementation
-
-uses
-  { VCL }
-  SysUtils, {}Math, {}Controls,
-  { VDebugPackage }
-  uProjectConsts, uCommon;
 
 { TCustomViewerForm }
 

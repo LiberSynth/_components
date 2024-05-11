@@ -31,12 +31,13 @@ uses
   { VCL }
   SysUtils, AppEvnts, Classes,
   { LiberSynth }
+  { TODO 2 -oVasilyevSM -cuCommon: Проверить, что релиз соберется. }
   {$IFDEF DEBUG}
   uLog,
   {$ENDIF}
   uFileUtils, uParams, uLSIni, uLSNIStringParamsCompiler,
-  { VDebugPackage }
-  uProjectConsts, uClasses;
+  { LSDebug }
+  uProjectConsts;
 
 { Сохраняемые параметры пакета }
 function PackageParams: TParams;
@@ -50,7 +51,7 @@ function GetExpressionKey(const Expression: String): String;
 { Проверяет ключ выражения на заданное значение }
 function CheckExpressionKey(const Expression, Key: String): Boolean;
 { Проверяет ключ выражения на значение SC_ExpressionKey_VDP }
-function CheckVDPExpressionKey(const Expression: String): Boolean;
+function CheckCustomExpressionKey(const Expression: String): Boolean;
 { Удаляет ключ из выражения }
 function ClearExpressionKey(const Expression: String): String;
 
@@ -83,6 +84,8 @@ begin
   Params.AsString ['StringValueReplacer.Method'             ] := 'DirectMemoryValue';
   Params.AsInteger['StringValueReplacer.ResultLengthLimit'  ] := 102400;
   Params.AsInteger['StringValueReplacer.MaxEvaluatingLength'] :=   4096;
+
+  Params.AsString['Common.DateTimeFormat'] := 'yyyy-mm-dd hh:nn:ss.zzz';
 
 end;
 
@@ -176,9 +179,9 @@ begin
   Result := SameText(Key, GetExpressionKey(Expression));
 end;
 
-function CheckVDPExpressionKey(const Expression: String): Boolean;
+function CheckCustomExpressionKey(const Expression: String): Boolean;
 begin
-  Result := CheckExpressionKey(Expression, SC_ExpressionKey_VDP);
+  Result := CheckExpressionKey(Expression, SC_CustomDebuggingExpressionKey);
 end;
 
 function ClearExpressionKey(const Expression: String): String;

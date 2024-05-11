@@ -28,8 +28,10 @@ unit uGUIDValueReplacer;
 interface
 
 uses
-  { VDebugPackage }
-  uClasses, uCustomVizualizers;
+  { LiberSynth }
+  uStrUtils,
+  { LSDebug }
+  uClasses, uCommon, uCustomVizualizers;
 
 type
 
@@ -47,12 +49,6 @@ type
   end;
 
 implementation
-
-uses
-  { Utils }
-  uStrUtils,
-  { VDebugPackage }
-  uProjectConsts, uCommon;
 
 { TGUIDValueReplacer }
 
@@ -83,18 +79,22 @@ end;
 
 procedure TGUIDValueReplacer.GetSupportedType(_Index: Integer; var _TypeName: String; var _AllDescendants: Boolean);
 begin
-  _AllDescendants := False;
   _TypeName := 'TGUID';
-end;
-
-function TGUIDValueReplacer.GetVisualizerDescription: String;
-begin
-  Result := SC_GUIDValueReplacer_Description;
+  _AllDescendants := True;
 end;
 
 function TGUIDValueReplacer.GetVisualizerName: String;
 begin
-  Result := SC_GUIDValueReplacer_Name;
+  Result := 'TGUID value replacer for Delphi';
+end;
+
+function TGUIDValueReplacer.GetVisualizerDescription: String;
+begin
+
+  Result :=
+
+      'TGUID type value replacer for Delphi debugger. For expression with key ''d'' replaces the default record ' +
+      'representation of the GUID with its human-readable string representation.';
 end;
 
 end.

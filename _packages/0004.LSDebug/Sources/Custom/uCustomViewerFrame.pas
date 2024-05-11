@@ -29,8 +29,8 @@ interface
 
 uses
   { VCL }
-  Forms, ToolsAPI, Controls,
-  { VDebugPackage }
+  SysUtils, Controls, Forms, ToolsAPI,
+  { LSDebug }
   uClasses;
 
 type
@@ -72,12 +72,6 @@ type
   end;
 
 implementation
-
-uses
-  { VCL }
-  SysUtils,
-  { VDebugPackage }
-  uProjectConsts;
 
 {$R *.dfm}
 

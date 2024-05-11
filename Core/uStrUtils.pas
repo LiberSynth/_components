@@ -113,6 +113,8 @@ function FormatDateTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZe
 function FormatDateTimeSorted(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
 function FormatDateTimeToFileName(Value: TDateTime; EmptyZero: Boolean = True): String;
 function FormatTime(Value: TDateTime; Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
+{ Просто формат, но с неограниченными долями секунды  }
+function FormatDateTimeEx(const Format: String; Value: TDateTime): String;
 
 function FormatNow(Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
 function FormatNowSorted(Milliseconds: Boolean = False; EmptyZero: Boolean = True): String;
@@ -427,7 +429,7 @@ begin
     { Секунд может не быть }
     if TimePartLength > 0 then
 
-      { Длина строки секунд, если уж они есть,  1 или 2 и это только цифры }
+      { Длина строки секунд, если уж они есть, 1 или 2 и это только цифры }
       if (TimePartLength in [1, 2]) and _CheckInt then begin
 
         S := StrToInt(TimePart);
@@ -1110,6 +1112,28 @@ begin
     Result := FormatDateTime(SC_STRICT_TIME_FORMAT_MS, Value)
   else
     Result := FormatDateTime(SC_STRICT_TIME_FORMAT, Value)
+
+end;
+
+function FormatDateTimeEx(const Format: String; Value: TDateTime): String;
+var
+  ZCount, i: Integer;
+  Fmt, Z: String;
+begin
+
+  Fmt := UpperCase(Format);
+
+  ZCount := StrCount(Fmt, 'Z');
+  if ZCount > 0 then begin
+
+    Z := IntToStr(Round(SecondFraction(Value) * Power(10, ZCount)));
+
+    for i := 1 to ZCount do
+      Fmt := StringReplace(Fmt, 'Z', Z[i], []);
+
+  end;
+
+  Result := SysUtils.FormatDateTime(Fmt, Value);
 
 end;
 
