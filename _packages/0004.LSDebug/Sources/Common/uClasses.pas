@@ -295,9 +295,9 @@ end;
 
 class function TCustomEvaluator.TVariable.Expression(const _TypeName: String; _Address: NativeInt): String;
 const
-  SC_VARIABLE_FORMAT = '%s((Pointer(%d))^)';
+  SC_VARIABLE_EXPRESSION = '%s(Pointer(%d)^)';
 begin
-  Result := Format(SC_VARIABLE_FORMAT, [_TypeName, _Address]);
+  Result := Format(SC_VARIABLE_EXPRESSION, [_TypeName, _Address]);
 end;
 
 function TCustomEvaluator.TVariable.Expression: String;
@@ -412,7 +412,9 @@ begin
 
     );
 
+    {$IFDEF DEBUG}
     WriteLogFmt('_Expression = %s; Item.Name = %s; Item.Expression = %s; ', [_Expression, Item.Name, Item.Expression]);
+    {$ENDIF}
 
   end;
 
@@ -461,7 +463,7 @@ begin
 
     with _EvaluateResult do begin
 
-      { TODO 3 -oVasilyevSM -cLSDebug: А это нормально вообще? А если там больше? }
+      { TODO 3 -oVasilyevSM -cLSDebug: Это нормально вообще? А если там больше? }
       SetLength(ResultStr, IC_EvalResultStrLength);
       ExprStr := _Expression;
       EvaluateResult := CurrentThread.Evaluate(_Expression, PChar(ResultStr), Length(ResultStr) - 1, CanModify, True, '', ResultAddress, ResultSize, ResVal);
@@ -545,7 +547,7 @@ begin
 
     with _ModifyResult do begin
 
-      { TODO 3 -oVasilyevSM -cLSDebug: А это нормально вообще? А если там больше? }
+      { TODO 3 -oVasilyevSM -cLSDebug: Это нормально вообще? А если там больше? }
       SetLength(ResultStr, IC_EvalResultStrLength);
       ExprStr := _ValueStr;
       EvaluateResult := CurrentThread.Modify(_ValueStr, PChar(ResultStr), Length(ResultStr) - 1, ResVal);

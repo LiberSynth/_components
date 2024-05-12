@@ -162,7 +162,7 @@ begin
     on E: Exception do begin
 
       WriteLog(LogMessage);
-      raise;
+      Result := FormatException(E);
 
     end;
 

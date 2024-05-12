@@ -41,8 +41,6 @@ uses
 
 var
 
-  { TODO 1 -oVasilyevSM -cLSDebug: Реплэйсер для типа Variant }
-
   StringValueReplacer:  TStringValueReplacer;
   GUIDValueReplacer:    TGUIDValueReplacer;
   VariantValueReplacer: TVariantValueReplacer;

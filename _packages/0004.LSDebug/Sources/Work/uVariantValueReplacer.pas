@@ -44,6 +44,7 @@ type
 
     function ReadDateTime: TDateTime;
     function FormatSimpleArray(_Address: NativeInt; _Count: Integer; const _PointerName: String; _TypeSize: Integer): String;
+    function FormatBooleanArray(const _Expression: String; _Low, _High: Integer): String;
     function FormatDateTimeArray(_Address: NativeInt; _Count: Integer): String;
 
   protected
@@ -121,7 +122,7 @@ begin
         varCurrency: Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PCurrency', SizeOf(Currency))]));
         varDate:     Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatDateTimeArray(Address, Count)]));
         varOleStr:   Exit('Complete this method.');
-        varBoolean:  Exit('Complete this method.');
+        varBoolean:  Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatBooleanArray(_Expression, Low, High)]));
         varVariant:  Exit('Complete this method.');
         varShortInt: Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PShortInt', SizeOf(ShortInt))]));
         varByte:     Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PByte',     SizeOf(Byte    ))]));
@@ -161,6 +162,25 @@ begin
         Evaluator.Evaluate(Format('%s(%d + %d)^', [_PointerName, _Address, i * _TypeSize]))
 
     ]);
+
+  CutStr(Result, 2);
+
+end;
+
+function TVariantValueReplacer.FormatBooleanArray(const _Expression: String; _Low, _High: Integer): String;
+var
+  i: Integer;
+  Item: String;
+begin
+
+  Result := '';
+
+  for i := _Low to _High do begin
+
+    Item := Evaluator.Evaluate(Format('%s[%d]', [_Expression, i]));
+    Result := Format('%s%s, ', [Result, Item]);
+
+  end;
 
   CutStr(Result, 2);
 
