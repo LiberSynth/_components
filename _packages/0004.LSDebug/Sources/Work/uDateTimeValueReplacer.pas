@@ -30,8 +30,10 @@ interface
 uses
   { VCL }
   SysUtils,
+  { LiberSynth }
+  uStrUtils, uDataUtils, uLog,
   { LSDebug }
-  uCustomVizualizers, uCommon, uStrUtils, uDataUtils;
+  uCustomVizualizers, uCommon;
 
 type
 
@@ -85,16 +87,29 @@ var
   DateTime: TDateTime;
 begin
 
-  with Evaluator do begin
+  try
 
-    InitVariable('Context', 'TDateTime', SizeOf(TDateTime), _Expression);
-    try
+    with Evaluator do begin
 
-      ReadVariable('Context', DateTime);
-      Result := FormatDateTimeEx(PackageParams.AsString['Common.DateTimeFormat'], DateTime);
+      InitVariable('Context', 'TDateTime', SizeOf(TDateTime), _Expression);
+      try
 
-    finally
-      FinVariable('Context');
+        ReadVariable('Context', DateTime);
+        Result := FormatDateTimeEx(PackageParams.AsString['Common.DateTimeFormat'], DateTime);
+
+      finally
+        FinVariable('Context');
+      end;
+
+    end;
+
+  except
+
+    on E: Exception do begin
+
+      WriteException(E);
+      Result := FormatException(E);
+
     end;
 
   end;

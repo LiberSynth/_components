@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils, ToolsAPI, Generics.Collections,
   { LiberSynth }
-  uCore, uLog, uStrUtils,
+  uCore, uTypes, uLog, uStrUtils,
   { LSDebug }
   uCustom, uCommon, uProjectConsts;
 
@@ -137,6 +137,7 @@ type
 
     function VariableExpression(const _Name: String): String;
     function InsertVariables(const _Expression: String): String;
+    procedure CheckUnknownVariables(const _Expression: String);
 
   public
 
@@ -415,6 +416,34 @@ begin
 
   end;
 
+  CheckUnknownVariables(Result);
+
+end;
+
+procedure TCustomEvaluator.CheckUnknownVariables(const _Expression: String);
+var
+  VStart, VFinish: Integer;
+  SA: TStringArray;
+begin
+
+  SetLength(SA, 0);
+  VFinish := 0;
+  repeat
+
+    VStart := Pos('<', _Expression, VFinish);
+    if VStart > 0 then begin
+
+      VFinish := Pos('>', _Expression, VStart);
+      if VFinish > 0 then
+        AddToStrArray(SA, Copy(_Expression, VStart + 1, VFinish - VStart - 1), False, True);
+
+    end;
+
+  until VStart = 0;
+
+  if Length(SA) > 0 then
+    raise ELSDebugException.CreateFmt('Context variables: %s are not initialized.', [ArrayToStr(SA, ', ')]);
+
 end;
 
 function TCustomEvaluator.Evaluate(const _Expression: String; var _EvaluateResult: TEvaluateResult): String;
@@ -432,7 +461,7 @@ begin
 
     with _EvaluateResult do begin
 
-      { TODO 3 -oVasilyevSM -cuClasses: А это нормально вообще? А если там больше? }
+      { TODO 3 -oVasilyevSM -cLSDebug: А это нормально вообще? А если там больше? }
       SetLength(ResultStr, IC_EvalResultStrLength);
       ExprStr := _Expression;
       EvaluateResult := CurrentThread.Evaluate(_Expression, PChar(ResultStr), Length(ResultStr) - 1, CanModify, True, '', ResultAddress, ResultSize, ResVal);
@@ -516,7 +545,7 @@ begin
 
     with _ModifyResult do begin
 
-      { TODO 3 -oVasilyevSM -cuClasses: А это нормально вообще? А если там больше? }
+      { TODO 3 -oVasilyevSM -cLSDebug: А это нормально вообще? А если там больше? }
       SetLength(ResultStr, IC_EvalResultStrLength);
       ExprStr := _ValueStr;
       EvaluateResult := CurrentThread.Modify(_ValueStr, PChar(ResultStr), Length(ResultStr) - 1, ResVal);
@@ -581,8 +610,10 @@ var
   ModifyResult: TModifyResult;
 begin
 
+  { TODO 1 -oVasilyevSM -cLSDebug: Вопрос к этому фрэймворку: что делать с переменными типов, которые хранятся по ссылке? }
+
   { Для лога. }
-  Address := -1;
+  {$IFDEF DEBUG}Address := -1;{$ENDIF}
 
   try
 
@@ -620,7 +651,7 @@ var
 begin
 
   { Для лога. }
-  Address := -1;
+  {$IFDEF DEBUG}Address := -1;{$ENDIF}
 
   try
 
@@ -653,8 +684,10 @@ var
 begin
 
   { Для лога. }
+  {$IFDEF DEBUG}
   Address := -1;
   Size    := -1;
+  {$ENDIF}
 
   try
 
@@ -679,7 +712,7 @@ var
 begin
 
   { Для лога. }
-  Address := -1;
+  {$IFDEF DEBUG}Address := -1;{$ENDIF}
 
   try
 

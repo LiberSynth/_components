@@ -28,8 +28,10 @@ unit uGUIDValueReplacer;
 interface
 
 uses
+  { VCL }
+  SysUtils,
   { LiberSynth }
-  uStrUtils,
+  uStrUtils, uLog,
   { LSDebug }
   uClasses, uCommon, uCustomVizualizers;
 
@@ -57,23 +59,36 @@ var
   Value: TGUID;
 begin
 
-  with Evaluator do begin
+  try
 
-      ReadSingleContext(_Expression + '.D1',    'LongWord', SizeOf(LongWord), Value.D1   );
-      ReadSingleContext(_Expression + '.D2',    'Word',     SizeOf(Word),     Value.D2   );
-      ReadSingleContext(_Expression + '.D3',    'Word',     SizeOf(Word),     Value.D3   );
-      ReadSingleContext(_Expression + '.D4[0]', 'Byte',     SizeOf(Byte),     Value.D4[0]);
-      ReadSingleContext(_Expression + '.D4[1]', 'Byte',     SizeOf(Byte),     Value.D4[1]);
-      ReadSingleContext(_Expression + '.D4[2]', 'Byte',     SizeOf(Byte),     Value.D4[2]);
-      ReadSingleContext(_Expression + '.D4[3]', 'Byte',     SizeOf(Byte),     Value.D4[3]);
-      ReadSingleContext(_Expression + '.D4[4]', 'Byte',     SizeOf(Byte),     Value.D4[4]);
-      ReadSingleContext(_Expression + '.D4[5]', 'Byte',     SizeOf(Byte),     Value.D4[5]);
-      ReadSingleContext(_Expression + '.D4[6]', 'Byte',     SizeOf(Byte),     Value.D4[6]);
-      ReadSingleContext(_Expression + '.D4[7]', 'Byte',     SizeOf(Byte),     Value.D4[7]);
+    with Evaluator do begin
+
+        ReadSingleContext(_Expression + '.D1',    'LongWord', SizeOf(LongWord), Value.D1   );
+        ReadSingleContext(_Expression + '.D2',    'Word',     SizeOf(Word),     Value.D2   );
+        ReadSingleContext(_Expression + '.D3',    'Word',     SizeOf(Word),     Value.D3   );
+        ReadSingleContext(_Expression + '.D4[0]', 'Byte',     SizeOf(Byte),     Value.D4[0]);
+        ReadSingleContext(_Expression + '.D4[1]', 'Byte',     SizeOf(Byte),     Value.D4[1]);
+        ReadSingleContext(_Expression + '.D4[2]', 'Byte',     SizeOf(Byte),     Value.D4[2]);
+        ReadSingleContext(_Expression + '.D4[3]', 'Byte',     SizeOf(Byte),     Value.D4[3]);
+        ReadSingleContext(_Expression + '.D4[4]', 'Byte',     SizeOf(Byte),     Value.D4[4]);
+        ReadSingleContext(_Expression + '.D4[5]', 'Byte',     SizeOf(Byte),     Value.D4[5]);
+        ReadSingleContext(_Expression + '.D4[6]', 'Byte',     SizeOf(Byte),     Value.D4[6]);
+        ReadSingleContext(_Expression + '.D4[7]', 'Byte',     SizeOf(Byte),     Value.D4[7]);
+
+    end;
+
+    Result := GUIDToStr(Value);
+
+  except
+
+    on E: Exception do begin
+
+      WriteException(E);
+      Result := FormatException(E);
+
+    end;
 
   end;
-
-  Result := GUIDToStr(Value);
 
 end;
 

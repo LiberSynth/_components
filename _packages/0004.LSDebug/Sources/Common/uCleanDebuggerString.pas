@@ -28,7 +28,7 @@ unit uCleanDebuggerString;
 interface
 
 uses
-  { LSL }
+  { LiberSynth }
   uCore, uCustomReadWrite, uCustomStringParser, uStrUtils, uConsts, uFileUtils;
 
 function CleanDebuggerString(const Value: String): String;

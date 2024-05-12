@@ -143,7 +143,6 @@ function ConcatStrArrays(const ArrayA, ArrayB: TStringArray; Distinct: Boolean =
 function SortStrArray(const Value: TStringArray): TStringArray;
 procedure DelimStrToArray(var StrArray: TStringArray; Value: String; const Delimiter: String = ';'; Sorted: Boolean = False); overload;
 function DelimStrToArray(const Value: String; const Delimiter: String = ';'; Sorted: Boolean = False): TStringArray; overload;
-function ArrayToDelimStr(const StrArray: TStringArray; const Delimiter: String = ';'): String;
 
 procedure CleanUpAnsiString(var Value: AnsiString);
 procedure CleanUpString(var Value: String);
@@ -1328,19 +1327,6 @@ end;
 function DelimStrToArray(const Value: String; const Delimiter: String; Sorted: Boolean): TStringArray;
 begin
   DelimStrToArray(Result, Value, Delimiter, Sorted);
-end;
-
-function ArrayToDelimStr(const StrArray: TStringArray; const Delimiter: String): String;
-var
-  S: String;
-begin
-
-  Result := '';
-  for S in StrArray do
-    Result := Result + S + Delimiter;
-
-  CutStr(Result, Length(Delimiter));
-
 end;
 
 procedure CleanUpAnsiString(var Value: AnsiString);

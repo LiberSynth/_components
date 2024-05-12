@@ -31,7 +31,6 @@ uses
   { VCL }
   SysUtils, AppEvnts, Classes,
   { LiberSynth }
-  { TODO 2 -oVasilyevSM -cuCommon: Проверить, что релиз соберется. }
   {$IFDEF DEBUG}
   uLog,
   {$ENDIF}
@@ -81,11 +80,14 @@ var
 procedure _InitDefaultParams(Params: TParams);
 begin
 
+  Params.AsString['Common.DateTimeFormat'] := 'yyyy-mm-dd hh:nn:ss.zzz';
+
   Params.AsString ['StringValueReplacer.Method'             ] := 'DirectMemoryValue';
   Params.AsInteger['StringValueReplacer.ResultLengthLimit'  ] := 102400;
   Params.AsInteger['StringValueReplacer.MaxEvaluatingLength'] :=   4096;
 
-  Params.AsString['Common.DateTimeFormat'] := 'yyyy-mm-dd hh:nn:ss.zzz';
+  Params.AsString['VariantValueReplacer.SingleVariantFormat'] := '%0:s: %1:s';
+  Params.AsString['VariantValueReplacer.ArrayVariantFormat' ] := 'varArray [%0:d..%1:d] of %3:s = (%4:s)';
 
 end;
 
@@ -108,7 +110,7 @@ begin
     with LSIni do begin
 
       SourcePath := PackageParamsFile;
-      LSNISaveOptions := LSNISaveOptions + [soTypesFree];
+      LSNISaveOptions := LSNISaveOptions + [soTypesFree, soForceQuoteStrings];
       _InitDefaultParams(Params);
       Load;
 

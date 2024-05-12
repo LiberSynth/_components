@@ -34,16 +34,14 @@ implementation
 uses
   { VCL }
   ToolsAPI,
-  { VDebugPackage }
+  { LSDebug }
   uClasses, uCustomVizualizers,
   { Visualizer units }
   uStringValueReplacer, uVariantValueReplacer, uGUIDValueReplacer, uDateTimeValueReplacer;
 
 var
 
-  { TODO 1 -oVasilyevSM -cVDebug : Реплэйсер для типа Variant }
-  { TODO 3 -oVasilyevSM -cVDebug : uses to trim }
-  { TODO 2 -oVasilyevSM -cVDebug : Похоже, проблема была в том, что для TDateTime уже объявлен визуализатор }
+  { TODO 1 -oVasilyevSM -cLSDebug: Реплэйсер для типа Variant }
 
   StringValueReplacer:  TStringValueReplacer;
   GUIDValueReplacer:    TGUIDValueReplacer;

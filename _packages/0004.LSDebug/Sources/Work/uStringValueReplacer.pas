@@ -31,10 +31,7 @@ uses
   { VCL }
   SysUtils, Windows,
   { LiberSynth }
-  uClasses, uCustomVizualizers, uCleanDebuggerString, uDataUtils, uConsts,
-  {$IFDEF DEBUG}
-  uLog,
-  {$ENDIF}
+  uClasses, uCustomVizualizers, uCleanDebuggerString, uDataUtils, uConsts, uLog,
   { Project }
   uCommon;
 
@@ -114,13 +111,13 @@ begin
 
       Len := ExpressionLength(_Expression);
 
-      LogMessage := Format('Value length = %d' + CRLF, [Len]);
+      LogMessage := LogMessage + Format('Value length = %d' + CRLF, [Len]);
 
       { Инициализация переменной в памяти отлаживаемого процесса. }
       InitVariable('Context', 'String', Len * 2, _Expression);
       try
 
-        LogMessage := 'Context initialized in debugging process memory.' + CRLF;
+        LogMessage := LogMessage + 'Context initialized in debugging process memory.' + CRLF;
 
         { Получение адреса первого символа строки }
         ReadFunction(
@@ -132,28 +129,28 @@ begin
 
         );
 
-        LogMessage := Format('Address of first character is %d.' + CRLF, [Address]);
+        LogMessage := LogMessage + Format('Address of first character is %d.' + CRLF, [Address]);
 
         Data := AllocMem(Len * 2);
         try
 
-          LogMessage := 'Local value memory allocated.' + CRLF;
+          LogMessage := LogMessage + 'Local value memory allocated.' + CRLF;
 
           { Считывание строки из памяти отлаживаемого процесса }
           CurrentProcess.ReadProcessMemory(Address, Len * 2, Data^);
-          LogMessage := 'Value read from debugging process memory.' + CRLF;
+          LogMessage := LogMessage + 'Value read from debugging process memory.' + CRLF;
 
           Result := Copy(Data, 1, Len);
-          LogMessage := 'Result is retrieved.' + CRLF;
+          LogMessage := LogMessage + 'Result is retrieved.' + CRLF;
 
         finally
           FreeMem(Data, Len * 2);
-          LogMessage := 'Local memory freed.' + CRLF;
+          LogMessage := LogMessage + 'Local memory freed.' + CRLF;
         end;
 
       finally
         FinVariable('<Context>');
-        LogMessage := 'Context finalized in debugging process memory.' + CRLF;
+        LogMessage := LogMessage + 'Context finalized in debugging process memory.' + CRLF;
       end;
 
     end;
@@ -255,7 +252,7 @@ begin
     on E: Exception do begin
 
       WriteLog(LogMessage);
-      raise;
+      Result := FormatException(E);
 
     end;
 
