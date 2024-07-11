@@ -46,6 +46,7 @@ type
     function FormatSimpleArray(_Address: NativeInt; _Count: Integer; const _PointerName: String; _TypeSize: Integer): String;
     function FormatBooleanArray(const _Expression: String; _Low, _High: Integer): String;
     function FormatDateTimeArray(_Address: NativeInt; _Count: Integer): String;
+    function FormatStringArray(_Address: NativeInt; _Count: Integer): String;
 
   protected
 
@@ -93,6 +94,10 @@ var
   ArrayFormat: String;
 begin
 
+  // check:
+//  VarTypeIsValidArrayType
+//  VarTypeIsValidElementType
+
   ArrayFormat := PackageParams.AsString['VariantValueReplacer.ArrayVariantFormat'];
 
   { —читываем TVarData. }
@@ -121,17 +126,13 @@ begin
         varDouble:   Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PDouble',   SizeOf(Double  ))]));
         varCurrency: Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PCurrency', SizeOf(Currency))]));
         varDate:     Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatDateTimeArray(Address, Count)]));
-        varOleStr:   Exit('Complete this method.');
+        varOleStr:   Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatStringArray( Address, Count)]));
         varBoolean:  Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatBooleanArray(_Expression, Low, High)]));
         varVariant:  Exit('Complete this method.');
         varShortInt: Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PShortInt', SizeOf(ShortInt))]));
         varByte:     Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PByte',     SizeOf(Byte    ))]));
         varWord:     Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PWord',     SizeOf(Word    ))]));
         varLongWord: Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PLongWord', SizeOf(LongWord))]));
-        varInt64:    Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PInt64',    SizeOf(Int64   ))]));
-        varUInt64:   Exit(Format(ArrayFormat, [Low, High, Dim, StrType, FormatSimpleArray(Address, Count, 'PUInt64',   SizeOf(UInt64  ))]));
-        varString:   Exit('Complete this method.');
-        varUString:  Exit('Complete this method.');
 
       end;
 
@@ -197,6 +198,43 @@ begin
 
     Evaluator.ReadFunction(Format('TDoubleDynArray(%d)[%d]', [_Address, i]), 'Double', SizeOf(Double), Item);
     Result := Format('%s%s, ', [Result, FormatDateTime(TDateTime(Item), True)]);
+
+  end;
+
+  CutStr(Result, 2);
+
+end;
+
+function TVariantValueReplacer.FormatStringArray(_Address: NativeInt; _Count: Integer): String;
+var
+  i, Size: Integer;
+  StrExpression: String;
+begin
+
+  Exit('Complete this method.'); // пример обращени€ к элементам строкового массива по указателю на него: _UStrArrayClr
+
+  Result := '';
+  for i := 0 to _Count - 1 do begin
+
+    StrExpression := Format('%s(%d + %d)^', ['PString', _Address, i * SizeOf(String)]);
+    Evaluator.ReadSingleFunction(
+
+        StrExpression,
+        'PInteger(NativeInt(@<SingleFunctionContext>^[1]) - 4)^)',
+        'String',
+        'Integer',
+        SizeOf(String),
+        SizeOf(Integer),
+        Size
+
+    );
+
+    Result := Format('%s%s, ', [
+
+        Result,
+        IntToStr(Size)
+
+    ]);
 
   end;
 
