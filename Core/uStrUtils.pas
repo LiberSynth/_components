@@ -31,7 +31,7 @@ uses
   { VCL }
   SysUtils,
   { LiberSynth }
-  uConsts, uTypes, uDataUtils;
+  uConsts, Core.uTypes, uDataUtils;
 
 function StrIsBoolean(const S: String): Boolean;
 function StrIsGUID(const Value: String): Boolean;

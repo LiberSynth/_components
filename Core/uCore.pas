@@ -33,7 +33,7 @@ uses
   { VCL }
   SysUtils, Rtti,
   { LiberSynth }
-  uTypes;
+  Core.uTypes;
 
 type
 
@@ -41,6 +41,7 @@ type
 
   protected
 
+    { IInterface }
     function QueryInterface(const IID: TGUID; out Obj): HResult; virtual; stdcall;
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
@@ -171,8 +172,8 @@ end;
 { ArrayConverter }
 
 class function ArrayConverter<T>.Encode(const _Value: TArray<T>): TConstArray;
-var
-  i: Integer;
+//var
+//  i: Integer;
 begin
 
   SetLength(Result, Length(_Value));
@@ -183,8 +184,8 @@ begin
 end;
 
 class function ArrayConverter<T>.Decode(const _Value: array of const): TArray<T>;
-var
-  i: Integer;
+//var
+//  i: Integer;
 begin
 
   SetLength(Result, Length(_Value));

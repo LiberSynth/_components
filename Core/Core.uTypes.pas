@@ -1,4 +1,4 @@
-unit uTypes;
+unit Core.uTypes;
 
 (*******************************************************************************************)
 (*            _____          _____          _____          _____          _____            *)
@@ -27,6 +27,10 @@ unit uTypes;
 
 interface
 
+uses
+  { VCL }
+  System.SysUtils;
+
 type
 
   TData         = TArray<Byte>;
@@ -43,6 +47,8 @@ type
   TObjProc = procedure () of object;
 
   TProgressEvent = procedure (_Max, _Position: Integer; const _Text: String) of object;
+
+  ELibSupportException = class(Exception);
 
 implementation
 
